@@ -5,38 +5,40 @@ import '../theme/app_colors.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 class ReminderPopup {
-  static OverlayEntry? _current;
-
   static void show(
     BuildContext context, {
     required String body,
     required String scheduledTime,
   }) {
-    _dismiss();
-    final overlay = Overlay.of(context);
-
-    late final OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => _ReminderPopupCard(
-        body: body,
-        scheduledTime: scheduledTime,
-        onDismiss: _dismiss,
-      ),
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss Reminder',
+      barrierColor: Colors.black.withOpacity(0.3),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _ReminderPopupCard(
+          body: body,
+          scheduledTime: scheduledTime,
+          onDismiss: () => Navigator.of(context).pop(),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+            ),
+            child: child,
+          ),
+        );
+      },
     );
-
-    _current = entry;
-    overlay.insert(entry);
-  }
-
-  static void _dismiss() {
-    if (_current != null) {
-      _current?.remove();
-      _current = null;
-    }
   }
 }
 
-class _ReminderPopupCard extends StatefulWidget {
+class _ReminderPopupCard extends StatelessWidget {
   final String body;
   final String scheduledTime;
   final VoidCallback onDismiss;
@@ -48,86 +50,16 @@ class _ReminderPopupCard extends StatefulWidget {
   });
 
   @override
-  State<_ReminderPopupCard> createState() => _ReminderPopupCardState();
-}
-
-class _ReminderPopupCardState extends State<_ReminderPopupCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fadeAnim;
-  late final Animation<double> _scaleAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _fadeAnim = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    _scaleAnim = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _handleSnooze() async {
-    // Basic snooze logic - closes dialog. Real implementation would fire API.
-    await _controller.reverse();
-    widget.onDismiss();
-  }
-
-  void _handleDismiss() async {
-    await _controller.reverse();
-    widget.onDismiss();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          // Blur background
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _handleSnooze,
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                child: Container(
-                  color: Colors.black.withOpacity(isDark ? 0.42 : 0.26),
-                ),
-              ),
-            ),
-          ),
-          // Animated Card
-          Positioned.fill(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: Align(
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 32.w),
-                  child: ScaleTransition(
-                    scale: _scaleAnim,
-                    child: _buildCard(context, isDark),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32.w),
+          child: _buildCard(context, isDark),
+        ),
       ),
     );
   }
@@ -200,7 +132,7 @@ class _ReminderPopupCardState extends State<_ReminderPopupCard>
                     borderRadius: BorderRadius.circular(20.r),
                   ),
                   child: Text(
-                    widget.body,
+                    body,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Lexend',
@@ -215,7 +147,7 @@ class _ReminderPopupCardState extends State<_ReminderPopupCard>
                 ),
                 SizedBox(height: 24.h),
                 Text(
-                  widget.scheduledTime.toUpperCase(),
+                  scheduledTime.toUpperCase(),
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontSize: 11.sp,
@@ -226,7 +158,7 @@ class _ReminderPopupCardState extends State<_ReminderPopupCard>
                 ),
                 SizedBox(height: 32.h),
                 GestureDetector(
-                  onTap: _handleDismiss,
+                  onTap: onDismiss,
                   child: Container(
                     color: Colors.transparent,
                     padding: EdgeInsets.symmetric(
@@ -247,37 +179,7 @@ class _ReminderPopupCardState extends State<_ReminderPopupCard>
               ],
             ),
           ),
-          // Bottom Snooze Bar
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 20.h),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1E293B)
-                  : const Color(0xFFF1F5F9), // Slate 100
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(32.r),
-                bottomRight: Radius.circular(32.r),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.info, size: 16.w, color: const Color(0xFF64748B)),
-                SizedBox(width: 8.w),
-                Text(
-                  'TAP OUTSIDE TO SNOOZE FOR 15M',
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          SizedBox(height: 24.h),
         ],
       ),
     );

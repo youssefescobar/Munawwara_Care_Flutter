@@ -36,8 +36,10 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
   final Set<String> _selectedGroupIds = {};
 
   final _messageController = TextEditingController();
-  DateTime _startDate = DateTime.now();
-  TimeOfDay _startTime = TimeOfDay.now();
+  DateTime? _selectedDate;
+  DateTime get _startDate => _selectedDate ?? DateTime.now();
+  TimeOfDay? _selectedTime;
+  TimeOfDay get _startTime => _selectedTime ?? TimeOfDay.now();
   int _repeatCount = 1;
   int? _selectedIntervalMin; // null = custom
   bool _isCustomInterval = false;
@@ -69,7 +71,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked != null) setState(() => _startDate = picked);
+    if (picked != null) setState(() => _selectedDate = picked);
   }
 
   void _onSelectTime() async {
@@ -77,7 +79,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
       context: context,
       initialTime: _startTime,
     );
-    if (picked != null) setState(() => _startTime = picked);
+    if (picked != null) setState(() => _selectedTime = picked);
   }
 
   Future<void> _createReminders() async {

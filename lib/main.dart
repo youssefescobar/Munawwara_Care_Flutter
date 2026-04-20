@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:io';
+import 'dart:ui';
+import 'dart:isolate';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -105,6 +107,35 @@ void main() async {
         }
       });
 
+      // ── Background Isolate Communication Port ───────────────────────────────
+      // Used to receive triggers from the background isolate (e.g. for reminders)
+      // when Android routes FCM messages to the background even if app is open.
+      final ReceivePort port = ReceivePort();
+      IsolateNameServer.removePortNameMapping('popup_port');
+      IsolateNameServer.registerPortWithName(port.sendPort, 'popup_port');
+      port.listen((dynamic data) {
+        if (data is Map && data['type'] == 'reminder_popup') {
+          AppLogger.i('🔔 Received popup trigger from background isolate');
+          final ctx = AppRouter.navigatorKey.currentContext;
+          if (ctx != null) {
+            String schedTime = '';
+            final rawTime = data['rawTime']?.toString() ?? '';
+            if (rawTime.isNotEmpty) {
+              try {
+                final parsed = DateTime.parse(rawTime).toLocal();
+                schedTime = 'SCHEDULED FOR TODAY  ${DateFormat('HH:mm').format(parsed)}';
+              } catch (_) {}
+            }
+            if (schedTime.isEmpty) {
+              schedTime = 'SCHEDULED FOR TODAY  ${DateFormat('HH:mm').format(DateTime.now())}';
+            }
+            ReminderPopup.show(ctx, body: data['body'], scheduledTime: schedTime);
+          } else {
+            AppLogger.w('⚠️ No navigator context — cannot show reminder popup');
+          }
+        }
+      });
+
       // ── Handle Foreground Messages ──────────────────────────────────────────
       FirebaseMessaging.onMessage.listen((msg) async {
         AppLogger.i('FCM onMessage: ${msg.notification?.title} ${msg.data}');
@@ -138,10 +169,7 @@ void main() async {
           AppLogger.i('FCM onMessage: suppressed system notif (in-app popup)');
           return;
         }
-        await NotificationService.instance.showNotificationFromMessage(msg);
-        // ── Foreground TTS for urgent / reminder messages ─────────────────
-        // showNotificationFromMessage plays the alert sound; after it finishes
-        // we also speak the text so the pilgrim hears it even with screen on.
+        // ── Foreground TTS + popup for urgent / reminder messages ────────────
         if (isUrgentTts) {
           final text =
               msg.data['body']?.toString() ??
@@ -174,15 +202,16 @@ void main() async {
                   schedTime =
                       'SCHEDULED FOR TODAY  ${DateFormat('HH:mm').format(DateTime.now())}';
                 }
-
                 ReminderPopup.show(ctx, body: text, scheduledTime: schedTime);
+              } else {
+                AppLogger.w('⚠️ No navigator context — cannot show reminder popup');
               }
             }
-
-            await Future.delayed(const Duration(milliseconds: 2200));
             await NotificationService.speakTts('$prefix $text');
           }
         }
+
+        await NotificationService.instance.showNotificationFromMessage(msg);
       });
 
       // ── Handle Message Opened App ───────────────────────────────────────────

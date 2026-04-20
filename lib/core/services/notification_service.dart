@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -219,6 +220,19 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     // 1. Show notification — the urgent channel plays urgent_tts.wav as sound
     await NotificationService.instance.showNotificationFromMessage(message);
+
+    // ── Attempt to trigger the in-app popup if the main isolate is alive ──
+    final sendPort = IsolateNameServer.lookupPortByName('popup_port');
+    if (sendPort != null) {
+      AppLogger.i('🔔 Main isolate is alive — sending popup trigger');
+      sendPort.send({
+        'type': 'reminder_popup',
+        'body': text,
+        'rawTime': message.data['scheduledAt']?.toString() ??
+            message.data['scheduled_time']?.toString() ??
+            '',
+      });
+    }
 
     if (text.isNotEmpty) {
       // 2. Wait for the alert sound to finish before TTS begins
