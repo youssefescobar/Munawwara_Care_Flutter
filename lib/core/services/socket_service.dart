@@ -97,18 +97,6 @@ class SocketService {
       debugPrint('[SocketService] Socket error: $err');
     });
 
-    _socket!.on('reconnect', (_) {
-      debugPrint('[SocketService] Reconnected – re-registering as $userId');
-      _socket!.emit('register-user', {'userId': userId, 'role': role});
-      for (final cb in List.of(_onConnectCallbacks)) {
-        try {
-          cb();
-        } catch (e) {
-          debugPrint('[SocketService] onConnected callback error: $e');
-        }
-      }
-    });
-
     // Apply custom-event listeners that were registered before connect().
     _applyPendingListeners();
   }
