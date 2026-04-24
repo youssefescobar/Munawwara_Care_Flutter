@@ -39,6 +39,14 @@ class PilgrimProfile {
 
   String get firstName => fullName.split(' ').first;
 
+  String get shortName {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0]} ${parts[1]}';
+    }
+    return fullName;
+  }
+
   /// Display ID like "#7821-KSA" derived from national_id or object id tail
   String get displayId {
     if (nationalId != null && nationalId!.length >= 4) {
