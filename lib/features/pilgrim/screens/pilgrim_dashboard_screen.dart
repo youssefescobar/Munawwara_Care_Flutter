@@ -1065,9 +1065,13 @@ class _HomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = pilgrimState.profile;
     final group = pilgrimState.groupInfo;
+    final headerBg = isDark ? AppColors.backgroundDark : const Color(0xFFFFF7ED);
+    final headerText = isDark ? Colors.white : AppColors.textDark;
+    final headerMuted = isDark ? Colors.white70 : AppColors.textMutedDark;
+    final iconContainerBg = isDark ? Colors.white.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1);
 
     return Container(
-      color: const Color(0xFF09162D),
+      color: headerBg,
       child: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -1076,27 +1080,27 @@ class _HomeTab extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ── Dark Header ────────────────────────────────────────────────
+              // ── Header Section ─────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 20.h),
+                  padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top row: Avatar + Name/ID + Settings
+                      // Top row: Avatar + ID + Settings
                       Row(
                         children: [
                           Container(
                             width: 52.w,
                             height: 52.w,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE4E9F2),
+                            decoration: BoxDecoration(
+                              color: iconContainerBg,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.person,
-                              size: 32.w,
-                              color: const Color(0xFF09162D),
+                              size: 30.w,
+                              color: AppColors.primary,
                             ),
                           ),
                           SizedBox(width: 12.w),
@@ -1105,23 +1109,14 @@ class _HomeTab extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'app_title'.tr(),
-                                  style: TextStyle(
-                                    fontFamily: 'Lexend',
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.5,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
                                   pilgrimState.isLoading
                                       ? '${'pilgrim_id_prefix'.tr()} ...'
                                       : '${'pilgrim_id_prefix'.tr()} ${profile?.displayId ?? '------'}',
                                   style: TextStyle(
                                     fontFamily: 'Lexend',
-                                    fontSize: 12.sp,
-                                    color: Colors.white70,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: headerText,
                                   ),
                                 ),
                               ],
@@ -1129,142 +1124,93 @@ class _HomeTab extends StatelessWidget {
                           ),
                           GestureDetector(
                             onTap: onSettingsTap,
-                            child: Icon(
-                              Symbols.settings,
-                              size: 26.w,
-                              color: Colors.white,
+                            child: Container(
+                              padding: EdgeInsets.all(10.w),
+                              decoration: BoxDecoration(
+                                color: iconContainerBg,
+                                borderRadius: BorderRadius.circular(14.r),
+                              ),
+                              child: Icon(
+                                Symbols.settings,
+                                size: 22.w,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 24.h),
-                      // Greeting row: orange + white
-                      Row(
-                        children: [
-                          Text(
-                            'home_greeting'.tr(),
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              fontSize: 22.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFE67E22),
+                      SizedBox(height: 28.h),
+
+                      // Greeting + Name (Multi-line)
+                      Text(
+                        'home_greeting'.tr(),
+                        style: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontSize: 22.sp,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        pilgrimState.isLoading
+                            ? '...'
+                            : (profile?.shortName ?? ''),
+                        style: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontSize: 32.sp,
+                          fontWeight: FontWeight.w800,
+                          color: headerText,
+                          height: 1.1,
+                        ),
+                      ),
+                      SizedBox(height: 20.h),
+
+                      // Sharing Status indicator (Full width badge style)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                        decoration: BoxDecoration(
+                          color: iconContainerBg,
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.navigation_rounded,
+                              color: AppColors.primary,
+                              size: 18.w,
                             ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              pilgrimState.isLoading
-                                  ? '...'
-                                  : (profile?.firstName ?? ''),
+                            SizedBox(width: 10.w),
+                            Text(
+                              'home_location_sharing'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
-                                fontSize: 22.sp,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                fontSize: 13.sp,
+                                color: headerMuted,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 16.h),
-                      // Status indicators side-by-side
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32.w,
-                                  height: 32.w,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE67E22),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.health_and_safety_rounded,
-                                    color: Colors.white,
-                                    size: 18.w,
-                                  ),
-                                ),
-                                SizedBox(width: 8.w),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'home_current_status'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontSize: 11.sp,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    Text(
-                                      'status_safe'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            SizedBox(width: 6.w),
+                            Text(
+                              pilgrimState.isSharingLocation
+                                  ? 'card_active'.tr()
+                                  : 'card_paused'.tr(),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32.w,
-                                  height: 32.w,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE67E22),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.navigation_rounded,
-                                    color: Colors.white,
-                                    size: 18.w,
-                                  ),
-                                ),
-                                SizedBox(width: 8.w),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'home_location_sharing'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontSize: 11.sp,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    Text(
-                                      pilgrimState.isSharingLocation
-                                          ? 'card_active'.tr()
-                                          : 'card_paused'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // ── White Body Container ───────────────────────────────────────
+              // ── Main Body ──────────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Container(
                   width: double.infinity,
@@ -1272,7 +1218,7 @@ class _HomeTab extends StatelessWidget {
                     minHeight: MediaQuery.of(context).size.height,
                   ),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.backgroundDark : Colors.white,
+                    color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(36.r),
                     ),
@@ -1288,16 +1234,18 @@ class _HomeTab extends StatelessWidget {
                             width: double.infinity,
                             padding: EdgeInsets.all(16.w),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.primary.withValues(alpha: 0.12),
-                                  AppColors.accentGold.withValues(alpha: 0.08),
-                                ],
-                              ),
+                              color: isDark ? AppColors.surfaceDark : Colors.white,
                               borderRadius: BorderRadius.circular(16.r),
                               border: Border.all(
                                 color: AppColors.primary.withValues(alpha: 0.3),
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Row(
                               children: [
@@ -1594,17 +1542,26 @@ class _WeatherCardNew extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
-        color: const Color(0xFFD6EAF8),
+        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(alert.icon, color: const Color(0xFFF1C40F), size: 28.w),
+          Icon(alert.icon, color: AppColors.accentGold, size: 28.w),
           SizedBox(height: 8.h),
           Text(
             alert.isLoading
@@ -1616,7 +1573,7 @@ class _WeatherCardNew extends StatelessWidget {
               fontFamily: 'Lexend',
               fontSize: 26.sp,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1B4F72),
+              color: isDark ? Colors.white : AppColors.textDark,
             ),
           ),
           SizedBox(height: 2.h),
@@ -1630,7 +1587,7 @@ class _WeatherCardNew extends StatelessWidget {
               fontFamily: 'Lexend',
               fontSize: 13.sp,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF154360),
+              color: isDark ? AppColors.primary : AppColors.primaryDark,
             ),
           ),
           SizedBox(height: 4.h),
@@ -1642,7 +1599,7 @@ class _WeatherCardNew extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 11.sp,
-                color: const Color(0xFF34495E),
+                color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
               ),
             ),
           ),
@@ -1660,20 +1617,29 @@ class _GroupCardNew extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAE5D3),
+          color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Symbols.groups, color: const Color(0xFFD35400), size: 36.w),
+            Icon(Symbols.groups, color: AppColors.primary, size: 36.w),
             SizedBox(height: 16.h),
             Text(
               'home_my_group'.tr(),
@@ -1681,7 +1647,7 @@ class _GroupCardNew extends StatelessWidget {
                 fontFamily: 'Lexend',
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFFD35400),
+                color: AppColors.primary,
               ),
             ),
             SizedBox(height: 4.h),
@@ -1692,9 +1658,9 @@ class _GroupCardNew extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: 'Lexend',
-                  fontSize: 28.sp,
+                  fontSize: 24.sp,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF000000),
+                  color: isDark ? Colors.white : AppColors.textDark,
                   height: 1.1,
                 ),
               ),
@@ -1705,7 +1671,7 @@ class _GroupCardNew extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 12.sp,
-                color: const Color(0xFF7B7D7D),
+                color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
               ),
             ),
           ],
@@ -1721,27 +1687,36 @@ class _ExploreCardNew extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 16.h),
         decoration: BoxDecoration(
-          color: const Color(0xFFFADBD8),
+          color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               width: 36.w,
               height: 36.w,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5B7B1),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.navigation_rounded,
-                color: const Color(0xFFC0392B),
+                color: AppColors.primary,
                 size: 20.w,
               ),
             ),
@@ -1752,8 +1727,14 @@ class _ExploreCardNew extends StatelessWidget {
                 fontFamily: 'Lexend',
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF000000),
+                color: isDark ? Colors.white : AppColors.textDark,
               ),
+            ),
+            const Spacer(),
+            Icon(
+              Symbols.arrow_forward_ios,
+              size: 14.w,
+              color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
             ),
           ],
         ),
