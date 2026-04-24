@@ -20,13 +20,21 @@ class VoiceCallScreen extends ConsumerStatefulWidget {
   /// Prevents duplicate instances from being pushed onto the stack.
   static bool isActive = false;
 
-  const VoiceCallScreen({super.key});
+  final List<Map<String, String>>? autoRouteMods;
+  final VoidCallback? onAllBusy;
+
+  const VoiceCallScreen({
+    super.key,
+    this.autoRouteMods,
+    this.onAllBusy,
+  });
 
   @override
   ConsumerState<VoiceCallScreen> createState() => _VoiceCallScreenState();
 }
 
 class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
+  late List<Map<String, String>> _queue;
   /// Cached caller name so it survives provider state resets.
   String? _cachedName;
   Timer? _autoPopTimer;
@@ -39,6 +47,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
   void initState() {
     super.initState();
     VoiceCallScreen.isActive = true;
+    _queue = List.from(widget.autoRouteMods ?? []);
     // Lock the cancel button for the first 3 s so the call-offer socket
     // message has time to reach the server before a cancel is sent.
     _cancelLockTimer = Timer(const Duration(seconds: 3), () {
@@ -68,13 +77,39 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
       if (next.status == CallStatus.ended &&
           prev?.status != CallStatus.ended &&
           mounted) {
-        _autoPopTimer?.cancel();
-        _autoPopTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted) Navigator.of(context).maybePop();
-        });
+          
+        final autoRouteReasons = ['declined', 'busy', 'error', 'missed', 'timeout'];
+        final isAutoRouteReason = autoRouteReasons.contains(next.endReason);
+
+        if (isAutoRouteReason && _queue.isNotEmpty) {
+          // Auto route to the next moderator
+          _autoPopTimer?.cancel();
+          _autoPopTimer = Timer(const Duration(seconds: 1), () {
+            if (!mounted) return;
+            final nextMod = _queue.removeAt(0);
+            setState(() {
+              _cachedName = nextMod['name'];
+            });
+            ref.read(callProvider.notifier).startCall(
+              remoteUserId: nextMod['id']!,
+              remoteUserName: nextMod['name']!,
+            );
+          });
+        } else {
+          // No more moderators or user manually cancelled/ended, pop
+          _autoPopTimer?.cancel();
+          _autoPopTimer = Timer(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).maybePop();
+              if (isAutoRouteReason && widget.onAllBusy != null) {
+                widget.onAllBusy!();
+              }
+            }
+          });
+        }
       }
-      // Safety net: also pop on idle
-      if (next.status == CallStatus.idle && mounted) {
+      // Safety net: also pop on idle (if not auto-routing)
+      if (next.status == CallStatus.idle && prev?.status != CallStatus.ended && mounted) {
         Navigator.of(context).maybePop();
       }
     });
@@ -219,8 +254,10 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                               SocketService.emit('call-cancel', {
                                 'to': call.remoteUserId,
                               });
+                              _queue.clear(); // Abort auto-route
                               ref.read(callProvider.notifier).endCall();
                             } else {
+                              _queue.clear(); // Abort auto-route
                               ref.read(callProvider.notifier).endCall();
                             }
                           },

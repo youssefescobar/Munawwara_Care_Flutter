@@ -628,6 +628,8 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   Future<void> _setupEngine() async {
+    if (_engine != null) return; // Reuse existing engine
+    
     _engine = createAgoraRtcEngine();
     await _engine!.initialize(RtcEngineContext(appId: _agoraAppId));
     await _engine!.enableAudio();
@@ -693,8 +695,8 @@ class CallNotifier extends Notifier<CallState> {
     _callTimer?.cancel();
     _callTimer = null;
     _engine?.leaveChannel();
-    _engine?.release();
-    _engine = null;
+    // Do NOT release the engine here, we reuse it for consecutive calls.
+    // It will be disposed only when the app is terminated or CallProvider is disposed.
     _pendingChannelName = null;
     _pendingFromId = null;
   }

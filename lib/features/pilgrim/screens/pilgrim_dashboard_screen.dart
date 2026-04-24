@@ -777,17 +777,38 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           onInternetCall: () {
             final mods = ref.read(pilgrimProvider).groupInfo?.moderators ?? [];
             if (mods.isNotEmpty) {
-              final mod = mods.first;
+              final shuffledMods = List.of(mods)..shuffle();
+              
+              // Map to List<Map<String, String>>
+              final autoRouteMods = shuffledMods.map((m) => {
+                'id': m.id,
+                'name': m.fullName,
+              }).toList();
+              
+              final firstMod = autoRouteMods.removeAt(0);
+
               Navigator.pop(ctx);
-              ref
-                  .read(callProvider.notifier)
-                  .startCall(
-                    remoteUserId: mod.id,
-                    remoteUserName: mod.fullName,
-                  );
+              
+              ref.read(callProvider.notifier).startCall(
+                remoteUserId: firstMod['id']!,
+                remoteUserName: firstMod['name']!,
+              );
+              
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const VoiceCallScreen()),
+                MaterialPageRoute(builder: (_) => VoiceCallScreen(
+                  autoRouteMods: autoRouteMods,
+                  onAllBusy: () {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('sos_all_busy_warning'.tr()),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  },
+                )),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -799,26 +820,78 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           },
           onNormalCall: () async {
             final mods = ref.read(pilgrimProvider).groupInfo?.moderators ?? [];
-            final phone = mods.isNotEmpty ? mods.first.phoneNumber : null;
-            if (phone != null && phone.isNotEmpty) {
-              final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-              final uri = Uri.parse('tel:$cleanPhone');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri);
-              } else if (mounted) {
+            if (mods.isEmpty) {
+              if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('dash_error_dialer'.tr()),
-                  ),
+                  SnackBar(content: Text('dash_no_mod_phone'.tr())),
                 );
               }
-            } else if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('dash_no_mod_phone'.tr()),
-                ),
-              );
+              return;
             }
+            
+            Navigator.pop(ctx); // Close SOS Options Sheet
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+              ),
+              builder: (ctx2) {
+                return SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 16.w),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'select_moderator_to_call'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        ...mods.map((mod) {
+                          final hasPhone = mod.phoneNumber != null && mod.phoneNumber!.isNotEmpty;
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary,
+                              child: Text(
+                                mod.fullName.isNotEmpty ? mod.fullName[0].toUpperCase() : 'M',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            title: Text(
+                              mod.fullName,
+                              style: TextStyle(fontFamily: 'Lexend', fontSize: 16.sp),
+                            ),
+                            subtitle: hasPhone 
+                              ? Text(mod.phoneNumber!, style: const TextStyle(fontFamily: 'Lexend', color: Colors.grey))
+                              : Text('dash_no_mod_phone'.tr(), style: TextStyle(fontFamily: 'Lexend', color: Colors.red.shade300)),
+                            trailing: Icon(Icons.call, color: hasPhone ? Colors.green : Colors.grey),
+                            onTap: hasPhone ? () async {
+                              Navigator.pop(ctx2);
+                              final cleanPhone = mod.phoneNumber!.replaceAll(RegExp(r'[^\d+]'), '');
+                              final uri = Uri.parse('tel:$cleanPhone');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('dash_error_dialer'.tr())),
+                                );
+                              }
+                            } : null,
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
           },
         ),
       );
