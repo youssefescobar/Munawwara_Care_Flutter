@@ -760,8 +760,14 @@ class _PilgrimProvisioningScreenState
                             keyboardType: TextInputType.number,
                             decoration: _inputDecoration(
                               isDark,
-                              label: 'Age (0-120)',
+                              label: 'Age (0-120) *',
                             ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Age is required';
+                              final num = int.tryParse(v.trim());
+                              if (num == null || num < 0 || num > 120) return 'Invalid age';
+                              return null;
+                            },
                           ),
                         ),
                         SizedBox(width: 10.w),
@@ -907,120 +913,127 @@ class _PilgrimProvisioningScreenState
                       ],
                     ),
                     SizedBox(height: 20.h),
-                    Text(
-                      'Extra Details (Optional)',
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15.sp,
-                        color: textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 8.h),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedHotelId,
-                      isExpanded: true,
-                      decoration: _inputDecoration(isDark, label: 'Hotel'),
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('group_no_hotel'.tr()),
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(
+                          'Extra Details (Optional)',
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15.sp,
+                            color: textPrimary,
+                          ),
                         ),
-                        ..._hotels.map(
-                          (h) => DropdownMenuItem<String>(
-                            value: h.id,
-                            child: Text(
-                              h.name,
-                              overflow: TextOverflow.ellipsis,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedHotelId,
+                            isExpanded: true,
+                            decoration: _inputDecoration(isDark, label: 'Hotel'),
+                            items: [
+                              DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('group_no_hotel'.tr()),
+                              ),
+                              ..._hotels.map(
+                                (h) => DropdownMenuItem<String>(
+                                  value: h.id,
+                                  child: Text(
+                                    h.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            onChanged: _isLoadingResources
+                                ? null
+                                : (v) {
+                                    setState(() {
+                                      _selectedHotelId = v;
+                                      _selectedRoomId = null;
+                                    });
+                                  },
+                          ),
+                          SizedBox(height: 10.h),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: _selectedRoomId,
+                                  isExpanded: true,
+                                  decoration: _inputDecoration(isDark, label: 'Room'),
+                                  items: [
+                                    DropdownMenuItem<String>(
+                                      value: null,
+                                      child: Text('group_no_room'.tr()),
+                                    ),
+                                    ...rooms.map(
+                                      (r) => DropdownMenuItem<String>(
+                                        value: r.id,
+                                        child: Text(
+                                          r.floor == null
+                                              ? r.roomNumber
+                                              : '${r.roomNumber} - F${r.floor}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: selectedHotel == null
+                                      ? null
+                                      : (v) => setState(() => _selectedRoomId = v),
+                                ),
+                              ),
+                              SizedBox(width: 10.w),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: _selectedBusId,
+                                  isExpanded: true,
+                                  decoration: _inputDecoration(isDark, label: 'Bus'),
+                                  items: [
+                                    DropdownMenuItem<String>(
+                                      value: null,
+                                      child: Text('group_no_bus'.tr()),
+                                    ),
+                                    ..._buses.map(
+                                      (b) => DropdownMenuItem<String>(
+                                        value: b.id,
+                                        child: Text(
+                                          b.destination.isEmpty
+                                              ? b.busNumber
+                                              : '${b.busNumber} - ${b.destination}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (v) =>
+                                      setState(() => _selectedBusId = v),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 10.h),
+                          TextFormField(
+                            controller: _nationalIdCtrl,
+                            decoration: _inputDecoration(
+                              isDark,
+                              label: 'National ID (optional)',
                             ),
                           ),
-                        ),
-                      ],
-                      onChanged: _isLoadingResources
-                          ? null
-                          : (v) {
-                              setState(() {
-                                _selectedHotelId = v;
-                                _selectedRoomId = null;
-                              });
-                            },
-                    ),
-                    SizedBox(height: 10.h),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _selectedRoomId,
-                            isExpanded: true,
-                            decoration: _inputDecoration(isDark, label: 'Room'),
-                            items: [
-                              DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('group_no_room'.tr()),
-                              ),
-                              ...rooms.map(
-                                (r) => DropdownMenuItem<String>(
-                                  value: r.id,
-                                  child: Text(
-                                    r.floor == null
-                                        ? r.roomNumber
-                                        : '${r.roomNumber} - F${r.floor}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            onChanged: selectedHotel == null
-                                ? null
-                                : (v) => setState(() => _selectedRoomId = v),
+                          SizedBox(height: 10.h),
+                          TextFormField(
+                            controller: _medicalHistoryCtrl,
+                            maxLines: 3,
+                            maxLength: 500,
+                            decoration: _inputDecoration(
+                              isDark,
+                              label: 'Medical history (max 500 chars)',
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 10.w),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _selectedBusId,
-                            isExpanded: true,
-                            decoration: _inputDecoration(isDark, label: 'Bus'),
-                            items: [
-                              DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('group_no_bus'.tr()),
-                              ),
-                              ..._buses.map(
-                                (b) => DropdownMenuItem<String>(
-                                  value: b.id,
-                                  child: Text(
-                                    b.destination.isEmpty
-                                        ? b.busNumber
-                                        : '${b.busNumber} - ${b.destination}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setState(() => _selectedBusId = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10.h),
-                    TextFormField(
-                      controller: _nationalIdCtrl,
-                      decoration: _inputDecoration(
-                        isDark,
-                        label: 'National ID (optional)',
-                      ),
-                    ),
-                    SizedBox(height: 10.h),
-                    TextFormField(
-                      controller: _medicalHistoryCtrl,
-                      maxLines: 3,
-                      maxLength: 500,
-                      decoration: _inputDecoration(
-                        isDark,
-                        label: 'Medical history (max 500 chars)',
+                        ],
                       ),
                     ),
                     SizedBox(height: 14.h),
