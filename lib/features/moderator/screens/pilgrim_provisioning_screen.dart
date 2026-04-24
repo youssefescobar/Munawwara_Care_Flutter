@@ -429,6 +429,17 @@ class _PilgrimProvisioningScreenState
       final token = login['token']?.toString();
       final qr = login['qr_code_data_url']?.toString();
 
+      if (token != null && qr != null) {
+        setState(() {
+          _items = _items.map((e) {
+            if (e.pilgrimId == item.pilgrimId) {
+              return e.copyWith(token: token, qrDataUrl: qr);
+            }
+            return e;
+          }).toList();
+        });
+      }
+
       await _loadProvisioningStatus();
 
       if (token != null && mounted) {
