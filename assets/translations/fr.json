@@ -354,6 +354,7 @@
   "qibla_error_permission": "L'autorisation de localisation est requise pour utiliser la boussole Qibla.",
   "qibla_error_sensor": "Le capteur de boussole n'est pas disponible sur cet appareil.",
   "qibla_error_generic": "Impossible d'initialiser la boussole Qibla.",
+  "qibla_calibration_needed": "La boussole a besoin d’être calibrée. Tenez votre téléphone et déplacez-le lentement en forme de 8 ou ∞ jusqu’à ce que cette bannière disparaisse.",
   "tab_qibla": "Qibla",
   "group_details_title": "Détails du groupe",
   "group_hotel_info": "Informations sur l'hôtel",

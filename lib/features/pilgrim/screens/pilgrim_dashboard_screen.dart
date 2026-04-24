@@ -992,7 +992,6 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
             ? AppColors.backgroundDark
             : const Color(0xfff1f5f3),
         body: IndexedStack(index: _currentTab, children: tabs),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
         bottomNavigationBar: _BottomNav(
           currentIndex: _currentTab,
           onTap: (i) {
@@ -1078,7 +1077,12 @@ class _HomeTab extends StatelessWidget {
           color: AppColors.primary,
           onRefresh: onRefresh,
           child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
+            // AlwaysScrollableScrollPhysics is required by RefreshIndicator.
+            // The empty-space issue is handled by SliverFillRemaining below
+            // so the body never artificially expands past its content.
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
             slivers: [
               // ── Header Section ─────────────────────────────────────────────
               SliverToBoxAdapter(
@@ -1211,255 +1215,309 @@ class _HomeTab extends StatelessWidget {
               ),
 
               // ── Main Body ──────────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Container(
-                  width: double.infinity,
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height,
+              // When there are no beacons: SliverFillRemaining fills the exact
+              // remaining viewport with no dead-space and no over-scroll gap.
+              // When beacons are present: SliverToBoxAdapter lets the list grow
+              // naturally so the user can scroll down to reach the beacon card.
+              if (navBeacons.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _HomeBody(
+                    isDark: isDark,
+                    pilgrimState: pilgrimState,
+                    group: group,
+                    weatherAlert: weatherAlert,
+                    sosPulseController: sosPulseController,
+                    sosHoldController: sosHoldController,
+                    isSosHolding: isSosHolding,
+                    sosCountdown: sosCountdown,
+                    onSosHoldStart: onSosHoldStart,
+                    onSosHoldEnd: onSosHoldEnd,
+                    onCancelSos: onCancelSos,
+                    onGroupCardTap: onGroupCardTap,
+                    onHotspotsTap: onHotspotsTap,
+                    navBeacons: navBeacons,
+                    onNavigateToModerator: onNavigateToModerator,
                   ),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(36.r),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: _HomeBody(
+                    isDark: isDark,
+                    pilgrimState: pilgrimState,
+                    group: group,
+                    weatherAlert: weatherAlert,
+                    sosPulseController: sosPulseController,
+                    sosHoldController: sosHoldController,
+                    isSosHolding: isSosHolding,
+                    sosCountdown: sosCountdown,
+                    onSosHoldStart: onSosHoldStart,
+                    onSosHoldEnd: onSosHoldEnd,
+                    onCancelSos: onCancelSos,
+                    onGroupCardTap: onGroupCardTap,
+                    onHotspotsTap: onHotspotsTap,
+                    navBeacons: navBeacons,
+                    onNavigateToModerator: onNavigateToModerator,
+                  ),
+                ),
+
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _HomeBody — shared body content rendered inside both SliverFillRemaining and
+// SliverToBoxAdapter so beacon / no-beacon layouts stay in sync.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HomeBody extends StatelessWidget {
+  final bool isDark;
+  final PilgrimState pilgrimState;
+  final GroupInfo? group;
+  final _WeatherAlert weatherAlert;
+  final AnimationController sosPulseController;
+  final AnimationController sosHoldController;
+  final bool isSosHolding;
+  final int sosCountdown;
+  final VoidCallback onSosHoldStart;
+  final VoidCallback onSosHoldEnd;
+  final VoidCallback onCancelSos;
+  final VoidCallback onGroupCardTap;
+  final VoidCallback onHotspotsTap;
+  final Map<String, ModeratorBeacon> navBeacons;
+  final void Function(ModeratorBeacon) onNavigateToModerator;
+
+  const _HomeBody({
+    required this.isDark,
+    required this.pilgrimState,
+    required this.group,
+    required this.weatherAlert,
+    required this.sosPulseController,
+    required this.sosHoldController,
+    required this.isSosHolding,
+    required this.sosCountdown,
+    required this.onSosHoldStart,
+    required this.onSosHoldEnd,
+    required this.onCancelSos,
+    required this.onGroupCardTap,
+    required this.onHotspotsTap,
+    required this.navBeacons,
+    required this.onNavigateToModerator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(36.r)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Card Grid ──────────────────────────────────────────────────
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: _GroupCardNew(
+                      groupName: group?.groupName ?? 'card_no_group'.tr(),
+                      onTap: onGroupCardTap,
                     ),
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    flex: 5,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ── Card Grid ────────────────────────────────────────
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Left: Group Card
-                              Expanded(
-                                flex: 5,
-                                child: _GroupCardNew(
-                                  groupName:
-                                      group?.groupName ?? 'card_no_group'.tr(),
-                                  onTap: onGroupCardTap,
-                                ),
-                              ),
-                              SizedBox(width: 12.w),
-                              // Right: Weather + Explore stacked
-                              Expanded(
-                                flex: 5,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      child: _WeatherCardNew(
-                                        alert: weatherAlert,
-                                      ),
-                                    ),
-                                    SizedBox(height: 12.h),
-                                    _ExploreCardNew(onTap: onHotspotsTap),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                        Expanded(
+                          child: _WeatherCardNew(alert: weatherAlert),
                         ),
-                        SizedBox(height: 32.h),
-
-                        // ── SOS ──────────────────────────────────────────────
-                        Center(
-                          child: Column(
-                            children: [
-                              _SosButton(
-                                pulseController: sosPulseController,
-                                holdController: sosHoldController,
-                                isHolding: isSosHolding,
-                                isLoading: pilgrimState.isSosLoading,
-                                sosActive: pilgrimState.sosActive,
-                                countdown: sosCountdown,
-                                onHoldStart: onSosHoldStart,
-                                onHoldEnd: onSosHoldEnd,
-                              ),
-                              if (pilgrimState.sosActive) ...[
-                                SizedBox(height: 16.h),
-                                GestureDetector(
-                                  onTap: onCancelSos,
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 28.w,
-                                      vertical: 10.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: Colors.red.shade400,
-                                        width: 1.5,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20.r),
-                                    ),
-                                    child: Text(
-                                      'sos_cancel'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14.sp,
-                                        color: Colors.red.shade500,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 32.h),
-
-                        // ── Navigate to Moderator ────────────────────────────
-                        if (navBeacons.isNotEmpty)
-                          Container(
-                            margin: EdgeInsets.only(bottom: 24.h),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.surfaceDark
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(20.r),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                    16.w,
-                                    14.h,
-                                    16.w,
-                                    8.h,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Symbols.my_location,
-                                        size: 18.w,
-                                        color: AppColors.primary,
-                                      ),
-                                      SizedBox(width: 8.w),
-                                      Text(
-                                        'nav_to_moderator'.tr(),
-                                        style: TextStyle(
-                                          fontFamily: 'Lexend',
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 14.sp,
-                                          color: isDark
-                                              ? Colors.white
-                                              : AppColors.textDark,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Divider(height: 1),
-                                ...navBeacons.values.map(
-                                  (beacon) => Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16.w,
-                                      vertical: 10.h,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40.w,
-                                          height: 40.w,
-                                          decoration: BoxDecoration(
-                                            color: isDark
-                                                ? AppColors.iconBgDark
-                                                : AppColors.iconBgLight,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            Symbols.person_pin_circle,
-                                            size: 22.w,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        SizedBox(width: 12.w),
-                                        Expanded(
-                                          child: Text(
-                                            beacon.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontFamily: 'Lexend',
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14.sp,
-                                              color: isDark
-                                                  ? Colors.white
-                                                  : AppColors.textDark,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 10.w),
-                                        GestureDetector(
-                                          onTap: () =>
-                                              onNavigateToModerator(beacon),
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 14.w,
-                                              vertical: 9.h,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary,
-                                              borderRadius:
-                                                  BorderRadius.circular(14.r),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: AppColors.primary
-                                                      .withOpacity(0.35),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 3),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Symbols.navigation,
-                                                  color: Colors.white,
-                                                  size: 16.w,
-                                                ),
-                                                SizedBox(width: 6.w),
-                                                Text(
-                                                  'nav_go'.tr(),
-                                                  style: TextStyle(
-                                                    fontFamily: 'Lexend',
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 13.sp,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 8.h),
-                              ],
-                            ),
-                          ),
+                        SizedBox(height: 12.h),
+                        _ExploreCardNew(onTap: onHotspotsTap),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
+            SizedBox(height: 32.h),
+
+            // ── SOS ────────────────────────────────────────────────────────
+            Center(
+              child: Column(
+                children: [
+                  _SosButton(
+                    pulseController: sosPulseController,
+                    holdController: sosHoldController,
+                    isHolding: isSosHolding,
+                    isLoading: pilgrimState.isSosLoading,
+                    sosActive: pilgrimState.sosActive,
+                    countdown: sosCountdown,
+                    onHoldStart: onSosHoldStart,
+                    onHoldEnd: onSosHoldEnd,
+                  ),
+                  if (pilgrimState.sosActive) ...[
+                    SizedBox(height: 16.h),
+                    GestureDetector(
+                      onTap: onCancelSos,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 28.w,
+                          vertical: 10.h,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.red.shade400,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(20.r),
+                        ),
+                        child: Text(
+                          'sos_cancel'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.sp,
+                            color: Colors.red.shade500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: 32.h),
+
+            // ── Navigate to Moderator (only when beacon active) ────────────
+            if (navBeacons.isNotEmpty)
+              Container(
+                margin: EdgeInsets.only(bottom: 24.h),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(20.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 8.h),
+                      child: Row(
+                        children: [
+                          Icon(Symbols.my_location,
+                              size: 18.w, color: AppColors.primary),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'nav_to_moderator'.tr(),
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.sp,
+                              color: isDark ? Colors.white : AppColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ...navBeacons.values.map(
+                      (beacon) => Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 16.w, vertical: 10.h),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40.w,
+                              height: 40.w,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.iconBgDark
+                                    : AppColors.iconBgLight,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Symbols.person_pin_circle,
+                                  size: 22.w, color: AppColors.primary),
+                            ),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: Text(
+                                beacon.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14.sp,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textDark,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 10.w),
+                            GestureDetector(
+                              onTap: () => onNavigateToModerator(beacon),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 14.w, vertical: 9.h),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(14.r),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Symbols.navigation,
+                                        color: Colors.white, size: 16.w),
+                                    SizedBox(width: 6.w),
+                                    Text(
+                                      'nav_go'.tr(),
+                                      style: TextStyle(
+                                        fontFamily: 'Lexend',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13.sp,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                  ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -1958,181 +2016,130 @@ class _BottomNav extends StatelessWidget {
     required this.isDark,
   });
 
-  // Tabs that appear in the nav bar (skip index 2 which is the FAB slot)
-  static const _navMap = [0, 1, 3, 2];
+  // Maps nav-bar slot → tab index in the IndexedStack.
+  // Slot 0 = Home (0), Slot 1 = Map (1), Slot 2 = Qibla (2), Slot 3 = Chat (3)
+  static const _tabIndices = [0, 1, 2, 3];
 
   @override
   Widget build(BuildContext context) {
     final labels = [
       'tab_home'.tr(),
       'tab_map'.tr(),
-      'tab_chat'.tr(),
       'tab_qibla'.tr(),
+      'tab_chat'.tr(),
     ];
     final icons = [
       Symbols.home,
       Symbols.map,
-      Symbols.chat_bubble,
       Symbols.explore,
+      Symbols.chat_bubble,
     ];
-    final tabIndices = _navMap;
-    final badges = [0, 0, unreadMessages, 0];
+    // Badge counts per slot (only chat has a badge)
+    final badges = [0, 0, 0, unreadMessages];
 
-    return BottomAppBar(
-      color: isDark ? AppColors.surfaceDark : Colors.white,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      padding: EdgeInsets.zero,
-      surfaceTintColor: Colors.transparent,
-      elevation: 8,
-      height: 66.h,
+    final bgColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final dividerColor = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -2),
+          ),
+        ],
+        border: Border(
+          top: BorderSide(color: dividerColor, width: 1),
+        ),
+      ),
+      height: 66.h + MediaQuery.of(context).padding.bottom,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // Left two tabs
-          ...List.generate(2, (slot) {
-            final i = tabIndices[slot];
-            final isSelected = i == currentIndex;
-            return GestureDetector(
-              onTap: () => onTap(i),
+        children: List.generate(4, (slot) {
+          final tabIndex = _tabIndices[slot];
+          final isSelected = tabIndex == currentIndex;
+          final badge = badges[slot];
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onTap(tabIndex),
               behavior: HitTestBehavior.opaque,
-              child: SizedBox(
-                width: 60.w,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 44.w,
-                      height: 32.h,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (isDark
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44.w,
+                        height: 32.h,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (isDark
                                   ? AppColors.iconBgDark
                                   : AppColors.iconBgLight)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
-                      child: Icon(
-                        icons[slot],
-                        size: 22.w,
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textMutedLight,
-                      ),
-                    ),
-                    SizedBox(height: 2.h),
-                    Text(
-                      labels[slot],
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 10.sp,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textMutedLight,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-
-          // Center gap for FAB
-          SizedBox(width: 60.w),
-
-          // Right two tabs (chat + settings)
-          ...List.generate(2, (slot) {
-            final listSlot = slot + 2; // slots 2 & 3 in our lists
-            final i = tabIndices[listSlot];
-            final isSelected = i == currentIndex;
-            return GestureDetector(
-              onTap: () => onTap(i),
-              behavior: HitTestBehavior.opaque,
-              child: SizedBox(
-                width: 60.w,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 44.w,
-                          height: 32.h,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? (isDark
-                                      ? AppColors.iconBgDark
-                                      : AppColors.iconBgLight)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: Icon(
-                            icons[listSlot],
-                            size: 22.w,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textMutedLight,
-                          ),
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12.r),
                         ),
-                        if (badges[listSlot] > 0)
-                          Positioned(
-                            top: -2,
-                            right: -2,
-                            child: Container(
-                              padding: EdgeInsets.all(3.w),
-                              decoration: const BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
+                        child: Icon(
+                          icons[slot],
+                          size: 22.w,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textMutedLight,
+                        ),
+                      ),
+                      if (badge > 0)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            padding: EdgeInsets.all(3.w),
+                            decoration: const BoxDecoration(
+                              color: Colors.orange,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: BoxConstraints(
+                              minWidth: 14.w,
+                              minHeight: 14.w,
+                            ),
+                            child: Text(
+                              badge > 9 ? '9+' : '$badge',
+                              style: TextStyle(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
-                              constraints: BoxConstraints(
-                                minWidth: 14.w,
-                                minHeight: 14.w,
-                              ),
-                              child: Text(
-                                badges[listSlot] > 9
-                                    ? '9+'
-                                    : '${badges[listSlot]}',
-                                style: TextStyle(
-                                  fontSize: 9.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                      ],
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    labels[slot],
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 10.sp,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textMutedLight,
                     ),
-                    SizedBox(height: 2.h),
-                    Text(
-                      labels[listSlot],
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 10.sp,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textMutedLight,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-            );
-          }),
-        ],
+            ),
+          );
+        }),
       ),
     );
   }
@@ -2141,6 +2148,7 @@ class _BottomNav extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Map Tab
 // ─────────────────────────────────────────────────────────────────────────────
+
 
 class _PilgrimMapTab extends StatelessWidget {
   final LatLng? myLocation;

@@ -19,29 +19,63 @@ class QiblaCompassScreen extends StatefulWidget {
   State<QiblaCompassScreen> createState() => _QiblaCompassScreenState();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// State — ALL compass logic lives here; UI widgets below are untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
+  // ── Constants ──────────────────────────────────────────────────────────────
+
+  /// Needle is "aligned" when it is within ±5° of the Qibla bearing.
   static const double _alignToleranceDeg = 5.0;
+
+  /// Compass events with a delta smaller than this are noise — ignore them so
+  /// the needle stays still when the phone is stationary.
   static const double _headingDeadbandDeg = 0.8;
+
+  /// Only recompute the Qibla bearing when GPS moves at least this far.
   static const double _minGpsMoveMeters = 20.0;
+
+  // ── Streams ────────────────────────────────────────────────────────────────
 
   StreamSubscription<CompassEvent>? _compassSub;
   StreamSubscription<Position>? _positionSub;
 
+  // ── State ──────────────────────────────────────────────────────────────────
+
   bool _loading = true;
   String? _error;
 
+  /// Latest raw heading from the magnetometer (degrees, true-north).
   double? _rawHeading;
+
+  /// Low-pass filtered heading used for all rendering.
   double? _smoothedHeading;
+
+  /// True-north great-circle bearing from the current position to the Kaaba.
   double? _qiblaBearing;
+
+  /// Haversine distance to the Kaaba in kilometres.
   double? _distanceKm;
+
   // ignore: unused_field
   Position? _lastGpsPosition;
+
+  /// GPS coordinates at which [_qiblaBearing] was last computed.
   double? _lastBearingLat;
   double? _lastBearingLng;
+
+  /// Used to fire the haptic only on the unaligned → aligned transition.
   bool _wasAligned = false;
+
+  /// Magnetometer accuracy reported by the OS (0 = unreliable, 3 = high).
+  /// Shown as a calibration banner when low.
+  int _sensorAccuracy = 3;
 
   DateTime? _lastUiUpdate;
   final Duration _uiThrottle = const Duration(milliseconds: 40);
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -56,13 +90,14 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
     super.dispose();
   }
 
+  // ── Initialisation ─────────────────────────────────────────────────────────
+
   Future<void> _startQiblaTracking() async {
     try {
+      // 1 – Verify location services and permissions.
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _setError(
-          'qibla_error_location'.tr(),
-        );
+        _setError('qibla_error_location'.tr());
         return;
       }
 
@@ -76,15 +111,17 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
         return;
       }
 
+      // 2 – Grab an initial GPS fix so the bearing is ready before the first
+      //     compass event fires.
       final initial = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 5,
         ),
       );
       _lastGpsPosition = initial;
       _applyLocation(lat: initial.latitude, lng: initial.longitude);
 
+      // 3 – Stream GPS updates; 15 m filter keeps battery use reasonable.
       _positionSub?.cancel();
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -96,37 +133,9 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
         _applyLocation(lat: pos.latitude, lng: pos.longitude);
       });
 
+      // 4 – Subscribe to the magnetometer/fusion heading stream.
       _compassSub?.cancel();
-      _compassSub = FlutterCompass.events?.listen((event) {
-        final heading = event.heading;
-        if (heading == null) return;
-
-        _rawHeading = QiblaMath.normalize360(heading);
-        if (_smoothedHeading == null) {
-          _smoothedHeading = _rawHeading;
-        } else {
-          final delta = QiblaMath.shortestDelta(
-            _smoothedHeading!,
-            _rawHeading!,
-          ).abs();
-          if (delta < _headingDeadbandDeg) return;
-          final alpha = delta > 20
-              ? 0.35
-              : delta > 8
-                  ? 0.22
-                  : 0.12;
-          _smoothedHeading = QiblaMath.smoothAngle(
-            _smoothedHeading!,
-            _rawHeading!,
-            alpha,
-          );
-        }
-
-        _handleAlignmentFeedback();
-        _loading = false;
-        _error = null;
-        _throttledRebuild();
-      });
+      _compassSub = FlutterCompass.events?.listen(_onCompassEvent);
 
       if (_compassSub == null) {
         _setError('qibla_error_sensor'.tr());
@@ -136,6 +145,48 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
     }
   }
 
+  // ── Compass event ──────────────────────────────────────────────────────────
+
+  void _onCompassEvent(CompassEvent event) {
+    final heading = event.heading;
+    if (heading == null) return;
+
+    // Track sensor accuracy so we can show a calibration prompt when needed.
+    // accuracy: 0 = unreliable, 1 = low, 2 = medium, 3 = high.
+    final accuracy = event.accuracy?.toInt() ?? 3;
+    if (accuracy != _sensorAccuracy) {
+      _sensorAccuracy = accuracy;
+    }
+
+    final raw = QiblaMath.normalize360(heading);
+    _rawHeading = raw;
+
+    if (_smoothedHeading == null) {
+      // Cold start: accept the first sample directly so there is no initial
+      // "fly-in" animation from 0° to the real heading.
+      _smoothedHeading = raw;
+    } else {
+      final absDelta = QiblaMath.shortestDelta(_smoothedHeading!, raw).abs();
+
+      // Dead-band: discard tiny fluctuations that are pure sensor noise.
+      if (absDelta < _headingDeadbandDeg) return;
+
+      // Adaptive alpha: snap fast for large rotations, damp heavily for small
+      // drifts so the needle does not oscillate when the phone is held still.
+      final alpha = QiblaMath.adaptiveAlpha(absDelta);
+      _smoothedHeading = QiblaMath.smoothAngle(_smoothedHeading!, raw, alpha);
+    }
+
+    _handleAlignmentFeedback();
+    _loading = false;
+    _error = null;
+    _throttledRebuild();
+  }
+
+  // ── GPS update ─────────────────────────────────────────────────────────────
+
+  /// Recalculates the Qibla bearing and distance only when the device has moved
+  /// more than [_minGpsMoveMeters] from the last calculation point.
   void _applyLocation({required double lat, required double lng}) {
     if (_lastBearingLat != null && _lastBearingLng != null) {
       final moved = Geolocator.distanceBetween(
@@ -144,38 +195,39 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
         lat,
         lng,
       );
-      if (moved < _minGpsMoveMeters) {
-        return;
-      }
+      if (moved < _minGpsMoveMeters) return;
     }
 
     _qiblaBearing = QiblaMath.bearingToKaaba(lat, lng);
     _distanceKm = QiblaMath.distanceToKaabaKm(lat, lng);
     _lastBearingLat = lat;
     _lastBearingLng = lng;
+
     _handleAlignmentFeedback();
     _loading = false;
     _error = null;
     _throttledRebuild(force: true);
   }
 
-  /// How far the phone heading is from the Qibla direction.
+  // ── Alignment helpers ──────────────────────────────────────────────────────
+
+  /// Signed angular offset from the current phone heading to the Qibla
+  /// direction.  Positive = Qibla is clockwise from where the phone points.
   double _qiblaDelta() {
     if (_qiblaBearing == null || _smoothedHeading == null) return 999;
     return QiblaMath.shortestDelta(_smoothedHeading!, _qiblaBearing!);
   }
 
-  bool _isAligned() {
-    return _qiblaDelta().abs() <= _alignToleranceDeg;
-  }
+  bool _isAligned() => _qiblaDelta().abs() <= _alignToleranceDeg;
 
+  /// Fires a single light haptic pulse on the unaligned → aligned transition.
   void _handleAlignmentFeedback() {
     final aligned = _isAligned();
-    if (aligned && !_wasAligned) {
-      HapticFeedback.lightImpact();
-    }
+    if (aligned && !_wasAligned) HapticFeedback.lightImpact();
     _wasAligned = aligned;
   }
+
+  // ── Utility ────────────────────────────────────────────────────────────────
 
   void _setError(String message) {
     if (!mounted) return;
@@ -197,6 +249,8 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
   }
 
   double _degToRad(double deg) => deg * math.pi / 180;
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -250,21 +304,28 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
     final qibla = _qiblaBearing ?? 0;
     final aligned = _isAligned();
 
-    // The angle from the phone's heading to the Qibla (how much we rotate the
-    // Qibla marker from "straight up" on screen).
-    // Qibla marker sits outside. When the phone turns, the marker rotates to
-    // keep pointing at the real-world Qibla direction.
-    final qiblaRelative = QiblaMath.normalize360(qibla - heading);
+    // ── Core angle calculation ───────────────────────────────────────────────
+    //
+    // Compass model:
+    //   • The dial  rotates by (−heading) so N/E/S/W labels stay in their
+    //     real-world positions as the phone turns.
+    //   • The Qibla marker sits at the top of the dial.  Rotating it by
+    //     (qibla − heading) keeps it pointing at the real-world Kaaba direction
+    //     regardless of how the phone is oriented.
+    //
+    // When the phone is pointed exactly at the Qibla, heading == qibla, so the
+    // marker angle is 0° (straight up) and the needle is aligned.
+    final qiblaRelative = QiblaMath.qiblaScreenAngle(qibla, heading);
 
-    // Arrow inside the circle: always points up (phone's heading direction)
-    // and lights up when aligned with Qibla
     final arrowColor = aligned
-        ? const Color(0xFF2ECC71) // bright green
-        : const Color(0xFFE67E22); // orange
+        ? const Color(0xFF2ECC71)  // green when aligned
+        : const Color(0xFFE67E22); // orange otherwise
 
     final glowColor = aligned
-        ? const Color(0xFF2ECC71).withOpacity(0.4)
+        ? const Color(0xFF2ECC71).withValues(alpha: 0.4)
         : Colors.transparent;
+
+    final needsCalibration = _sensorAccuracy < 2;
 
     return Container(
       color: const Color(0xFF09162D),
@@ -298,6 +359,46 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
               ),
             ),
 
+            // ── Calibration banner ─────────────────────────────────────
+            // Shown when the OS reports the magnetometer as unreliable.
+            // Guides the user through the figure-8 gesture without any
+            // external explanation needed.
+            if (needsCalibration)
+              Padding(
+                padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE67E22).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: const Color(0xFFE67E22).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Symbols.explore,
+                        color: const Color(0xFFE67E22),
+                        size: 20.w,
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Text(
+                          'qibla_calibration_needed'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontSize: 12.sp,
+                            color: const Color(0xFFE67E22),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             SizedBox(height: 16.h),
 
             // ── Compass ────────────────────────────────────────────────
@@ -309,9 +410,8 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // ── Compass ring (rotates with phone heading) ────
-                      // The whole dial rotates inversely to the heading so
-                      // N/E/S/W labels stay in their real-world directions.
+                      // Compass ring — rotates inversely to the phone heading
+                      // so N/E/S/W stay in their real-world directions.
                       Transform.rotate(
                         angle: _degToRad(-heading),
                         child: CustomPaint(
@@ -323,9 +423,8 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                         ),
                       ),
 
-                      // ── Qibla marker (outside circle) ───────────────
-                      // Rotates with qiblaRelative so it always points at
-                      // the real Qibla direction.
+                      // Qibla marker — always points at the Kaaba in
+                      // screen-space regardless of phone orientation.
                       Transform.rotate(
                         angle: _degToRad(qiblaRelative),
                         child: Align(
@@ -337,9 +436,8 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                         ),
                       ),
 
-                      // ── Center arrow (phone heading) ────────────────
-                      // Always points straight up (phone heading direction).
-                      // Lights up green when aligned with Qibla.
+                      // Centre arrow — always points up (= where the phone
+                      // faces). Lights up green when aligned with the Qibla.
                       Container(
                         width: 64.w,
                         height: 64.w,
@@ -354,7 +452,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                             ),
                           ],
                           border: Border.all(
-                            color: arrowColor.withOpacity(0.5),
+                            color: arrowColor.withValues(alpha: 0.5),
                             width: 2,
                           ),
                         ),
@@ -431,7 +529,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                             ? Symbols.check_circle
                             : Symbols.rotate_right,
                         label: 'qibla_offset'.tr(),
-                        value: '${_qiblaDelta().round()}°',
+                        value: '${_qiblaDelta().abs().round()}°',
                         isDark: isDark,
                         highlight: aligned,
                       ),
@@ -473,7 +571,7 @@ class _QiblaMarker extends StatelessWidget {
                 color: (aligned
                         ? const Color(0xFF2ECC71)
                         : const Color(0xFFE67E22))
-                    .withOpacity(0.5),
+                    .withValues(alpha: 0.5),
                 blurRadius: 16,
                 spreadRadius: 2,
               ),
@@ -529,7 +627,7 @@ class _InfoChip extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: highlight
-                ? const Color(0xFF2ECC71).withOpacity(0.15)
+                ? const Color(0xFF2ECC71).withValues(alpha: 0.15)
                 : isDark
                     ? const Color(0xFF1A2640)
                     : const Color(0xFFF0F2F5),
@@ -586,8 +684,8 @@ class _CompassDialPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..color = aligned
-          ? const Color(0xFF2ECC71).withOpacity(0.5)
-          : const Color(0xFFE67E22).withOpacity(0.3);
+          ? const Color(0xFF2ECC71).withValues(alpha: 0.5)
+          : const Color(0xFFE67E22).withValues(alpha: 0.3);
     canvas.drawCircle(center, radius - 28, outerRing);
 
     // Inner ring
@@ -694,10 +792,10 @@ class _CompassDialPainter extends CustomPainter {
       }
     }
 
-    // Degree numbers at 30° intervals (except cardinals)
+    // Degree numbers at 30° intervals (except cardinals and sub-cardinals)
     for (var i = 30; i < 360; i += 30) {
-      if (i % 90 == 0) continue; // skip cardinals
-      if (i % 45 == 0) continue; // skip sub-cardinals
+      if (i % 90 == 0) continue;
+      if (i % 45 == 0) continue;
 
       final angle = _degToRad(i.toDouble() - 90);
       final textPainter = TextPainter(

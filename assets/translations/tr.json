@@ -354,6 +354,7 @@
   "qibla_error_permission": "Kıble pusulası için konum izni gereklidir.",
   "qibla_error_sensor": "Bu cihazda pusula sensörü mevcut değil.",
   "qibla_error_generic": "Kıble pusulası başlatılamadı.",
+  "qibla_calibration_needed": "Pusula kalibrasyona ihtiyaç duyuyor. Telefonunuzu tutun ve bu banner kaybolana kadar yavaşça 8 veya ∞ şeklinde hareket ettirin.",
   "tab_qibla": "Kıble",
   "group_details_title": "Grup Detayları",
   "group_hotel_info": "Otel Bilgileri",

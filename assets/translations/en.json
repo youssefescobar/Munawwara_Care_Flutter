@@ -416,6 +416,7 @@
   "qibla_error_permission": "Location permission is required to use Qibla compass.",
   "qibla_error_sensor": "Compass sensor is unavailable on this device.",
   "qibla_error_generic": "Unable to initialize Qibla compass.",
+  "qibla_calibration_needed": "Compass needs calibration. Hold your phone and slowly move it in a figure-8 pattern ∞ until this banner disappears.",
   "tab_qibla": "Qibla",
   "group_details_title": "Group Details",
   "group_hotel_info": "Hotel Information",

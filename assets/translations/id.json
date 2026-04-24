@@ -354,6 +354,7 @@
   "qibla_error_permission": "Izin lokasi diperlukan untuk menggunakan kompas Kiblat.",
   "qibla_error_sensor": "Sensor kompas tidak tersedia di perangkat ini.",
   "qibla_error_generic": "Tidak dapat menginisialisasi kompas Kiblat.",
+  "qibla_calibration_needed": "Kompas perlu kalibrasi. Pegang ponsel Anda dan gerakkan perlahan membentuk angka 8 atau ∞ sampai banner ini menghilang.",
   "tab_qibla": "Kiblat",
   "group_details_title": "Detail Grup",
   "group_hotel_info": "Informasi Hotel",
