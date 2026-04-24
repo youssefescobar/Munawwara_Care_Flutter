@@ -163,6 +163,11 @@ class _ModeratorDashboardScreenState
           if (!mounted) return;
           ref.read(notificationProvider.notifier).refetch();
         });
+        // Listen for notification refresh (invitations, areas, etc.)
+        SocketService.on('notification_refresh', (_) {
+          if (!mounted) return;
+          ref.read(notificationProvider.notifier).refetch();
+        });
       }
     });
   }
@@ -174,6 +179,7 @@ class _ModeratorDashboardScreenState
     SocketService.off('sos-alert-received');
     SocketService.off('sos-alert-cancelled');
     SocketService.off('missed-call-received');
+    SocketService.off('notification_refresh');
     SocketService.offConnected(_onSocketConnected);
     super.dispose();
   }
