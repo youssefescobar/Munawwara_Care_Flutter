@@ -1,4 +1,4 @@
-package com.munawwaracare.mcmobile
+package com.munawwaracare.andriod
 
 import android.app.Application
 import android.content.Context

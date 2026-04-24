@@ -104,7 +104,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                     sendEventFlutter(CallkitConstants.ACTION_CALL_INCOMING, data)
                     addCall(context, Data.fromBundle(data))
                     // ── Start IncomingCallService (Core-Telecom) ──
-                    startCallService(context, "com.munawwaracare.mcmobile.ACTION_INCOMING_CALL", data)
+                    startCallService(context, "com.munawwaracare.andriod.ACTION_INCOMING_CALL", data)
                 } catch (error: Exception) {
                     Log.e(TAG, null, error)
                 }
@@ -152,7 +152,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                     sendEventFlutter(CallkitConstants.ACTION_CALL_DECLINE, data)
                     removeCall(context, Data.fromBundle(data))
                     // ── Signal IncomingCallService to fire HTTP decline ──
-                    startCallService(context, "com.munawwaracare.mcmobile.ACTION_DECLINE_CALL", data)
+                    startCallService(context, "com.munawwaracare.andriod.ACTION_DECLINE_CALL", data)
                     // Also fire HTTP directly as a fallback (with goAsync)
                     sendDeclineToBackend(context, data)
                 } catch (error: Exception) {
@@ -181,7 +181,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                     sendEventFlutter(CallkitConstants.ACTION_CALL_TIMEOUT, data)
                     removeCall(context, Data.fromBundle(data))
                     // ── Signal IncomingCallService to fire HTTP decline ──
-                    startCallService(context, "com.munawwaracare.mcmobile.ACTION_DECLINE_CALL", data)
+                    startCallService(context, "com.munawwaracare.andriod.ACTION_DECLINE_CALL", data)
                     // Also fire HTTP directly as a fallback
                     sendDeclineToBackend(context, data)
                 } catch (error: Exception) {

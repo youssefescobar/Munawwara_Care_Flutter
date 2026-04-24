@@ -1,4 +1,4 @@
-package com.munawwaracare.mcmobile
+package com.munawwaracare.andriod
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -34,10 +34,10 @@ class IncomingCallService : Service() {
         private const val CHANNEL_ID = "incoming_call_service"
         private const val NOTIFICATION_ID = 9999
 
-        const val ACTION_INCOMING = "com.munawwaracare.mcmobile.ACTION_INCOMING_CALL"
-        const val ACTION_DECLINE = "com.munawwaracare.mcmobile.ACTION_DECLINE_CALL"
-        const val ACTION_ACCEPT = "com.munawwaracare.mcmobile.ACTION_ACCEPT_CALL"
-        const val ACTION_END = "com.munawwaracare.mcmobile.ACTION_END_CALL"
+        const val ACTION_INCOMING = "com.munawwaracare.andriod.ACTION_INCOMING_CALL"
+        const val ACTION_DECLINE = "com.munawwaracare.andriod.ACTION_DECLINE_CALL"
+        const val ACTION_ACCEPT = "com.munawwaracare.andriod.ACTION_ACCEPT_CALL"
+        const val ACTION_END = "com.munawwaracare.andriod.ACTION_END_CALL"
 
         const val EXTRA_CALLER_ID = "callerId"
         const val EXTRA_CALLER_NAME = "callerName"
