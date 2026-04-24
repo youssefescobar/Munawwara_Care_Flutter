@@ -20,6 +20,8 @@ class _PilgrimItem {
   final bool isOnline;
   final String? currentGroupId;
   final String? currentGroupName;
+  final String? limboReason; // manual | group_deleted
+  final String? limboGroupName;
 
   const _PilgrimItem({
     required this.id,
@@ -32,6 +34,8 @@ class _PilgrimItem {
     required this.isOnline,
     this.currentGroupId,
     this.currentGroupName,
+    this.limboReason,
+    this.limboGroupName,
   });
 
   factory _PilgrimItem.fromMap(Map<String, dynamic> m) {
@@ -47,6 +51,8 @@ class _PilgrimItem {
       isOnline: m['is_online'] == true,
       currentGroupId: g?['group_id']?.toString(),
       currentGroupName: g?['group_name']?.toString(),
+      limboReason: m['limbo_reason']?.toString(),
+      limboGroupName: m['limbo_group_name']?.toString(),
     );
   }
 
@@ -75,6 +81,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
   bool _isLoading = true;
   String? _error;
   String _filter = 'all'; // all | assigned | unassigned
+  String _unassignedSubFilter = 'all'; // all | manual | deleted
   String _search = '';
 
   @override
@@ -120,12 +127,27 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   List<_PilgrimItem> get _filtered {
     return _all.where((p) {
-      final matchFilter = _filter == 'all' ||
-          (_filter == 'assigned' && p.isAssigned) ||
-          (_filter == 'unassigned' && !p.isAssigned);
+      bool matchFilter = false;
+      if (_filter == 'all') {
+        matchFilter = true;
+      } else if (_filter == 'assigned') {
+        matchFilter = p.isAssigned;
+      } else if (_filter == 'unassigned') {
+        if (p.isAssigned) {
+          matchFilter = false;
+        } else {
+          if (_unassignedSubFilter == 'all') {
+            matchFilter = true;
+          } else if (_unassignedSubFilter == 'manual') {
+            matchFilter = p.limboReason == 'manual' || p.limboReason == null;
+          } else if (_unassignedSubFilter == 'deleted') {
+            matchFilter = p.limboReason == 'group_deleted';
+          }
+        }
+      }
+
       final q = _search.toLowerCase();
       final matchSearch = q.isEmpty ||
           p.fullName.toLowerCase().contains(q) ||
@@ -316,6 +338,52 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                         ),
                       ],
                     ),
+                    if (_filter == 'unassigned') ...[
+                      SizedBox(height: 12.h),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Text(
+                              'Type:',
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted,
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            _FilterChip(
+                              label: 'All Unassigned',
+                              selected: _unassignedSubFilter == 'all',
+                              onTap: () => setState(() => _unassignedSubFilter = 'all'),
+                              isDark: isDark,
+                              accentColor: const Color(0xFFFF8400),
+                              isSmall: true,
+                            ),
+                            SizedBox(width: 6.w),
+                            _FilterChip(
+                              label: 'Manual',
+                              selected: _unassignedSubFilter == 'manual',
+                              onTap: () => setState(() => _unassignedSubFilter = 'manual'),
+                              isDark: isDark,
+                              accentColor: const Color(0xFFFF8400),
+                              isSmall: true,
+                            ),
+                            SizedBox(width: 6.w),
+                            _FilterChip(
+                              label: 'From Deleted Groups',
+                              selected: _unassignedSubFilter == 'deleted',
+                              onTap: () => setState(() => _unassignedSubFilter = 'deleted'),
+                              isDark: isDark,
+                              accentColor: const Color(0xFFFF8400),
+                              isSmall: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     SizedBox(height: 16.h),
                   ],
                 ),
@@ -517,7 +585,9 @@ class _PilgrimCard extends StatelessWidget {
                         Text(
                           pilgrim.isAssigned
                               ? pilgrim.currentGroupName!
-                              : 'Unassigned',
+                              : (pilgrim.limboReason == 'group_deleted'
+                                  ? 'Deleted Group: ${pilgrim.limboGroupName ?? '?'}'
+                                  : 'Unassigned'),
                           style: TextStyle(
                             fontFamily: 'Lexend',
                             fontWeight: FontWeight.w600,
@@ -742,6 +812,7 @@ class _FilterChip extends StatelessWidget {
   final VoidCallback onTap;
   final bool isDark;
   final Color? accentColor;
+  final bool isSmall;
 
   const _FilterChip({
     required this.label,
@@ -749,6 +820,7 @@ class _FilterChip extends StatelessWidget {
     required this.onTap,
     required this.isDark,
     this.accentColor,
+    this.isSmall = false,
   });
 
   @override
@@ -758,7 +830,10 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmall ? 8.w : 12.w,
+          vertical: isSmall ? 4.h : 7.h,
+        ),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(20.r),
@@ -772,7 +847,7 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontFamily: 'Lexend',
-            fontSize: 12.sp,
+            fontSize: isSmall ? 10.sp : 12.sp,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             color: selected
                 ? color
