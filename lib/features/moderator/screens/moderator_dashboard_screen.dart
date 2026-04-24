@@ -12,6 +12,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../../main.dart' show isNavigatingToCall;
+import '../../../core/services/notification_service.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/screens/alerts_tab.dart';
 import '../providers/moderator_provider.dart';
@@ -61,9 +62,18 @@ class _ModeratorDashboardScreenState
     ref.read(notificationProvider.notifier).fetch();
     // Auto-navigate to Alerts tab so the moderator sees it
     setState(() => _currentTab = 4);
-    // Speak the alert aloud
+    
     final map = data is Map ? data : <String, dynamic>{};
     final name = map['pilgrim_name'] as String? ?? 'A pilgrim';
+
+    // Show a system notification
+    NotificationService.instance.showUrgentNotification(
+      title: '🚨 SOS Alert!',
+      body: '$name needs immediate help!',
+      data: {'type': 'urgent'},
+    );
+
+    // Speak the alert aloud
     await _alertTts.setVolume(1.0);
     await _alertTts.setSpeechRate(0.42);
     await _alertTts.speak('SOS Alert! $name needs immediate help!');
@@ -202,7 +212,10 @@ class _ModeratorDashboardScreenState
           IndexedStack(
             index: _currentTab,
             children: [
-              _GroupsHomeTab(searchController: _searchController), // 0: Groups
+              _GroupsHomeTab(
+                searchController: _searchController,
+                onNotificationTap: () => setState(() => _currentTab = 4),
+              ), // 0: Groups
               const PilgrimProvisioningScreen(), // 1: Provisioning
               const SystemRemindersScreen(), // 2: Reminders
               const ModeratorProfileScreen(), // 3: Profile
@@ -263,7 +276,12 @@ class _ModeratorDashboardScreenState
 
 class _GroupsHomeTab extends ConsumerStatefulWidget {
   final TextEditingController searchController;
-  const _GroupsHomeTab({required this.searchController});
+  final VoidCallback onNotificationTap;
+
+  const _GroupsHomeTab({
+    required this.searchController,
+    required this.onNotificationTap,
+  });
 
   @override
   ConsumerState<_GroupsHomeTab> createState() => _GroupsHomeTabState();
@@ -294,6 +312,7 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(moderatorProvider);
+    final notifCount = ref.watch(notificationProvider).unreadCount;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final groups = _filtered(state.groups);
     final showEmptyState =
@@ -345,41 +364,114 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                             ],
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ModeratorProfileScreen(),
-                            ),
-                          ),
-                          child: Container(
-                            width: 44.w,
-                            height: 44.w,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.iconBgDark
-                                  : AppColors.iconBgLight,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDark
-                                    ? AppColors.backgroundDark
-                                    : const Color(0xFFD0D0F0),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: widget.onNotificationTap,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: 44.w,
+                                    height: 44.w,
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.iconBgDark
+                                          : AppColors.iconBgLight,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppColors.backgroundDark
+                                            : const Color(0xFFD0D0F0),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.06),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      Symbols.notifications,
+                                      size: 22.w,
+                                      color: isDark
+                                          ? AppColors.primary
+                                          : const Color(0xFF8A6A30),
+                                    ),
+                                  ),
+                                  if (notifCount > 0)
+                                    Positioned(
+                                      top: -2,
+                                      right: -2,
+                                      child: Container(
+                                        padding: EdgeInsets.all(4.w),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEF4444),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isDark
+                                                ? AppColors.backgroundDark
+                                                : Colors.white,
+                                            width: 2.w,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          notifCount > 99
+                                              ? '99+'
+                                              : notifCount.toString(),
+                                          style: TextStyle(
+                                            fontFamily: 'Lexend',
+                                            fontSize: 9.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                            ),
+                            SizedBox(width: 12.w),
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ModeratorProfileScreen(),
                                 ),
-                              ],
+                              ),
+                              child: Container(
+                                width: 44.w,
+                                height: 44.w,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppColors.iconBgDark
+                                      : AppColors.iconBgLight,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isDark
+                                        ? AppColors.backgroundDark
+                                        : const Color(0xFFD0D0F0),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.06),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Symbols.person,
+                                  size: 22.w,
+                                  color: isDark
+                                      ? AppColors.primary
+                                      : const Color(0xFF8A6A30),
+                                ),
+                              ),
                             ),
-                            child: Icon(
-                              Symbols.person,
-                              size: 22.w,
-                              color: isDark
-                                  ? AppColors.primary
-                                  : const Color(0xFF8A6A30),
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),

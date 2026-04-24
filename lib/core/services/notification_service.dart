@@ -409,7 +409,7 @@ class NotificationService {
     // Handle urgent notifications
     if (type == 'urgent') {
       AppLogger.w('🚨 Urgent notification detected');
-      await _showUrgentNotification(title: title, body: body, data: data);
+      await showUrgentNotification(title: title, body: body, data: data);
       return;
     }
 
@@ -422,7 +422,7 @@ class NotificationService {
 
   // ── Show Urgent Notification ──────────────────────────────────────────────
 
-  Future<void> _showUrgentNotification({
+  Future<void> showUrgentNotification({
     required String title,
     required String body,
     required Map<String, dynamic> data,
