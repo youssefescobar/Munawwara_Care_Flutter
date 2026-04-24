@@ -11,6 +11,9 @@ import '../providers/notification_provider.dart';
 import '../../moderator/providers/moderator_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../moderator/widgets/pilgrim_profile_sheet.dart';
+import 'package:dio/dio.dart';
+import '../../../core/services/api_service.dart';
+import '../../pilgrim/providers/pilgrim_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Alerts Tab — shown when the user taps "Alerts" in the bottom nav
@@ -31,6 +34,66 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationProvider.notifier).fetch();
     });
+  }
+
+  Future<void> _acceptInvitation(String invId) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+
+      final res = await ApiService.dio.post('/invitations/$invId/accept');
+      
+      if (!mounted) return;
+      Navigator.pop(context); // close dialog
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        // Reload dashboard so groupInfo is populated
+        final role = ref.read(authProvider).role;
+        if (role == 'moderator') {
+          await ref.read(moderatorProvider.notifier).loadDashboard();
+        } else {
+          await ref.read(pilgrimProvider.notifier).loadDashboard();
+        }
+        
+        // Remove or update the notification by fetching
+        ref.read(notificationProvider.notifier).fetch();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.data['message']?.toString() ?? 'Invitation accepted!'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // close dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ApiService.parseError(e)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // close dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('An unexpected error occurred'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -137,6 +200,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
                           onDelete: () => ref
                               .read(notificationProvider.notifier)
                               .delete(n.id),
+                          onAcceptInvitation: (id) => _acceptInvitation(id),
                         );
                       },
                     ),
@@ -156,11 +220,13 @@ class _NotificationTile extends ConsumerWidget {
   final AppNotification notification;
   final bool isDark;
   final VoidCallback onDelete;
+  final void Function(String)? onAcceptInvitation;
 
   const _NotificationTile({
     required this.notification,
     required this.isDark,
     required this.onDelete,
+    this.onAcceptInvitation,
   });
 
   @override
@@ -391,6 +457,56 @@ class _NotificationTile extends ConsumerWidget {
                               SizedBox(width: 4.w),
                               Text(
                                 'area_navigate'.tr(),
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    // Join Group button for group invitations
+                    if (n.type == 'group_invitation') ...[
+                      SizedBox(height: 8.h),
+                      GestureDetector(
+                        onTap: () {
+                          final invId = n.data?['invitation_id']?.toString();
+                          if (invId != null && onAcceptInvitation != null) {
+                            onAcceptInvitation!(invId);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Invalid invitation data'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12.w,
+                            vertical: 7.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: n.iconColor,
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Symbols.group_add,
+                                size: 14.w,
+                                color: Colors.white,
+                                fill: 1,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Join Group',
                                 style: TextStyle(
                                   fontFamily: 'Lexend',
                                   fontWeight: FontWeight.w700,
