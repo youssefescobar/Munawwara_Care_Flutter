@@ -282,6 +282,20 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           if (!mounted) return;
           ref.read(notificationProvider.notifier).refetch();
         });
+
+        // Listen for remote force logout (e.g., code refreshed by moderator)
+        SocketService.on('force_logout', (_) {
+          if (!mounted) return;
+          ref.read(authProvider.notifier).logout();
+          context.go('/login');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Your login code was refreshed. You have been logged out.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        });
       }
       // Fetch notification badge count
       ref.read(notificationProvider.notifier).fetchUnreadCount();
@@ -326,6 +340,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     SocketService.off('missed-call-received');
     SocketService.off('moderator-request-approved');
     SocketService.off('moderator-request-rejected');
+    SocketService.off('force_logout');
     SocketService.offConnected(_onSocketConnected);
     super.dispose();
   }

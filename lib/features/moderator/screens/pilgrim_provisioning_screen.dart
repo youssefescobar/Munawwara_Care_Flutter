@@ -415,6 +415,31 @@ class _PilgrimProvisioningScreenState
     final groupId = _selectedGroupId;
     if (groupId == null) return;
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Refresh Login Code'),
+        content: Text(
+          'Are you sure you want to refresh the login code for ${item.fullName}? This will immediately log them out of their current device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('group_cancel'.tr()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final resp = await ApiService.dio.post(
         '/auth/groups/$groupId/pilgrims/${item.pilgrimId}/reissue-login',

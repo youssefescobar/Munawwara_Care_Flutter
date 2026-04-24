@@ -84,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _loginError = 'Please enter your login code');
       return;
     }
-    final token = _extractToken(rawToken);
+    final token = _extractToken(rawToken).toUpperCase();
     if (token.isEmpty) {
       setState(() => _loginError = 'Invalid login code');
       return;
@@ -375,6 +375,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           decoration: _fieldDecoration(isDark),
           child: TextField(
             controller: _codeController,
+            textCapitalization: TextCapitalization.characters,
             style: GoogleFonts.lexend(
               fontSize: 14.sp,
               color: isDark ? Colors.white : AppColors.textDark,
