@@ -887,36 +887,63 @@ class _ActionsSheet extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                height: 100.h,
+                height: 140.h,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  padding: EdgeInsets.symmetric(horizontal: 20.w),
                   itemCount: available.length,
                   itemBuilder: (context, index) {
                     final g = available[index];
                     return GestureDetector(
                       onTap: () => onAssign(g),
                       child: Container(
-                        width: 120.w,
-                        margin: EdgeInsets.only(right: 10.w),
+                        width: 130.w,
+                        margin: EdgeInsets.only(right: 12.w, bottom: 8.h),
+                        padding: EdgeInsets.all(12.w),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.backgroundDark : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12.r),
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(16.r),
                           border: Border.all(
-                            color: isDark ? AppColors.dividerDark : Colors.grey.shade300,
+                            color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
                           ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            g.name,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(10.w),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Symbols.group,
+                                color: AppColors.primary,
+                                size: 24.w,
+                              ),
+                            ),
+                            SizedBox(height: 12.h),
+                            Text(
+                              g.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );

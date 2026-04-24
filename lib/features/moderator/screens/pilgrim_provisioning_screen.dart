@@ -1464,17 +1464,7 @@ class _ProvisionTabState
                                   color: textPrimary,
                                 ),
                               ),
-                              SizedBox(width: 14.w),
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: EdgeInsets.zero,
-                                onPressed: () => _showEditDetailsDialog(item),
-                                icon: Icon(
-                                  Symbols.edit_square,
-                                  size: 20.w,
-                                  color: Colors.blue.shade600,
-                                ),
-                              ),
+
                               SizedBox(width: 14.w),
                               IconButton(
                                 constraints: const BoxConstraints(),
@@ -1515,17 +1505,7 @@ class _ProvisionTabState
                                           fontSize: 12.sp)),
                                 ),
                               const Spacer(),
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: EdgeInsets.zero,
-                                onPressed: () => _showEditDetailsDialog(item),
-                                icon: Icon(
-                                  Symbols.edit_square,
-                                  size: 20.w,
-                                  color: Colors.blue.shade600,
-                                ),
-                              ),
-                              SizedBox(width: 14.w),
+
                               IconButton(
                                 constraints: const BoxConstraints(),
                                 padding: EdgeInsets.zero,
