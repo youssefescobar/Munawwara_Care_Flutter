@@ -13,6 +13,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../moderator/widgets/pilgrim_profile_sheet.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/widgets/custom_dialog.dart';
 import '../../pilgrim/providers/pilgrim_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,13 +39,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
 
   Future<void> _acceptInvitation(String invId) async {
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
+      StandardDialog.showLoading(context);
 
       final res = await ApiService.dio.post('/invitations/$invId/accept');
       
@@ -98,13 +93,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
 
   Future<void> _declineInvitation(String invId) async {
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
+      StandardDialog.showLoading(context);
 
       final res = await ApiService.dio.post('/invitations/$invId/decline');
       

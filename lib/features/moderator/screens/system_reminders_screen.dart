@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../../core/widgets/custom_dialog.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../providers/moderator_provider.dart';
@@ -900,43 +901,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                               ),
                             ),
                             confirmDismiss: (_) async {
-                              return showDialog<bool>(
+                              return StandardDialog.show<bool>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: Text(
-                                    'reminder_delete_title'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontSize: 16.sp,
-                                    ),
-                                  ),
-                                  content: Text(
-                                    'reminder_delete_body'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontSize: 14.sp,
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, false),
-                                      child: Text(
-                                        'reminder_no'.tr(),
-                                        style: const TextStyle(fontFamily: 'Lexend'),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(
-                                        'reminder_delete_confirm'.tr(),
-                                        style: const TextStyle(
-                                          fontFamily: 'Lexend',
-                                          color: Colors.redAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                title: 'reminder_delete_title',
+                                content: 'reminder_delete_body',
+                                confirmText: 'reminder_delete_confirm',
+                                cancelText: 'reminder_no',
+                                isDestructive: true,
                               );
                             },
                             onDismissed: (_) =>
@@ -944,37 +915,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             child: ReminderCard(
                               reminder: reminder,
                               onCancel: () async {
-                                final confirmed = await showDialog<bool>(
+                                final confirmed = await StandardDialog.show<bool>(
                                   context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: Text(
-                                      'reminder_cancel_title'.tr(),
-                                      style: TextStyle(fontFamily: 'Lexend', fontSize: 16.sp),
-                                    ),
-                                    content: Text(
-                                      'reminder_cancel_body'.tr(),
-                                      style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx, false),
-                                        child: Text(
-                                          'reminder_no'.tr(),
-                                          style: const TextStyle(fontFamily: 'Lexend'),
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        child: Text(
-                                          'reminder_cancel_confirm'.tr(),
-                                          style: const TextStyle(
-                                            fontFamily: 'Lexend',
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  title: 'reminder_cancel_title',
+                                  content: 'reminder_cancel_body',
+                                  confirmText: 'reminder_cancel_confirm',
+                                  cancelText: 'reminder_no',
+                                  isDestructive: true,
                                 );
                                 if (confirmed == true && mounted) {
                                   await ref.read(reminderProvider.notifier).cancel(reminder.id);

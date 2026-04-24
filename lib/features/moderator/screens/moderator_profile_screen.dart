@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/custom_dialog.dart';
 
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -55,56 +56,13 @@ class _ModeratorProfileScreenState
   }
 
   Future<void> _signOut() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await StandardDialog.show<bool>(
       context: context,
-      builder: (ctx) {
-        final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDarkDialog ? AppColors.surfaceDark : Colors.white,
-          title: Text(
-            'settings_sign_out_confirm_title'.tr(),
-            style: TextStyle(
-              color: isDarkDialog ? AppColors.textLight : AppColors.textDark,
-              fontFamily: 'Lexend',
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: Text(
-            'settings_sign_out_confirm_body'.tr(),
-            style: TextStyle(
-              color: isDarkDialog
-                  ? AppColors.textMutedLight
-                  : AppColors.textMutedDark,
-              fontFamily: 'Lexend',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(
-                'settings_cancel'.tr(),
-                style: TextStyle(
-                  color: isDarkDialog
-                      ? AppColors.textLight
-                      : AppColors.textDark,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-              child: Text('settings_sign_out'.tr()),
-            ),
-          ],
-        );
-      },
+      title: 'settings_sign_out_confirm_title',
+      content: 'settings_sign_out_confirm_body',
+      confirmText: 'settings_sign_out',
+      cancelText: 'settings_cancel',
+      isDestructive: true,
     );
     if (confirmed == true && mounted) {
       await ref.read(authProvider.notifier).logout();

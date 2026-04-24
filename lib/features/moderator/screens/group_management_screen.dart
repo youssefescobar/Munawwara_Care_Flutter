@@ -12,6 +12,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../../core/widgets/custom_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -513,52 +514,13 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     ModeratorGroup group,
     PilgrimInGroup pilgrim,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await StandardDialog.show<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.r),
-        ),
-        title: Text(
-          'group_remove_title'.tr(),
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontWeight: FontWeight.w700,
-            fontSize: 17.sp,
-          ),
-        ),
-        content: Text(
-          '${'group_remove_body'.tr()} ${pilgrim.fullName}?',
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 14.sp,
-            color: AppColors.textMutedLight,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'group_remove_cancel'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                color: AppColors.textMutedLight,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'group_remove_confirm'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
+      title: 'group_remove_title',
+      content: '${'group_remove_body'.tr()} ${pilgrim.fullName}?',
+      confirmText: 'group_remove_confirm',
+      cancelText: 'group_remove_cancel',
+      isDestructive: true,
     );
     if (confirmed == true && mounted) {
       final (ok, err) = await ref
@@ -1504,14 +1466,18 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                               padding: EdgeInsets.all(12.w),
                               decoration: BoxDecoration(
                                 color: area.isMeetpoint
-                                    ? const Color(0xFFFEF2F2)
-                                    : isDark
-                                    ? AppColors.backgroundDark
-                                    : const Color(0xFFF0F0F8),
+                                    ? (isDark
+                                        ? const Color(0xFF450a0a)
+                                        : const Color(0xFFFEF2F2))
+                                    : (isDark
+                                        ? AppColors.backgroundDark
+                                        : const Color(0xFFF0F0F8)),
                                 borderRadius: BorderRadius.circular(14.r),
                                 border: Border.all(
                                   color: area.isMeetpoint
-                                      ? const Color(0xFFFECACA)
+                                      ? (isDark
+                                          ? const Color(0xFF991b1b)
+                                          : const Color(0xFFFECACA))
                                       : Colors.transparent,
                                 ),
                               ),
@@ -1569,7 +1535,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                                         0xFFDC2626,
                                                       ).withOpacity(0.15)
                                                     : AppColors.primary
-                                                          .withOpacity(0.15),
+                                                        .withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(6.r),
                                               ),
@@ -1577,7 +1543,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                                 area.isMeetpoint
                                                     ? 'area_meetpoint'.tr()
                                                     : 'area_suggestion_label'
-                                                          .tr(),
+                                                        .tr(),
                                                 style: TextStyle(
                                                   fontFamily: 'Lexend',
                                                   fontWeight: FontWeight.w600,
@@ -1635,64 +1601,15 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                     onTap: () async {
                                       if (area.isMeetpoint) {
                                         final shouldDelete =
-                                            await showDialog<bool>(
-                                              context: context,
-                                              builder: (dialogCtx) {
-                                                return AlertDialog(
-                                                  title: Text(
-                                                    'area_delete_meetpoint_confirm_title'
-                                                        .tr(),
-                                                    style: const TextStyle(
-                                                      fontFamily: 'Lexend',
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                  content: Text(
-                                                    'area_delete_meetpoint_confirm_message'
-                                                        .tr(),
-                                                    style: const TextStyle(
-                                                      fontFamily: 'Lexend',
-                                                    ),
-                                                  ),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Navigator.of(
-                                                          dialogCtx,
-                                                        ).pop(false);
-                                                      },
-                                                      child: Text(
-                                                        'area_cancel'.tr(),
-                                                        style: const TextStyle(
-                                                          fontFamily: 'Lexend',
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    ElevatedButton(
-                                                      style:
-                                                          ElevatedButton.styleFrom(
-                                                            backgroundColor:
-                                                                Colors.red,
-                                                          ),
-                                                      onPressed: () {
-                                                        Navigator.of(
-                                                          dialogCtx,
-                                                        ).pop(true);
-                                                      },
-                                                      child: Text(
-                                                        'msg_delete_confirm'
-                                                            .tr(),
-                                                        style: const TextStyle(
-                                                          fontFamily: 'Lexend',
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            ) ??
-                                            false;
+                                            await StandardDialog.show<bool>(
+                                          context: context,
+                                          title: 'area_delete_meetpoint_confirm_title',
+                                          content: 'area_delete_meetpoint_confirm_message',
+                                          confirmText: 'msg_delete_confirm',
+                                          cancelText: 'area_cancel',
+                                          isDestructive: true,
+                                        ) ??
+                                        false;
 
                                         if (!shouldDelete) return;
                                       }

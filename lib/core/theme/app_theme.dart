@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'app_colors.dart';
 
 // Lexend is declared in pubspec.yaml fonts section.
@@ -42,6 +43,24 @@ class AppTheme {
         bodyColor: AppColors.textDark,
         displayColor: AppColors.textDark,
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 18.sp,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textDark,
+        ),
+        contentTextStyle: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 14.sp,
+          color: AppColors.textMutedDark,
+        ),
+      ),
     );
   }
 
@@ -57,6 +76,24 @@ class AppTheme {
       textTheme: _textTheme.apply(
         bodyColor: AppColors.textLight,
         displayColor: AppColors.textLight,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        surfaceTintColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 18.sp,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+        contentTextStyle: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 14.sp,
+          color: AppColors.textMutedLight,
+        ),
       ),
     );
   }

@@ -1,4 +1,9 @@
 {
+  "dialog_cancel": "Cancel",
+  "dialog_confirm": "Confirm",
+  "dialog_delete": "Delete",
+  "dialog_yes": "Yes",
+  "dialog_no": "No",
   "welcome_back": "Welcome back",
   "login_subtitle": "Log in to Munawwara Care,\nyour companion for a blessed journey.",
   "tab_email": "Email",

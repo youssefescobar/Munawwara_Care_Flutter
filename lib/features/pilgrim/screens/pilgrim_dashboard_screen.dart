@@ -2471,15 +2471,6 @@ class _PlaceholderTab extends StatelessWidget {
               color: AppColors.textMutedLight,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'pilgrim_coming_soon'.tr(),
-            style: TextStyle(
-              fontFamily: 'Lexend',
-              fontSize: 13,
-              color: AppColors.textMutedLight.withOpacity(0.6),
-            ),
-          ),
         ],
       ),
     );
