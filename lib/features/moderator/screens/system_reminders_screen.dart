@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../../core/widgets/custom_dialog.dart';
+import '../../../core/widgets/standard_snackbar.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../providers/moderator_provider.dart';
@@ -85,15 +87,12 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
   Future<void> _createReminders() async {
     final msg = _messageController.text.trim();
     if (msg.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a reminder message')),
-      );
+      StandardSnackBar.showError(context, 'Please enter a reminder message');
       return;
     }
 
     final state = ref.read(moderatorProvider);
     final allGroups = state.groups;
-    final remState = ref.watch(reminderProvider);
 
     // Determine target groups
     List<String> targetGroups = [];
@@ -104,9 +103,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     }
 
     if (targetGroups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No groups selected to send reminder to')),
-      );
+      StandardSnackBar.showWarning(context, 'No groups selected to send reminder to');
       return;
     }
 
@@ -141,9 +138,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     setState(() => _isCreating = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminders created successfully!')),
-      );
+      if (mounted) StandardSnackBar.showSuccess(context, 'Reminders created successfully!');
       _messageController.clear();
       _selectedGroupIds.clear();
       setState(() {
@@ -153,38 +148,10 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         _isCustomInterval = false;
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Some reminders failed to create')),
-      );
+      if (mounted) StandardSnackBar.showError(context, 'Some reminders failed to create');
     }
   }
 
-  Widget _intervalChip(int min, String label) {
-    final sel = !_isCustomInterval && _selectedIntervalMin == min;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'Lexend',
-          fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
-          fontSize: 12.sp,
-          color: sel ? Colors.white : AppColors.primary,
-        ),
-      ),
-      selected: sel,
-      selectedColor: AppColors.primary,
-      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-      side: BorderSide.none,
-      onSelected: (v) {
-        if (v) {
-          setState(() {
-            _isCustomInterval = false;
-            _selectedIntervalMin = min;
-          });
-        }
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -900,43 +867,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                               ),
                             ),
                             confirmDismiss: (_) async {
-                              return showDialog<bool>(
+                              return StandardDialog.show<bool>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: Text(
-                                    'reminder_delete_title'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontSize: 16.sp,
-                                    ),
-                                  ),
-                                  content: Text(
-                                    'reminder_delete_body'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontSize: 14.sp,
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, false),
-                                      child: Text(
-                                        'reminder_no'.tr(),
-                                        style: const TextStyle(fontFamily: 'Lexend'),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(
-                                        'reminder_delete_confirm'.tr(),
-                                        style: const TextStyle(
-                                          fontFamily: 'Lexend',
-                                          color: Colors.redAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                title: 'reminder_delete_title',
+                                content: 'reminder_delete_body',
+                                confirmText: 'reminder_delete_confirm',
+                                cancelText: 'reminder_no',
+                                isDestructive: true,
                               );
                             },
                             onDismissed: (_) =>
@@ -944,37 +881,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             child: ReminderCard(
                               reminder: reminder,
                               onCancel: () async {
-                                final confirmed = await showDialog<bool>(
+                                final confirmed = await StandardDialog.show<bool>(
                                   context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: Text(
-                                      'reminder_cancel_title'.tr(),
-                                      style: TextStyle(fontFamily: 'Lexend', fontSize: 16.sp),
-                                    ),
-                                    content: Text(
-                                      'reminder_cancel_body'.tr(),
-                                      style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx, false),
-                                        child: Text(
-                                          'reminder_no'.tr(),
-                                          style: const TextStyle(fontFamily: 'Lexend'),
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        child: Text(
-                                          'reminder_cancel_confirm'.tr(),
-                                          style: const TextStyle(
-                                            fontFamily: 'Lexend',
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  title: 'reminder_cancel_title',
+                                  content: 'reminder_cancel_body',
+                                  confirmText: 'reminder_cancel_confirm',
+                                  cancelText: 'reminder_no',
+                                  isDestructive: true,
                                 );
                                 if (confirmed == true && mounted) {
                                   await ref.read(reminderProvider.notifier).cancel(reminder.id);

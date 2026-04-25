@@ -13,6 +13,8 @@ import '../../auth/providers/auth_provider.dart';
 import '../../moderator/widgets/pilgrim_profile_sheet.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/widgets/custom_dialog.dart';
+import '../../../core/widgets/standard_snackbar.dart';
 import '../../pilgrim/providers/pilgrim_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,18 +40,12 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
 
   Future<void> _acceptInvitation(String invId) async {
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
+      StandardDialog.showLoading(context);
 
       final res = await ApiService.dio.post('/invitations/$invId/accept');
       
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         // Reload dashboard so groupInfo is populated
@@ -60,91 +56,50 @@ class _AlertsTabState extends ConsumerState<AlertsTab> {
           await ref.read(pilgrimProvider.notifier).loadDashboard();
         }
         
-        // Remove or update the notification by fetching
         ref.read(notificationProvider.notifier).fetch();
+        
+        if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.data['message']?.toString() ?? 'Invitation accepted!'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        StandardSnackBar.showSuccess(context, res.data['message']?.toString() ?? 'Invitation accepted!');
       }
     } on DioException catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ApiService.parseError(e)),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      StandardSnackBar.showError(context, ApiService.parseError(e));
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('An unexpected error occurred'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      StandardSnackBar.showError(context, 'An unexpected error occurred');
     }
   }
 
   Future<void> _declineInvitation(String invId) async {
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
+      StandardDialog.showLoading(context);
 
       final res = await ApiService.dio.post('/invitations/$invId/decline');
       
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         // Remove or update the notification by fetching
         ref.read(notificationProvider.notifier).fetch();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.data['message']?.toString() ?? 'Invitation declined.'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        StandardSnackBar.showSuccess(context, res.data['message']?.toString() ?? 'Invitation declined.');
       }
     } on DioException catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ApiService.parseError(e)),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      StandardSnackBar.showError(context, ApiService.parseError(e));
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      StandardDialog.hide(context); // close dialog
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('An unexpected error occurred'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      StandardSnackBar.showError(context, 'An unexpected error occurred');
     }
   }
 
@@ -299,7 +254,7 @@ class _NotificationTile extends ConsumerWidget {
             : Border(left: BorderSide(color: n.iconColor, width: 3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -417,17 +372,7 @@ class _NotificationTile extends ConsumerWidget {
                                   uid,
                                 );
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Pilgrim not found in your groups',
-                                      style: const TextStyle(
-                                        fontFamily: 'Lexend',
-                                      ),
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                StandardSnackBar.showWarning(context, 'Pilgrim not found in your groups');
                               }
                             },
                             child: Container(
@@ -523,12 +468,7 @@ class _NotificationTile extends ConsumerWidget {
                               if (invId != null && onAcceptInvitation != null) {
                                 onAcceptInvitation!(invId);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Invalid invitation data'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                StandardSnackBar.showError(context, 'Invalid invitation data');
                               }
                             },
                             child: Container(
@@ -570,12 +510,7 @@ class _NotificationTile extends ConsumerWidget {
                               if (invId != null && onDeclineInvitation != null) {
                                 onDeclineInvitation!(invId);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Invalid invitation data'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                StandardSnackBar.showError(context, 'Invalid invitation data');
                               }
                             },
                             child: Container(

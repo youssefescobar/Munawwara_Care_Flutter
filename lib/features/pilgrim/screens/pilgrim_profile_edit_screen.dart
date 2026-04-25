@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PilgrimProfileEditScreen extends ConsumerStatefulWidget {
@@ -68,30 +69,12 @@ class _PilgrimProfileEditScreenState
     setState(() => _saving = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('edit_profile_success'.tr()),
-          backgroundColor: AppColors.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-        ),
-      );
+      StandardSnackBar.showSuccess(context, 'edit_profile_success');
       Navigator.of(context).pop();
     } else {
       final error =
           ref.read(authProvider).error ?? 'edit_profile_error_generic'.tr();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-        ),
-      );
+      StandardSnackBar.showError(context, error);
     }
   }
 
@@ -136,7 +119,7 @@ class _PilgrimProfileEditScreenState
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -232,7 +215,7 @@ class _PilgrimProfileEditScreenState
                           decoration: BoxDecoration(
                             color: isDark
                                 ? AppColors.backgroundDark
-                                : AppColors.primary.withOpacity(0.15),
+                                : AppColors.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8.r),
                           ),
                           child: Text(
@@ -262,8 +245,8 @@ class _PilgrimProfileEditScreenState
                           borderRadius: BorderRadius.circular(16.r),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(
-                                isDark ? 0.3 : 0.06,
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.3 : 0.06,
                               ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
@@ -317,8 +300,8 @@ class _PilgrimProfileEditScreenState
                           borderRadius: BorderRadius.circular(16.r),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(
-                                isDark ? 0.3 : 0.06,
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.3 : 0.06,
                               ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
@@ -503,7 +486,7 @@ class _PilgrimProfileEditScreenState
                                         hintStyle: TextStyle(
                                           fontFamily: 'Lexend',
                                           fontSize: 13.sp,
-                                          color: textMuted.withOpacity(0.6),
+                                          color: textMuted.withValues(alpha: 0.6),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding: EdgeInsets.symmetric(
@@ -530,7 +513,7 @@ class _PilgrimProfileEditScreenState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             disabledBackgroundColor: AppColors.primary
-                                .withOpacity(0.6),
+                                .withValues(alpha: 0.6),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -691,110 +674,6 @@ class _EditField extends StatelessWidget {
   }
 }
 
-class _ReadOnlyField extends StatelessWidget {
-  const _ReadOnlyField({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.isDark,
-    required this.textPrimary,
-    required this.textMuted,
-  });
-
-  final String value;
-  final String label;
-  final IconData icon;
-  final bool isDark;
-  final Color textPrimary;
-  final Color textMuted;
-  final bool isVerified;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 6.h),
-      child: Row(
-        children: [
-          Container(
-            width: 38.w,
-            height: 38.w,
-            decoration: BoxDecoration(
-              color: textMuted.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: Icon(icon, color: textMuted, size: 18.sp),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 14.h),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 11.sp,
-                    color: textMuted,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        value,
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 14.sp,
-                          color: textMuted,
-                        ),
-                      ),
-                    ),
-                    if (isVerified)
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 7.w,
-                          vertical: 3.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.iconBgDark
-                              : AppColors.iconBgLight,
-                          borderRadius: BorderRadius.circular(6.r),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.verified_rounded,
-                              size: 12.sp,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 3.w),
-                            Text(
-                              'edit_profile_email_verified'.tr(),
-                              style: TextStyle(
-                                fontFamily: 'Lexend',
-                                fontSize: 10.sp,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                SizedBox(height: 14.h),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _GenderChip extends StatelessWidget {
   const _GenderChip({

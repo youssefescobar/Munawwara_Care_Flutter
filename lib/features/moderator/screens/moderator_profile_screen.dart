@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/custom_dialog.dart';
 
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -55,56 +56,13 @@ class _ModeratorProfileScreenState
   }
 
   Future<void> _signOut() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await StandardDialog.show<bool>(
       context: context,
-      builder: (ctx) {
-        final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDarkDialog ? AppColors.surfaceDark : Colors.white,
-          title: Text(
-            'settings_sign_out_confirm_title'.tr(),
-            style: TextStyle(
-              color: isDarkDialog ? AppColors.textLight : AppColors.textDark,
-              fontFamily: 'Lexend',
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: Text(
-            'settings_sign_out_confirm_body'.tr(),
-            style: TextStyle(
-              color: isDarkDialog
-                  ? AppColors.textMutedLight
-                  : AppColors.textMutedDark,
-              fontFamily: 'Lexend',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(
-                'settings_cancel'.tr(),
-                style: TextStyle(
-                  color: isDarkDialog
-                      ? AppColors.textLight
-                      : AppColors.textDark,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-              child: Text('settings_sign_out'.tr()),
-            ),
-          ],
-        );
-      },
+      title: 'settings_sign_out_confirm_title',
+      content: 'settings_sign_out_confirm_body',
+      confirmText: 'settings_sign_out',
+      cancelText: 'settings_cancel',
+      isDestructive: true,
     );
     if (confirmed == true && mounted) {
       await ref.read(authProvider.notifier).logout();
@@ -178,7 +136,7 @@ class _ModeratorProfileScreenState
                         borderRadius: BorderRadius.circular(16.r),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(
+                            color: Colors.black.withValues(alpha: 
                               isDark ? 0.3 : 0.06,
                             ),
                             blurRadius: 12,
@@ -199,7 +157,7 @@ class _ModeratorProfileScreenState
                               decoration: BoxDecoration(
                                 color: isDark
                                     ? AppColors.surfaceDark
-                                    : AppColors.primary.withOpacity(0.15),
+                                    : AppColors.primary.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12.r),
                               ),
                               child: Icon(
@@ -237,7 +195,7 @@ class _ModeratorProfileScreenState
                             Switch(
                               value: isDark,
                               activeThumbColor: AppColors.primary,
-                              activeTrackColor: AppColors.primary.withOpacity(
+                              activeTrackColor: AppColors.primary.withValues(alpha: 
                                 0.3,
                               ),
                               inactiveThumbColor: isDark
@@ -267,7 +225,7 @@ class _ModeratorProfileScreenState
                         borderRadius: BorderRadius.circular(16.r),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(
+                            color: Colors.black.withValues(alpha: 
                               isDark ? 0.3 : 0.06,
                             ),
                             blurRadius: 12,
@@ -411,7 +369,7 @@ class _Header extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -473,7 +431,7 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -526,7 +484,7 @@ class _ProfileCard extends StatelessWidget {
                     vertical: 3.h,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.15),
+                    color: AppColors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(

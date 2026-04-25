@@ -20,6 +20,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/in_app_popup.dart';
+import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
@@ -173,13 +174,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           // Show notification to user
           final map = data as Map<String, dynamic>;
           final groupName = map['group_name'] as String? ?? 'the group';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('You have been removed from $groupName'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
-            ),
-          );
+          StandardSnackBar.showWarning(context, 'You have been removed from $groupName', duration: const Duration(seconds: 5));
         });
 
         // Listen for new group messages — append silently to avoid flicker
@@ -245,13 +240,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           if (!mounted) return;
           ref.read(authProvider.notifier).logout();
           context.go('/login');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Your login code was refreshed. You have been logged out.'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
+          StandardSnackBar.showError(context, 'Your login code was refreshed. You have been logged out.', duration: const Duration(seconds: 5));
         });
 
         // Listen for group membership changes (moderator controlled)
@@ -711,31 +700,20 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
                   autoRouteMods: autoRouteMods,
                   onAllBusy: () {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('sos_all_busy_warning'.tr()),
-                          backgroundColor: Colors.red.shade700,
-                        ),
-                      );
+                      StandardSnackBar.showError(context, 'sos_all_busy_warning');
                     }
                   },
                 )),
               );
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('dash_no_moderator_call'.tr()),
-                ),
-              );
+              StandardSnackBar.showWarning(context, 'dash_no_moderator_call');
             }
           },
           onNormalCall: () async {
             final mods = ref.read(pilgrimProvider).groupInfo?.moderators ?? [];
             if (mods.isEmpty) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('dash_no_mod_phone'.tr())),
-                );
+                StandardSnackBar.showWarning(context, 'dash_no_mod_phone');
               }
               return;
             }
@@ -790,9 +768,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
                               if (await canLaunchUrl(uri)) {
                                 await launchUrl(uri);
                               } else if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('dash_error_dialer'.tr())),
-                                );
+                                StandardSnackBar.showError(context, 'dash_error_dialer');
                               }
                             } : null,
                           );
@@ -810,16 +786,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       // Get the actual error message from the provider
       final errorMsg = ref.read(pilgrimProvider).error ?? 'sos_failed'.tr();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.grey.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          content: Text(errorMsg, style: const TextStyle(color: Colors.white)),
-        ),
-      );
+      StandardSnackBar.showError(context, errorMsg);
     }
   }
 
@@ -833,19 +800,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       });
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        content: Text(
-          'sos_cancelled'.tr(),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ),
-    );
+    StandardSnackBar.showSuccess(context, 'sos_cancelled');
   }
 
   // ── Join Group (no longer used - moderator assigns pilgrims) ────────────────
@@ -1836,7 +1791,7 @@ class _SosButtonState extends State<_SosButton>
                       height: size.w,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.red.withOpacity(
+                        color: Colors.red.withValues(alpha: 
                           0.15 * widget.pulseController.value,
                         ),
                       ),
@@ -1866,7 +1821,7 @@ class _SosButtonState extends State<_SosButton>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withOpacity(
+                      color: Colors.red.withValues(alpha: 
                         _isPressed || widget.isHolding ? 0.25 : 0.45,
                       ),
                       blurRadius: _isPressed || widget.isHolding ? 14 : 30,
@@ -1916,7 +1871,7 @@ class _SosButtonState extends State<_SosButton>
                               fontFamily: 'Lexend',
                               fontSize: 20.sp,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha: 0.6),
                               letterSpacing: 2,
                             ),
                           ),
@@ -1945,7 +1900,7 @@ class _SosButtonState extends State<_SosButton>
                       value: widget.holdController.value,
                       strokeWidth: ringStroke,
                       color: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
                     ),
                   ),
                 ),
@@ -2221,7 +2176,7 @@ class _PilgrimMapTab extends StatelessWidget {
                             border: Border.all(color: Colors.white, width: 2.5),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.5),
+                                color: AppColors.primary.withValues(alpha: 0.5),
                                 blurRadius: 10,
                                 spreadRadius: 3,
                               ),
@@ -2273,7 +2228,7 @@ class _PilgrimMapTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16.r),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -2327,7 +2282,7 @@ class _PilgrimMapTab extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
+                    color: Colors.black.withValues(alpha: 0.12),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -2361,7 +2316,7 @@ class _PilgrimMapTab extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFDC2626).withOpacity(0.45),
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.45),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
@@ -2469,15 +2424,6 @@ class _PlaceholderTab extends StatelessWidget {
               fontFamily: 'Lexend',
               fontSize: 16,
               color: AppColors.textMutedLight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'pilgrim_coming_soon'.tr(),
-            style: TextStyle(
-              fontFamily: 'Lexend',
-              fontSize: 13,
-              color: AppColors.textMutedLight.withOpacity(0.6),
             ),
           ),
         ],
@@ -2762,7 +2708,7 @@ class _SuggestionsCycleButtonState extends State<_SuggestionsCycleButton> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.45),
+                  color: AppColors.primary.withValues(alpha: 0.45),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -2839,7 +2785,7 @@ void _showAreaInfo(BuildContext context, SuggestedArea area) {
             width: 56.w,
             height: 56.w,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -2853,7 +2799,7 @@ void _showAreaInfo(BuildContext context, SuggestedArea area) {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8.r),
             ),
             child: Text(
@@ -2951,6 +2897,7 @@ void _showAreaInfo(BuildContext context, SuggestedArea area) {
                   ),
                 );
                 if (confirmed == true) {
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   final lat = area.latitude;
                   final lng = area.longitude;
@@ -2982,10 +2929,6 @@ void _showAreaInfo(BuildContext context, SuggestedArea area) {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: color,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16.r),
-                ),
-                elevation: 0,
               ),
             ),
           ),
@@ -3016,7 +2959,7 @@ class _PilgrimAreaMarker extends StatelessWidget {
             borderRadius: BorderRadius.circular(10.r),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.35),
+                color: color.withValues(alpha: 0.35),
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
@@ -3059,7 +3002,7 @@ class _PilgrimAreaMarker extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.5),
+                color: color.withValues(alpha: 0.5),
                 blurRadius: 6,
                 spreadRadius: 2,
               ),
@@ -3116,7 +3059,7 @@ class _SosCallOptionsSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(28.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -3143,7 +3086,7 @@ class _SosCallOptionsSheet extends StatelessWidget {
               width: 60.w,
               height: 60.w,
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.12),
+                color: Colors.red.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -3194,10 +3137,6 @@ class _SosCallOptionsSheet extends StatelessWidget {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(vertical: 14.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  elevation: 0,
                 ),
               ),
             ),
@@ -3218,12 +3157,7 @@ class _SosCallOptionsSheet extends StatelessWidget {
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary, width: 1.5),
                   padding: EdgeInsets.symmetric(vertical: 14.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
                 ),
               ),
             ),
