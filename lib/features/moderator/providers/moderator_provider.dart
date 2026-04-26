@@ -23,6 +23,8 @@ class PilgrimInGroup {
   final String? busInfo;
   final String? visaNumber;
   final String? visaStatus;
+  final String language;
+  final String ethnicity;
 
   const PilgrimInGroup({
     required this.id,
@@ -43,6 +45,8 @@ class PilgrimInGroup {
     this.busInfo,
     this.visaNumber,
     this.visaStatus,
+    this.language = 'en',
+    this.ethnicity = 'Other',
   });
 
   factory PilgrimInGroup.fromJson(Map<String, dynamic> j) {
@@ -67,6 +71,8 @@ class PilgrimInGroup {
       busInfo: j['bus_info']?.toString(),
       visaNumber: j['visa']?['visa_number']?.toString(),
       visaStatus: j['visa']?['status']?.toString(),
+      language: j['language']?.toString() ?? 'en',
+      ethnicity: j['ethnicity']?.toString() ?? 'Other',
     );
   }
 
@@ -96,6 +102,8 @@ class PilgrimInGroup {
     busInfo: busInfo,
     visaNumber: visaNumber,
     visaStatus: visaStatus,
+    language: language,
+    ethnicity: ethnicity,
   );
 
   bool get hasLocation => lat != null && lng != null;

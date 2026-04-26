@@ -109,7 +109,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen>
 
     return Scaffold(
       backgroundColor: isDark
-          ? AppColors.surfaceDark
+          ? AppColors.backgroundDark
           : AppColors.backgroundLight,
       body: SafeArea(
         child: Column(
@@ -235,9 +235,36 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen>
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
             hintText: 'create_group_name_hint'.tr(),
+            hintStyle: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 14.sp,
+              color: AppColors.textMutedLight,
+            ),
             prefixIcon: Icon(
               Symbols.group,
               size: 22.w,
+              color: AppColors.primary,
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16.r),
+              borderSide: BorderSide(
+                color: isDark
+                    ? AppColors.backgroundDark
+                    : const Color(0xFFE2E2F0),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16.r),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 1.5,
+              ),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 16.h,
             ),
           ),
           onSubmitted: (_) => _submit(),

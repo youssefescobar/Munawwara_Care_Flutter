@@ -9,6 +9,9 @@ import '../../../core/theme/app_colors.dart';
 import '../providers/moderator_provider.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../../core/widgets/custom_dialog.dart';
+import '../widgets/pilgrim_profile_sheet.dart';
+import '../providers/moderator_provider.dart';
+import '../../auth/providers/auth_provider.dart';
 
 // ── Data Models ──────────────────────────────────────────────────────────────
 
@@ -29,6 +32,7 @@ class _PilgrimItem {
   final String? roomNumber;
   final String? busInfo;
   final String? visaStatus;
+  final String? visaNumber;
   final String? medicalHistory;
 
   const _PilgrimItem({
@@ -48,6 +52,7 @@ class _PilgrimItem {
     this.roomNumber,
     this.busInfo,
     this.visaStatus,
+    this.visaNumber,
     this.medicalHistory,
   });
 
@@ -70,11 +75,33 @@ class _PilgrimItem {
       roomNumber: m['room_number']?.toString(),
       busInfo: m['bus_info']?.toString(),
       visaStatus: m['visa']?['status']?.toString(),
+      visaNumber: m['visa']?['visa_number']?.toString(),
       medicalHistory: m['medical_history']?.toString(),
     );
   }
 
   bool get isAssigned => currentGroupId != null;
+
+  PilgrimInGroup toPilgrimInGroup() => PilgrimInGroup(
+        id: id,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        nationalId: nationalId,
+        isOnline: isOnline,
+        lastUpdated: DateTime.now(), // Fake or not available here
+        batteryPercent: null,
+        lat: null,
+        lng: null,
+        hotelName: hotelName,
+        roomNumber: roomNumber,
+        busInfo: busInfo,
+        visaNumber: visaNumber,
+        visaStatus: visaStatus,
+        language: language,
+        ethnicity: ethnicity,
+        medicalHistory: medicalHistory,
+        age: age,
+      );
 }
 
 class _GroupOption {
@@ -370,12 +397,9 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
   }
 
   void _showProfileSheet(_PilgrimItem pilgrim, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PilgrimProfileSheet(pilgrim: pilgrim, isDark: isDark),
-    );
+    final currentUserId = ref.read(authProvider).userId ?? '';
+    final gId = pilgrim.currentGroupId ?? 'limbo';
+    showPilgrimProfileSheet(context, pilgrim.toPilgrimInGroup(), gId, currentUserId);
   }
 
   @override
@@ -1294,330 +1318,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
 
 }
 
-// ── Pilgrim Profile Sheet ───────────────────────────────────────────────────
 
-class _PilgrimProfileSheet extends StatelessWidget {
-  final _PilgrimItem pilgrim;
-  final bool isDark;
-
-  const _PilgrimProfileSheet({required this.pilgrim, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDark ? AppColors.backgroundDark : Colors.white;
-    final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
-    final textMuted = isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-      ),
-      child: Column(
-        children: [
-          // Handle
-          Container(
-            margin: EdgeInsets.only(top: 12.h),
-            width: 40.w,
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white24 : Colors.black12,
-              borderRadius: BorderRadius.circular(2.r),
-            ),
-          ),
-
-          // Header
-          Padding(
-            padding: EdgeInsets.all(20.w),
-            child: Row(
-              children: [
-                Text(
-                  'Pilgrim Profile',
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.w700,
-                    color: textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(Symbols.close, color: textMuted),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 20.w),
-              children: [
-                // Top Info Card
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.surfaceDark : AppColors.primary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                      color: isDark ? AppColors.dividerDark : AppColors.primary.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64.w,
-                        height: 64.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            pilgrim.fullName.isNotEmpty ? pilgrim.fullName[0].toUpperCase() : '?',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 24.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pilgrim.fullName,
-                              style: TextStyle(
-                                fontFamily: 'Lexend',
-                                fontSize: 18.sp,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 4.h),
-                            Row(
-                              children: [
-                                Icon(Symbols.phone, size: 14.w, color: textMuted),
-                                SizedBox(width: 4.w),
-                                Text(
-                                  pilgrim.phoneNumber,
-                                  style: TextStyle(
-                                    fontFamily: 'Lexend',
-                                    fontSize: 13.sp,
-                                    color: textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: 24.h),
-
-                // Logistics Section
-                _ProfileSectionTitle(title: 'Travel & Accommodation', isDark: isDark),
-                _InfoRow(
-                  icon: Symbols.apartment,
-                  label: 'Hotel',
-                  value: pilgrim.hotelName ?? 'Not Assigned',
-                  isDark: isDark,
-                ),
-                _InfoRow(
-                  icon: Symbols.meeting_room,
-                  label: 'Room Number',
-                  value: pilgrim.roomNumber ?? 'Not Assigned',
-                  isDark: isDark,
-                ),
-                _InfoRow(
-                  icon: Symbols.directions_bus,
-                  label: 'Bus Info',
-                  value: pilgrim.busInfo ?? 'Not Assigned',
-                  isDark: isDark,
-                ),
-
-                SizedBox(height: 24.h),
-
-                // Visa Section
-                _ProfileSectionTitle(title: 'Visa Information', isDark: isDark),
-                _InfoRow(
-                  icon: Symbols.verified_user,
-                  label: 'Visa Status',
-                  value: pilgrim.visaStatus?.toUpperCase() ?? 'UNKNOWN',
-                  valueColor: _getVisaColor(pilgrim.visaStatus),
-                  isDark: isDark,
-                ),
-
-                SizedBox(height: 24.h),
-
-                // Medical History
-                _ProfileSectionTitle(title: 'Medical History', isDark: isDark),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Text(
-                    (pilgrim.medicalHistory == null || pilgrim.medicalHistory!.isEmpty)
-                        ? 'No medical history provided.'
-                        : pilgrim.medicalHistory!,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontSize: 14.sp,
-                      color: textPrimary,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: 24.h),
-
-                // Personal Details
-                _ProfileSectionTitle(title: 'Personal Details', isDark: isDark),
-                _InfoRow(
-                  icon: Symbols.badge,
-                  label: 'National ID',
-                  value: pilgrim.nationalId ?? 'Not Provided',
-                  isDark: isDark,
-                ),
-                _InfoRow(
-                  icon: Symbols.cake,
-                  label: 'Age',
-                  value: pilgrim.age != null ? '${pilgrim.age} years' : 'Not Provided',
-                  isDark: isDark,
-                ),
-                _InfoRow(
-                  icon: Symbols.language,
-                  label: 'Language',
-                  value: pilgrim.language.toUpperCase(),
-                  isDark: isDark,
-                ),
-                _InfoRow(
-                  icon: Symbols.public,
-                  label: 'Ethnicity',
-                  value: pilgrim.ethnicity,
-                  isDark: isDark,
-                ),
-
-                SizedBox(height: 40.h),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getVisaColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'issued':
-        return Colors.green.shade600;
-      case 'pending':
-        return Colors.orange.shade600;
-      case 'rejected':
-      case 'expired':
-        return Colors.red.shade600;
-      default:
-        return Colors.grey.shade600;
-    }
-  }
-}
-
-class _ProfileSectionTitle extends StatelessWidget {
-  final String title;
-  final bool isDark;
-
-  const _ProfileSectionTitle({required this.title, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12.h),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontFamily: 'Lexend',
-          fontSize: 11.sp,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.2,
-          color: isDark ? AppColors.primary : AppColors.primary.withValues(alpha: 0.8),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isDark;
-  final Color? valueColor;
-
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.isDark,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
-    final textMuted = isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 16.h),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Icon(icon, size: 18.w, color: AppColors.primary),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 11.sp,
-                    color: textMuted,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: valueColor ?? textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 
 

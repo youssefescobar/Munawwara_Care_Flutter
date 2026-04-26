@@ -172,9 +172,11 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           // Clear suggested areas
           ref.read(suggestedAreaProvider.notifier).clear();
           // Show notification to user
-          final map = data as Map<String, dynamic>;
+          final map = data is Map<String, dynamic> ? data : {};
           final groupName = map['group_name'] as String? ?? 'the group';
           StandardSnackBar.showWarning(context, 'You have been removed from $groupName', duration: const Duration(seconds: 5));
+          // Refresh pilgrim state so limbo UI shows
+          ref.invalidate(pilgrimProvider);
         });
 
         // Listen for new group messages — append silently to avoid flicker
@@ -257,11 +259,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           });
         });
 
-        SocketService.on('removed-from-group', (_) {
-          if (!mounted) return;
-          // Refresh pilgrim state so limbo UI shows
-          ref.invalidate(pilgrimProvider);
-        });
+
       }
       // Fetch notification badge count
       ref.read(notificationProvider.notifier).fetchUnreadCount();
@@ -803,11 +801,6 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     StandardSnackBar.showSuccess(context, 'sos_cancelled');
   }
 
-  // ── Join Group (no longer used - moderator assigns pilgrims) ────────────────
-  // Kept as stub for any remaining references
-  void _openJoinGroup() {}
-
-
   // ── Navigate to Moderator ──────────────────────────────────────────────────
 
   Future<void> _navigateToModerator(ModeratorBeacon beacon) async {
@@ -862,11 +855,16 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         onSosHoldEnd: _onSosHoldEnd,
         onRefresh: () async {
           await ref.read(pilgrimProvider.notifier).loadDashboard();
+          final gId = ref.read(pilgrimProvider).groupInfo?.groupId;
+          if (gId != null) {
+            await ref.read(suggestedAreaProvider.notifier).load(gId);
+          }
           await _loadWeatherAlert(force: true);
         },
         sosCountdown: _sosCountdown,
         onCancelSos: _cancelSOS,
         navBeacons: pilgrimState.navBeacons,
+        myLocation: _myLatLng,
         onNavigateToModerator: _navigateToModerator,
         notificationCount: notifCount,
         onNotificationTap: () {
@@ -882,7 +880,6 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
               });
         },
         onSettingsTap: () => setState(() => _currentTab = 4),
-        onJoinGroup: _openJoinGroup,
         onGroupCardTap: () {
           if (pilgrimState.groupInfo != null) {
             final hasModerator = pilgrimState.groupInfo!.moderators.isNotEmpty;
@@ -985,11 +982,11 @@ class _HomeTab extends StatelessWidget {
   final int sosCountdown;
   final VoidCallback onCancelSos;
   final Map<String, ModeratorBeacon> navBeacons;
+  final LatLng? myLocation;
   final void Function(ModeratorBeacon) onNavigateToModerator;
   final int notificationCount;
   final VoidCallback onNotificationTap;
   final VoidCallback onSettingsTap;
-  final VoidCallback onJoinGroup;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
 
@@ -1006,11 +1003,11 @@ class _HomeTab extends StatelessWidget {
     required this.sosCountdown,
     required this.onCancelSos,
     required this.navBeacons,
+    this.myLocation,
     required this.onNavigateToModerator,
     required this.notificationCount,
     required this.onNotificationTap,
     required this.onSettingsTap,
-    required this.onJoinGroup,
     required this.onGroupCardTap,
     required this.onHotspotsTap,
   });
@@ -1136,8 +1133,8 @@ class _HomeTab extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.navigation_rounded,
-                              color: AppColors.primary,
+                              myLocation == null ? Symbols.location_off : Icons.navigation_rounded,
+                              color: myLocation == null ? Colors.red : AppColors.primary,
                               size: 18.w,
                             ),
                             SizedBox(width: 10.w),
@@ -1192,6 +1189,7 @@ class _HomeTab extends StatelessWidget {
                     onGroupCardTap: onGroupCardTap,
                     onHotspotsTap: onHotspotsTap,
                     navBeacons: navBeacons,
+                    myLocation: myLocation,
                     onNavigateToModerator: onNavigateToModerator,
                   ),
                 )
@@ -1212,6 +1210,7 @@ class _HomeTab extends StatelessWidget {
                     onGroupCardTap: onGroupCardTap,
                     onHotspotsTap: onHotspotsTap,
                     navBeacons: navBeacons,
+                    myLocation: myLocation,
                     onNavigateToModerator: onNavigateToModerator,
                   ),
                 ),
@@ -1244,6 +1243,7 @@ class _HomeBody extends StatelessWidget {
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
   final Map<String, ModeratorBeacon> navBeacons;
+  final LatLng? myLocation;
   final void Function(ModeratorBeacon) onNavigateToModerator;
 
   const _HomeBody({
@@ -1261,6 +1261,7 @@ class _HomeBody extends StatelessWidget {
     required this.onGroupCardTap,
     required this.onHotspotsTap,
     required this.navBeacons,
+    this.myLocation,
     required this.onNavigateToModerator,
   });
 
@@ -1393,81 +1394,135 @@ class _HomeBody extends StatelessWidget {
                       ),
                     ),
                     const Divider(height: 1),
-                    ...navBeacons.values.map(
-                      (beacon) => Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16.w, vertical: 10.h),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40.w,
-                              height: 40.w,
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppColors.iconBgDark
-                                    : AppColors.iconBgLight,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Symbols.person_pin_circle,
-                                  size: 22.w, color: AppColors.primary),
-                            ),
-                            SizedBox(width: 12.w),
-                            Expanded(
-                              child: Text(
-                                beacon.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontFamily: 'Lexend',
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14.sp,
-                                  color: isDark
-                                      ? Colors.white
-                                      : AppColors.textDark,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 10.w),
-                            GestureDetector(
-                              onTap: () => onNavigateToModerator(beacon),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 14.w, vertical: 9.h),
+                    ...(() {
+                      final list = navBeacons.values.toList();
+                      if (myLocation != null) {
+                        list.sort((a, b) {
+                          final dA = Geolocator.distanceBetween(
+                            myLocation!.latitude,
+                            myLocation!.longitude,
+                            a.lat,
+                            a.lng,
+                          );
+                          final dB = Geolocator.distanceBetween(
+                            myLocation!.latitude,
+                            myLocation!.longitude,
+                            b.lat,
+                            b.lng,
+                          );
+                          return dA.compareTo(dB);
+                        });
+                      }
+                      return list.map((beacon) {
+                        double? dist;
+                        if (myLocation != null) {
+                          dist = Geolocator.distanceBetween(
+                            myLocation!.latitude,
+                            myLocation!.longitude,
+                            beacon.lat,
+                            beacon.lng,
+                          );
+                        }
+                        String distStr = '';
+                        if (dist != null) {
+                          if (dist < 1000) {
+                            distStr = '${dist.toStringAsFixed(0)}m';
+                          } else {
+                            distStr = '${(dist / 1000).toStringAsFixed(1)}km';
+                          }
+                        }
+
+                        return Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.w, vertical: 10.h),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40.w,
+                                height: 40.w,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(14.r),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.primary
-                                          .withValues(alpha: 0.35),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
+                                  color: isDark
+                                      ? AppColors.iconBgDark
+                                      : AppColors.iconBgLight,
+                                  shape: BoxShape.circle,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                child: Icon(Symbols.person_pin_circle,
+                                    size: 22.w, color: AppColors.primary),
+                              ),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Symbols.navigation,
-                                        color: Colors.white, size: 16.w),
-                                    SizedBox(width: 6.w),
                                     Text(
-                                      'nav_go'.tr(),
+                                      beacon.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontFamily: 'Lexend',
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13.sp,
-                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14.sp,
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.textDark,
                                       ),
                                     ),
+                                    if (distStr.isNotEmpty)
+                                      Text(
+                                        distStr,
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontSize: 12.sp,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : AppColors.textMutedDark,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                              SizedBox(width: 10.w),
+                              GestureDetector(
+                                onTap: () => onNavigateToModerator(beacon),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 14.w, vertical: 9.h),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(14.r),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.35),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Symbols.navigation,
+                                          color: Colors.white, size: 16.w),
+                                      SizedBox(width: 6.w),
+                                      Text(
+                                        'nav_go'.tr(),
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.sp,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList();
+                    })(),
                     SizedBox(height: 8.h),
                   ],
                 ),
@@ -2971,8 +3026,7 @@ class _PilgrimAreaMarker extends StatelessWidget {
             children: [
               Icon(icon, size: 14.w, color: color, fill: 1),
               SizedBox(width: 4.w),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 56.w),
+              Flexible(
                 child: Text(
                   area.name,
                   maxLines: 1,

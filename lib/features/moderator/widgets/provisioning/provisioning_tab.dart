@@ -125,6 +125,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
       final hotelsRaw = (payload['hotels'] as List<dynamic>? ?? const []);
       final busesRaw = (payload['buses'] as List<dynamic>? ?? const []);
 
+      if (!mounted) return;
       setState(() {
         _hotels = hotelsRaw.whereType<Map>().map((h) {
           final map = Map<String, dynamic>.from(h);
@@ -175,12 +176,14 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
       final summaryMap = (payload['summary'] as Map<String, dynamic>? ?? <String, dynamic>{});
       final itemsRaw = (payload['items'] as List<dynamic>? ?? const []);
 
+      if (!mounted) return;
       setState(() {
         _summary = ProvisioningSummary.fromJson(summaryMap);
         _items = itemsRaw.whereType<Map>().map((i) => ProvisioningItem.fromJson(Map<String, dynamic>.from(i))).toList();
       });
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
+        if (!mounted) return;
         setState(() => _provisioningStatusSupported = false);
       }
     } finally {

@@ -34,8 +34,10 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     });
   }
 
-  int _targetAudienceIndex = 0; // 0 = System Wide, 1 = Specific Groups
+  int _targetAudienceIndex = 0; // 0 = System Wide, 1 = Specific Groups, 2 = Specific Pilgrim
   final Set<String> _selectedGroupIds = {};
+  String? _selectedGroupIdForPilgrim;
+  String? _selectedPilgrimId;
 
   final _messageController = TextEditingController();
   DateTime? _selectedDate;
@@ -98,8 +100,14 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     List<String> targetGroups = [];
     if (_targetAudienceIndex == 0) {
       targetGroups = allGroups.map((g) => g.id).toList();
-    } else {
+    } else if (_targetAudienceIndex == 1) {
       targetGroups = _selectedGroupIds.toList();
+    } else {
+      if (_selectedGroupIdForPilgrim == null || _selectedPilgrimId == null) {
+        StandardSnackBar.showWarning(context, 'Please select a group and a pilgrim');
+        return;
+      }
+      targetGroups = [_selectedGroupIdForPilgrim!];
     }
 
     if (targetGroups.isEmpty) {
@@ -126,7 +134,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
           .read(reminderProvider.notifier)
           .create(
             groupId: groupId,
-            targetType: 'group',
+            targetType: _targetAudienceIndex == 2 ? 'pilgrim' : 'group',
+            pilgrimId: _targetAudienceIndex == 2 ? _selectedPilgrimId : null,
             text: msg,
             scheduledAt: sched,
             repeatCount: count,
@@ -146,6 +155,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         _repeatCount = 1;
         _selectedIntervalMin = null;
         _isCustomInterval = false;
+        _selectedGroupIdForPilgrim = null;
+        _selectedPilgrimId = null;
       });
     } else {
       if (mounted) StandardSnackBar.showError(context, 'Some reminders failed to create');
@@ -209,100 +220,52 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                   SizedBox(height: 12.h),
                   Container(
                     width: double.infinity,
-                    height: 48.h,
+                    height: 50.h,
+                    padding: EdgeInsets.all(4.w),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF2A2A3C)
-                          : const Color(0xFFE5E7EB),
-                      borderRadius: BorderRadius.circular(24.r),
+                      color: isDark ? const Color(0xFF2A2A3C) : const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(16.r),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _targetAudienceIndex = 0),
-                            child: Container(
-                              margin: EdgeInsets.all(4.w),
-                              decoration: BoxDecoration(
-                                color: _targetAudienceIndex == 0
-                                    ? (isDark
-                                          ? AppColors.surfaceDark
-                                          : Colors.white)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20.r),
-                                boxShadow: _targetAudienceIndex == 0
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.05,
-                                          ),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                'System Wide',
-                                style: TextStyle(
-                                  fontFamily: 'Lexend',
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14.sp,
-                                  color: _targetAudienceIndex == 0
-                                      ? (isDark
-                                            ? Colors.white
-                                            : const Color(0xFF3B1010))
-                                      : AppColors.textMutedLight,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final segmentWidth = constraints.maxWidth / 3;
+                        return Stack(
+                          children: [
+                            // Animated Indicator
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.fastOutSlowIn,
+                              left: _targetAudienceIndex * segmentWidth,
+                              width: segmentWidth,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: isDark ? 0.25 : 0.08,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _targetAudienceIndex = 1),
-                            child: Container(
-                              margin: EdgeInsets.all(4.w),
-                              decoration: BoxDecoration(
-                                color: _targetAudienceIndex == 1
-                                    ? (isDark
-                                          ? AppColors.surfaceDark
-                                          : Colors.white)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(20.r),
-                                boxShadow: _targetAudienceIndex == 1
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.05,
-                                          ),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                'Specific Groups',
-                                style: TextStyle(
-                                  fontFamily: 'Lexend',
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14.sp,
-                                  color: _targetAudienceIndex == 1
-                                      ? (isDark
-                                            ? Colors.white
-                                            : const Color(0xFF3B1010))
-                                      : AppColors.textMutedLight,
-                                ),
-                              ),
+                            // Buttons
+                            Row(
+                              children: [
+                                _buildSegment(0, 'System Wide', isDark),
+                                _buildSegment(1, 'Groups', isDark),
+                                _buildSegment(2, 'Pilgrim', isDark),
+                              ],
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      }
                     ),
                   ),
                 ],
@@ -432,6 +395,182 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
               SizedBox(height: 16.h),
             ],
 
+            // SPECIFIC PILGRIM SELECTOR
+            if (_targetAudienceIndex == 2) ...[
+              Container(
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.backgroundDark
+                        : const Color(0xFFEEEEF8),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.2 : 0.05,
+                      ),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select Pilgrim',
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(_selectedGroupIdForPilgrim),
+                      initialValue: _selectedGroupIdForPilgrim,
+                      decoration: InputDecoration(
+                        labelText: 'Select Group',
+                        labelStyle: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontSize: 14.sp,
+                          color: AppColors.textMutedLight,
+                        ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A3C) : const Color(0xFFF3F4F6),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14.r),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14.r),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFF97316),
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                      ),
+                      icon: Icon(
+                        Symbols.keyboard_arrow_down,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        size: 22.sp,
+                      ),
+                      dropdownColor: isDark ? const Color(0xFF2A2A3C) : Colors.white,
+                      borderRadius: BorderRadius.circular(14.r),
+                      elevation: 8,
+                      menuMaxHeight: 300.h,
+                      isExpanded: true,
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        fontSize: 14.sp,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                      ),
+                      items: allGroups
+                          .map((g) => DropdownMenuItem(
+                                value: g.id,
+                                child: Text(
+                                  g.groupName,
+                                  style: TextStyle(
+                                    fontFamily: 'Lexend',
+                                    fontSize: 14.sp,
+                                    color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedGroupIdForPilgrim = val;
+                          _selectedPilgrimId = null; // reset pilgrim when group changes
+                        });
+                      },
+                    ),
+                    SizedBox(height: 12.h),
+                    if (_selectedGroupIdForPilgrim != null) ...[
+                      Builder(
+                        builder: (ctx) {
+                          final group = allGroups.firstWhere((g) => g.id == _selectedGroupIdForPilgrim);
+                          final pilgrims = group.pilgrims;
+                          if (pilgrims.isEmpty) {
+                            return Text('No pilgrims in this group.', style: TextStyle(color: Colors.red, fontSize: 12.sp));
+                          }
+                          return DropdownButtonFormField<String>(
+                            key: ValueKey(_selectedPilgrimId),
+                            initialValue: _selectedPilgrimId,
+                            decoration: InputDecoration(
+                              labelText: 'Select Pilgrim',
+                              labelStyle: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 14.sp,
+                                color: AppColors.textMutedLight,
+                              ),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF2A2A3C) : const Color(0xFFF3F4F6),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.r),
+                                borderSide: BorderSide(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.r),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFF97316),
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                            ),
+                            icon: Icon(
+                              Symbols.keyboard_arrow_down,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                              size: 22.sp,
+                            ),
+                            dropdownColor: isDark ? const Color(0xFF2A2A3C) : Colors.white,
+                            borderRadius: BorderRadius.circular(14.r),
+                            elevation: 8,
+                            menuMaxHeight: 300.h,
+                            isExpanded: true,
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontSize: 14.sp,
+                              color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                            ),
+                            items: pilgrims
+                                .map((p) => DropdownMenuItem(
+                                      value: p.id,
+                                      child: Text(
+                                        p.fullName,
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontSize: 14.sp,
+                                          color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                                        ),
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedPilgrimId = val;
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(height: 16.h),
+            ],
+
             // REMINDER MESSAGE
             Container(
               padding: EdgeInsets.all(16.w),
@@ -475,6 +614,11 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     child: TextField(
                       controller: _messageController,
                       maxLines: null,
+                      minLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      cursorColor: AppColors.primary,
+                      selectionControls: MaterialTextSelectionControls(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontSize: 14.sp,
@@ -487,7 +631,21 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           fontSize: 14.sp,
                           color: AppColors.textMutedLight,
                         ),
-                        border: InputBorder.none,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                          borderSide: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                          borderSide: BorderSide.none,
+                        ),
                         contentPadding: EdgeInsets.all(16.w),
                       ),
                     ),
@@ -898,6 +1056,30 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                         },
                       ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegment(int index, String label, bool isDark) {
+    final isSelected = _targetAudienceIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _targetAudienceIndex = index),
+        child: Center(
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13.sp,
+              color: isSelected
+                  ? (isDark ? Colors.white : const Color(0xFF1A1A4E))
+                  : AppColors.textMutedLight,
+            ),
+            child: Text(label),
+          ),
         ),
       ),
     );

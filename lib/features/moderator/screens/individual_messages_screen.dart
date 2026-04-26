@@ -427,12 +427,12 @@ class _IndividualMessagesScreenState
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  widget.groupName, // context label
+                  'msg_private_header'.tr(),
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontSize: 12.sp,
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -529,6 +529,7 @@ class _IndividualMessagesScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const PrivateIndicator(isForPilgrim: false),
               // Header row: type badges + delete button
               Row(
                 children: [

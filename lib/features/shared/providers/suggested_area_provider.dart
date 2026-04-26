@@ -57,9 +57,9 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await ApiService.dio.get('/groups/$groupId/suggested-areas');
-      final raw = (res.data['areas'] as List<dynamic>)
-          .map((j) => SuggestedArea.fromJson(j as Map<String, dynamic>))
-          .toList();
+      final data = res.data is Map ? res.data : {};
+      final List<dynamic> list = (data['areas'] ?? data['data'] ?? []) as List<dynamic>;
+      final raw = list.map((j) => SuggestedArea.fromJson(j as Map<String, dynamic>)).toList();
       state = state.copyWith(areas: raw, isLoading: false);
     } on DioException catch (e) {
       state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
@@ -77,6 +77,8 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
     required double latitude,
     required double longitude,
     String areaType = 'suggestion',
+    DateTime? meetpointTime,
+    int? reminderMinutes,
   }) async {
     try {
       await ApiService.dio.post(
@@ -87,6 +89,8 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
           'latitude': latitude,
           'longitude': longitude,
           'area_type': areaType,
+          if (meetpointTime != null) 'meetpoint_time': meetpointTime.toIso8601String(),
+          if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
         },
       );
       // Don't update state here - let the socket event handle it
@@ -110,6 +114,40 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  // ── Update ─────────────────────────────────────────────────────────────────
+
+  Future<(bool, String?)> updateArea({
+    required String groupId,
+    required String areaId,
+    String? name,
+    String? description,
+    double? latitude,
+    double? longitude,
+    DateTime? meetpointTime,
+    int? reminderMinutes,
+  }) async {
+    try {
+      await ApiService.dio.put(
+        '/groups/$groupId/suggested-areas/$areaId',
+        data: {
+          if (name != null) 'name': name,
+          if (description != null) 'description': description,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (meetpointTime != null) 'meetpoint_time': meetpointTime.toIso8601String(),
+          if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
+        },
+      );
+      // We don't update state manually here as the socket event 'area_updated'
+      // will trigger the refresh for all clients.
+      return (true, null);
+    } on DioException catch (e) {
+      return (false, ApiService.parseError(e));
+    } catch (_) {
+      return (false, 'Something went wrong');
     }
   }
 

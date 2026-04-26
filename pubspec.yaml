@@ -43,11 +43,10 @@ dependencies:
   shared_preferences: ^2.5.4
   material_symbols_icons: ^4.2906.0
   easy_localization: ^3.0.8
-  geolocator: ^13.0.2
+  geolocator: ^14.0.2
   battery_plus: ^6.0.3
   permission_handler: ^11.3.1
   flutter_map: ^7.0.2
-  flutter_compass: ^0.8.1
   latlong2: ^0.9.1
   url_launcher: ^6.3.1
   share_plus: ^10.1.4
@@ -68,6 +67,7 @@ dependencies:
   logger: any
   qr_flutter: ^4.1.0
   screenshot: ^3.0.0
+  flutter_qiblah: ^3.2.0
 dependency_overrides:
   # Local copy of flutter_callkit_incoming with native Android HTTP decline fix.
   # The BroadcastReceiver now posts to /call-history/decline when the pilgrim

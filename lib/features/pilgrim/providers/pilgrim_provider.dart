@@ -224,12 +224,21 @@ class PilgrimState {
 // ── Pilgrim Notifier ──────────────────────────────────────────────────────────
 
 class PilgrimNotifier extends Notifier<PilgrimState> {
+  static DateTime? _lastDashboardLoad;
+  static DateTime? _lastLocationUpdate;
+
   @override
   PilgrimState build() {
     return const PilgrimState();
   }
 
-  Future<void> loadDashboard() async {
+  Future<void> loadDashboard({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force && _lastDashboardLoad != null && now.difference(_lastDashboardLoad!).inSeconds < 10) {
+      return; // Throttle to prevent 429 errors
+    }
+    _lastDashboardLoad = now;
+
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       // Parallel fetch: profile + group
@@ -270,18 +279,27 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
     int? batteryPercent,
   }) async {
     if (!state.isSharingLocation) return;
+    
+    final now = DateTime.now();
+    // Update battery locally immediately, but throttle network calls
+    if (batteryPercent != null) {
+      state = state.copyWith(batteryLevel: batteryPercent);
+    }
+
+    if (_lastLocationUpdate != null && now.difference(_lastLocationUpdate!).inSeconds < 15) {
+      return; // Throttle location updates to at most once every 15 seconds
+    }
+    _lastLocationUpdate = now;
+
     try {
       await ApiService.dio.put(
         '/pilgrim/location',
         data: {
           'latitude': latitude,
           'longitude': longitude,
-          'battery_percent': ?batteryPercent,
+          'battery_percent': batteryPercent,
         },
       );
-      if (batteryPercent != null) {
-        state = state.copyWith(batteryLevel: batteryPercent);
-      }
     } catch (_) {
       // Silent — location updates should not disrupt UX
     }
@@ -350,22 +368,6 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
     );
   }
 
-  Future<(bool, String?)> joinGroup(String groupCode) async {
-    try {
-      final res = await ApiService.dio.post(
-        '/groups/join',
-        data: {'group_code': groupCode.trim().toUpperCase()},
-      );
-      final data = res.data as Map<String, dynamic>?;
-      // Reload dashboard so groupInfo is populated
-      await loadDashboard();
-      return (true, data?['group']?['group_name']?.toString());
-    } on DioException catch (e) {
-      return (false, ApiService.parseError(e));
-    } catch (e) {
-      return (false, e.toString());
-    }
-  }
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────

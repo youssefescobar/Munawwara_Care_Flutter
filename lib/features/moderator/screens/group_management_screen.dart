@@ -30,10 +30,12 @@ import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../shared/providers/suggested_area_provider.dart';
-import '../../shared/models/suggested_area_model.dart';
 import 'group_messages_screen.dart';
-import 'individual_messages_screen.dart';
-import 'reminders_screen.dart';
+import '../widgets/pilgrim_profile_sheet.dart';
+import '../widgets/area_picker_screen.dart';
+import '../widgets/moderator_map_widgets.dart';
+import '../widgets/active_meetpoint_card.dart';
+import '../../shared/models/suggested_area_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Beacon state: static map survives hot-reload (widget recreation).
@@ -502,278 +504,8 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
   // ── Pilgrim profile sheet ──────────────────────────────────────────────────
 
   void _showPilgrimProfile(PilgrimInGroup pilgrim) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final battColor = switch (pilgrim.batteryStatus) {
-          BatteryStatus.good => const Color(0xFF16A34A),
-          BatteryStatus.medium => const Color(0xFFF59E0B),
-          BatteryStatus.low => const Color(0xFFDC2626),
-          BatteryStatus.unknown => AppColors.textMutedLight,
-        };
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surfaceDark : Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-            ),
-            padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 32.h),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40.w,
-                    height: 4.h,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white24 : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2.r),
-                    ),
-                  ),
-                  SizedBox(height: 20.h),
-                  // Avatar
-                  Container(
-                    width: 72.w,
-                    height: 72.w,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        pilgrim.initials,
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 26.sp,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  Text(
-                    pilgrim.fullName,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20.sp,
-                      color: isDark ? Colors.white : AppColors.textDark,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 8.w,
-                        height: 8.w,
-                        decoration: BoxDecoration(
-                          color: pilgrim.isOnline
-                              ? const Color(0xFF16A34A)
-                              : Colors.grey,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      SizedBox(width: 6.w),
-                      Text(
-                        pilgrim.isOnline ? 'Online' : 'Offline',
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 12.sp,
-                          color: pilgrim.isOnline
-                              ? const Color(0xFF16A34A)
-                              : AppColors.textMutedLight,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Container(
-                        width: 8.w,
-                        height: 8.w,
-                        decoration: BoxDecoration(
-                          color: pilgrim.hasLocation
-                              ? AppColors.primary
-                              : Colors.grey,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      SizedBox(width: 6.w),
-                      Text(
-                        pilgrim.hasLocation
-                            ? 'Location sharing ON'
-                            : 'No location',
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 12.sp,
-                          color: pilgrim.hasLocation
-                              ? AppColors.primary
-                              : AppColors.textMutedLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 20.h),
-                  Divider(color: Colors.grey.shade200),
-                  SizedBox(height: 12.h),
-                  // Info rows — wrap in a shrink-wrapped ListView so the sheet
-                  // can scroll if there is a lot of content (e.g. medical history)
-                  if (pilgrim.nationalId != null)
-                    _ProfileRow(
-                      icon: Symbols.badge,
-                      label: 'profile_national_id'.tr(),
-                      value: pilgrim.nationalId!,
-                    ),
-                  if (pilgrim.phoneNumber != null)
-                    _ProfileRow(
-                      icon: Symbols.phone,
-                      label: 'profile_phone'.tr(),
-                      value: pilgrim.phoneNumber!,
-                    ),
-                  if (pilgrim.batteryPercent != null)
-                    _ProfileRow(
-                      icon: Symbols.battery_5_bar,
-                      label: 'profile_battery'.tr(),
-                      value: '${pilgrim.batteryPercent}%',
-                      valueColor: battColor,
-                    ),
-                  if (pilgrim.lastSeenText.isNotEmpty)
-                    _ProfileRow(
-                      icon: Symbols.schedule,
-                      label: 'profile_last_seen'.tr(),
-                      value: pilgrim.lastSeenText,
-                    ),
-                  if (pilgrim.age != null)
-                    _ProfileRow(
-                      icon: Symbols.cake,
-                      label: 'profile_age'.tr(),
-                      value: '${pilgrim.age}',
-                    ),
-                  if (pilgrim.gender != null && pilgrim.gender!.isNotEmpty)
-                    _ProfileRow(
-                      icon: Symbols.person,
-                      label: 'profile_gender'.tr(),
-                      value: 'profile_gender_${pilgrim.gender}'.tr(),
-                    ),
-                  if (pilgrim.medicalHistory != null &&
-                      pilgrim.medicalHistory!.isNotEmpty) ...[
-                    SizedBox(height: 4.h),
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(14.w),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.primary.withValues(alpha: 0.08)
-                            : const Color(0xFFF0F7F4),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.medical_information_rounded,
-                                size: 16.sp,
-                                color: AppColors.primary,
-                              ),
-                              SizedBox(width: 6.w),
-                              Text(
-                                'profile_medical_history'.tr(),
-                                style: TextStyle(
-                                  fontFamily: 'Lexend',
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12.sp,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 6.h),
-                          Text(
-                            pilgrim.medicalHistory!,
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              fontSize: 13.sp,
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textDark,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 8.h),
-                  ],
-                  SizedBox(height: 20.h),
-                  // Message Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48.h,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => IndividualMessagesScreen(
-                              groupId: widget.groupId,
-                              groupName: 'group_name'
-                                  .tr(), // Provide actual group name if available remotely, but this works
-                              recipientId: pilgrim.id,
-                              recipientName: pilgrim.fullName,
-                              currentUserId: widget.currentUserId,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: Icon(Symbols.chat, color: Colors.white, size: 20.w),
-                      label: Text(
-                        'Message',
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ── Group Reminders ────────────────────────────────────────────────────
-
-  void _openReminders(ModeratorGroup group) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            RemindersScreen(groupId: widget.groupId, pilgrims: group.pilgrims),
-      ),
-    );
+    final currentUserId = ref.read(authProvider).userId ?? '';
+    showPilgrimProfileSheet(context, pilgrim, widget.groupId, currentUserId);
   }
 
   // ── Leave Group Handlers ──────────────────────────────────────────────────
@@ -1358,6 +1090,38 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                     ),
                                   ),
                                   SizedBox(width: 6.w),
+                                  // Edit
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => AreaPickerScreen(
+                                            groupId: group.id,
+                                            areaType: area.areaType,
+                                            existingArea: area,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      width: 32.w,
+                                      height: 32.w,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.info.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Symbols.edit,
+                                        size: 15.w,
+                                        color: AppColors.info,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 6.w),
                                   // Delete
                                   GestureDetector(
                                     onTap: () async {
@@ -1412,10 +1176,34 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     );
   }
 
+  Future<void> _handleDeleteArea(SuggestedArea area) async {
+    if (area.isMeetpoint) {
+      final shouldDelete = await StandardDialog.show<bool>(
+            context: context,
+            title: 'area_delete_meetpoint_confirm_title',
+            content: 'area_delete_meetpoint_confirm_message',
+            confirmText: 'msg_delete_confirm',
+            cancelText: 'area_cancel',
+            isDestructive: true,
+          ) ??
+          false;
+      if (!shouldDelete) return;
+    }
+
+    final group = ref.read(moderatorProvider).currentGroup;
+    if (group == null) return;
+
+    final ok = await ref.read(suggestedAreaProvider.notifier).deleteArea(group.id, area.id);
+    if (!context.mounted) return;
+    if (ok) {
+      StandardSnackBar.showSuccess(context, 'area_deleted'.tr());
+    }
+  }
+
   void _openAreaPicker(ModeratorGroup group, String areaType) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => _AreaPickerScreen(
+        builder: (_) => AreaPickerScreen(
           groupId: group.id,
           areaType: areaType,
           initialCenter: _myLocation,
@@ -1496,9 +1284,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                       height: 72.h,
                       child: GestureDetector(
                         onTap: () => _focusPilgrim(p),
-                        child: _PilgrimMapMarker(
+                        child: PilgrimMapMarker(
                           pilgrim: p,
                           isSelected: _focusedPilgrimId == p.id,
+                          isSOS: p.hasSOS,
                         ),
                       ),
                     ),
@@ -1512,7 +1301,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                       point: LatLng(area.latitude, area.longitude),
                       width: 100.w,
                       height: 82.h,
-                      child: _AreaMapMarker(area: area),
+                      child: GestureDetector(
+                        onTap: () => _showAreaList(group, areaState),
+                        child: AreaMapMarker(area: area),
+                      ),
                     ),
                 ],
               ),
@@ -1532,7 +1324,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: _CircleButton(
+                      child: CircleButton(
                         icon: Symbols.arrow_back,
                         onTap: () => Navigator.of(context).pop(),
                       ),
@@ -1608,6 +1400,29 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
             ),
           ),
 
+          // ── Map Controls ──────────────────────────────────────────────────
+          Positioned(
+            bottom: 110.h,
+            right: 16.w,
+            child: Column(
+              children: [
+                CircleButton(
+                  icon: Symbols.my_location,
+                  onTap: () {
+                    if (_myLocation != null) {
+                      _mapController.move(_myLocation!, 16);
+                    }
+                  },
+                ),
+                SizedBox(height: 12.h),
+                CircleButton(
+                  icon: Symbols.layers,
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+
           // ── Top-right 3-dot menu ──────────────────────────────────────────
           Positioned(
             top: 12.h,
@@ -1633,8 +1448,6 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                         _showManageSheet(group);
                       case 'areas':
                         _showAreaActions(group, areaState);
-                      case 'reminder':
-                        _openReminders(group);
                       case 'leave':
                         _handleLeaveGroup(group);
                     }
@@ -1700,27 +1513,6 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                           SizedBox(width: 12.w),
                           Text(
                             'group_menu_areas'.tr(),
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              fontSize: 14.sp,
-                              color: isDark ? Colors.white : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'reminder',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Symbols.add_alarm,
-                            size: 18.w,
-                            color: AppColors.primary,
-                          ),
-                          SizedBox(width: 12.w),
-                          Text(
-                            'reminder_group_menu_item'.tr(),
                             style: TextStyle(
                               fontFamily: 'Lexend',
                               fontSize: 14.sp,
@@ -1923,6 +1715,25 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                         ),
                       ),
                     ),
+                    // Active Meetpoint Card (if exists)
+                    if (areaState.activeMeetpoint != null)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          child: ActiveMeetpointCard(
+                            activeMp: areaState.activeMeetpoint!,
+                            isDark: isDark,
+                            onDelete: () => _handleDeleteArea(areaState.activeMeetpoint!),
+                            onTap: () {
+                              _mapController.move(
+                                LatLng(areaState.activeMeetpoint!.latitude, areaState.activeMeetpoint!.longitude),
+                                17,
+                              );
+                              _dssController.animateTo(0.08, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                            },
+                          ),
+                        ),
+                      ),
                     // Search bar
                     SliverToBoxAdapter(
                       child: Padding(
@@ -3150,672 +2961,3 @@ class _PilgrimManageTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pilgrim map marker
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _PilgrimMapMarker extends StatelessWidget {
-  final PilgrimInGroup pilgrim;
-  final bool isSelected;
-
-  const _PilgrimMapMarker({required this.pilgrim, this.isSelected = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final isSOS = pilgrim.hasSOS;
-    final color = isSOS ? const Color(0xFFDC2626) : AppColors.primaryDark;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: isSelected ? 42.w : 36.w,
-          height: isSelected ? 42.w : 36.w,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected ? Colors.amber : Colors.white,
-              width: isSelected ? 3 : 2.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: isSelected ? 0.7 : 0.45),
-                blurRadius: isSelected ? 12 : 8,
-                spreadRadius: isSelected ? 4 : 2,
-              ),
-            ],
-          ),
-          child: isSOS
-              ? Icon(Symbols.warning, color: Colors.white, size: 18.w, fill: 1)
-              : Center(
-                  child: Text(
-                    pilgrim.initials,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontSize: isSelected ? 12.sp : 10.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-        ),
-        CustomPaint(
-          size: Size(10.w, 6.h),
-          painter: _MarkerTailPainter(color: color),
-        ),
-      ],
-    );
-  }
-}
-
-class _MarkerTailPainter extends CustomPainter {
-  final Color color;
-  const _MarkerTailPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = ui.Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_MarkerTailPainter old) => old.color != color;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Reusable widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _CircleButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _CircleButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.surfaceDark : Colors.white;
-    final fg = isDark ? Colors.white : AppColors.textDark;
-    final sz = 42.w;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: sz,
-        height: sz,
-        decoration: BoxDecoration(
-          color: bg,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: bg == Colors.white
-                  ? Colors.black.withValues(alpha: 0.1)
-                  : bg.withValues(alpha: 0.45),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Icon(icon, size: sz * 0.48, color: fg),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pilgrim profile info row
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ProfileRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  const _ProfileRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.h),
-      child: Row(
-        children: [
-          Container(
-            width: 36.w,
-            height: 36.w,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: Icon(icon, size: 16.w, color: AppColors.primary),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 11.sp,
-                    color: AppColors.textMutedLight,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14.sp,
-                    color:
-                        valueColor ??
-                        (isDark ? Colors.white : AppColors.textDark),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Area map marker (suggestions = primary/blue, meetpoints = red)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AreaMapMarker extends StatelessWidget {
-  final SuggestedArea area;
-  const _AreaMapMarker({required this.area});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = area.isMeetpoint
-        ? const Color(0xFFDC2626)
-        : AppColors.primary;
-    final icon = area.isMeetpoint ? Symbols.crisis_alert : Symbols.pin_drop;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(10.r),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.35),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
-            border: Border.all(color: color, width: 1.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14.w, color: color, fill: 1),
-              SizedBox(width: 4.w),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 56.w),
-                child: Text(
-                  area.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 9.sp,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        CustomPaint(
-          size: Size(10.w, 6.h),
-          painter: _MarkerTailPainter(color: color),
-        ),
-        Container(
-          width: 10.w,
-          height: 10.w,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.5),
-                blurRadius: 6,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Area Picker Screen (map pick + place search + name/desc input)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AreaPickerScreen extends ConsumerStatefulWidget {
-  final String groupId;
-  final String areaType;
-  final LatLng? initialCenter;
-  const _AreaPickerScreen({
-    required this.groupId,
-    required this.areaType,
-    this.initialCenter,
-  });
-
-  @override
-  ConsumerState<_AreaPickerScreen> createState() => _AreaPickerScreenState();
-}
-
-class _AreaPickerScreenState extends ConsumerState<_AreaPickerScreen> {
-  final _mapController = MapController();
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
-  final _searchController = TextEditingController();
-
-  LatLng? _pickedPoint;
-  bool _submitting = false;
-
-  // Place search
-  List<Map<String, dynamic>> _searchResults = [];
-  bool _searching = false;
-  Timer? _debounce;
-
-  @override
-  void dispose() {
-    _mapController.dispose();
-    _nameController.dispose();
-    _descController.dispose();
-    _searchController.dispose();
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  // ── Place search via Nominatim ────────────────────────────────────────────
-  void _onSearchChanged(String query) {
-    _debounce?.cancel();
-    if (query.trim().length < 3) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    _debounce = Timer(
-      const Duration(milliseconds: 500),
-      () => _searchPlaces(query.trim()),
-    );
-  }
-
-  Future<void> _searchPlaces(String query) async {
-    setState(() => _searching = true);
-    try {
-      final dio = Dio();
-      final resp = await dio.get(
-        'https://nominatim.openstreetmap.org/search',
-        queryParameters: {
-          'q': query,
-          'format': 'json',
-          'limit': '6',
-          'viewbox':
-              '39.7,21.5,39.95,21.3', // Makkah bounding box (approximate)
-          'bounded': '0',
-        },
-        options: Options(headers: {'User-Agent': 'FlutterMunawwara/1.0'}),
-      );
-      if (!mounted) return;
-      final list = (resp.data as List)
-          .map<Map<String, dynamic>>(
-            (e) => {
-              'display_name': e['display_name'] as String,
-              'lat': double.parse(e['lat'] as String),
-              'lon': double.parse(e['lon'] as String),
-            },
-          )
-          .toList();
-      setState(() => _searchResults = list);
-    } catch (_) {
-      // ignore errors
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  void _selectSearchResult(Map<String, dynamic> result) {
-    final point = LatLng(result['lat'] as double, result['lon'] as double);
-    setState(() {
-      _pickedPoint = point;
-      _searchResults = [];
-      _searchController.clear();
-    });
-    _mapController.move(point, 17);
-    // Auto-fill name if empty
-    if (_nameController.text.isEmpty) {
-      final parts = (result['display_name'] as String).split(',');
-      _nameController.text = parts.first.trim();
-    }
-  }
-
-  // ── Submit ────────────────────────────────────────────────────────────────
-  Future<void> _submit() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty || _pickedPoint == null) return;
-    setState(() => _submitting = true);
-    final (success, errorMsg) = await ref
-        .read(suggestedAreaProvider.notifier)
-        .addArea(
-          groupId: widget.groupId,
-          name: name,
-          description: _descController.text.trim(),
-          latitude: _pickedPoint!.latitude,
-          longitude: _pickedPoint!.longitude,
-          areaType: widget.areaType,
-        );
-    if (!context.mounted) return;
-    setState(() => _submitting = false);
-    if (success) {
-      Navigator.pop(context);
-    } else {
-      StandardSnackBar.showError(
-        context,
-        errorMsg ??
-            (widget.areaType == 'meetpoint'
-                ? 'area_meetpoint_exists'.tr()
-                : 'error_generic'.tr()),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMeetpoint = widget.areaType == 'meetpoint';
-    final accentColor = isMeetpoint
-        ? const Color(0xFFDC2626)
-        : AppColors.primary;
-    final center =
-        _pickedPoint ?? widget.initialCenter ?? const LatLng(21.4225, 39.8262);
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
-      appBar: AppBar(
-        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Symbols.arrow_back,
-            color: isDark ? Colors.white : AppColors.textDark,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isMeetpoint ? 'area_meetpoint'.tr() : 'area_suggest'.tr(),
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontWeight: FontWeight.w700,
-            fontSize: 17.sp,
-            color: isDark ? Colors.white : AppColors.textDark,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          // ── Search bar ─────────────────────────────────────────────────
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 13.sp,
-                color: isDark ? Colors.white : AppColors.textDark,
-              ),
-              decoration: InputDecoration(
-                hintText: 'area_search_hint'.tr(),
-                prefixIcon: Icon(
-                  Symbols.search,
-                  size: 20.w,
-                  color: AppColors.textMutedLight,
-                ),
-                suffixIcon: _searching
-                    ? Padding(
-                        padding: EdgeInsets.all(12.w),
-                        child: SizedBox(
-                          width: 16.w,
-                          height: 16.w,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: accentColor,
-                          ),
-                        ),
-                      )
-                    : null,
-              ),
-            ),
-          ),
-
-          // ── Search results dropdown ────────────────────────────────────
-          if (_searchResults.isNotEmpty)
-            Container(
-              constraints: BoxConstraints(maxHeight: 200.h),
-              margin: EdgeInsets.symmetric(horizontal: 16.w),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 12,
-                  ),
-                ],
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: _searchResults.length,
-                separatorBuilder: (_, _) => Divider(
-                  height: 1,
-                  color: isDark ? Colors.white12 : Colors.grey.shade200,
-                ),
-                itemBuilder: (_, i) {
-                  final r = _searchResults[i];
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(
-                      Symbols.location_on,
-                      size: 18.w,
-                      color: accentColor,
-                    ),
-                    title: Text(
-                      r['display_name'] as String,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 12.sp,
-                        color: isDark ? Colors.white : AppColors.textDark,
-                      ),
-                    ),
-                    onTap: () => _selectSearchResult(r),
-                  );
-                },
-              ),
-            ),
-
-          // ── Map ────────────────────────────────────────────────────────
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16.r),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16.r),
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: center,
-                      initialZoom: 15,
-                      onTap: (_, point) {
-                        setState(() => _pickedPoint = point);
-                      },
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      ),
-                      if (_pickedPoint != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _pickedPoint!,
-                              width: 56.w,
-                              height: 56.w,
-                              child: Center(
-                                child: Container(
-                                  width: 48.w,
-                                  height: 48.w,
-                                  decoration: BoxDecoration(
-                                    color: accentColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 3,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: accentColor.withValues(alpha: 0.45),
-                                        blurRadius: 10,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Symbols.location_on,
-                                    size: 24.w,
-                                    color: Colors.white,
-                                    fill: 1,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Name & Description inputs ──────────────────────────────────
-          Container(
-            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _nameController,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 13.sp,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'area_name_hint'.tr(),
-                    prefixIcon: Icon(
-                      isMeetpoint ? Symbols.crisis_alert : Symbols.pin_drop,
-                      size: 18.w,
-                      color: accentColor,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                TextField(
-                  controller: _descController,
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontSize: 13.sp,
-                    color: isDark ? Colors.white : AppColors.textDark,
-                  ),
-                  maxLines: 1,
-                  decoration: InputDecoration(
-                    hintText: 'area_desc_hint'.tr(),
-                    prefixIcon: Icon(
-                      Symbols.description,
-                      size: 18.w,
-                      color: AppColors.textMutedLight,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Submit button ──────────────────────────────────────────────
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              16.w,
-              4.h,
-              16.w,
-              MediaQuery.of(context).padding.bottom + 16.h,
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50.h,
-              child: ElevatedButton(
-                onPressed: (_pickedPoint == null || _submitting)
-                    ? null
-                    : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentColor,
-                ),
-                child: _submitting
-                    ? SizedBox(
-                        width: 22.w,
-                        height: 22.w,
-                        child: const CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : Text(
-                        isMeetpoint
-                            ? 'area_set_meetpoint'.tr()
-                            : 'area_add_suggestion'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15.sp,
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

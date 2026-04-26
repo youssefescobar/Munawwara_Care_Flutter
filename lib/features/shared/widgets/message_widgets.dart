@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -169,6 +170,61 @@ class UrgentBadge extends StatelessWidget {
               fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
               color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private message indicator
+// ─────────────────────────────────────────────────────────────────────────────
+
+class PrivateIndicator extends StatelessWidget {
+  final bool isForPilgrim; // true = "Only you see this", false = "Private"
+  final String? recipientName; // optional: "Private for [Name]"
+  const PrivateIndicator({
+    super.key,
+    required this.isForPilgrim,
+    this.recipientName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 6.h),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Symbols.lock,
+            size: 12.w,
+            color: AppColors.primary,
+            fill: 1,
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            isForPilgrim
+                ? 'msg_only_you'.tr()
+                : (recipientName != null
+                    ? 'msg_private_for'.tr(namedArgs: {'name': recipientName!})
+                    : 'msg_private_indicator'.tr()),
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
             ),
           ),
         ],

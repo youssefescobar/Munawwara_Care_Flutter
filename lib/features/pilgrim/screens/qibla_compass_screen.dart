@@ -3,14 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
-import 'package:flutter_compass/flutter_compass.dart';
+import 'package:flutter_compass_v2/flutter_compass_v2.dart';
+import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../utils/qibla_math.dart';
 
 class QiblaCompassScreen extends StatefulWidget {
   const QiblaCompassScreen({super.key});
@@ -23,206 +23,110 @@ class QiblaCompassScreen extends StatefulWidget {
 // State — ALL compass logic lives here; UI widgets below are untouched.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
-  // ── Constants ──────────────────────────────────────────────────────────────
-
-  /// Needle is "aligned" when it is within ±5° of the Qibla bearing.
+class _QiblaCompassScreenState extends State<QiblaCompassScreen>
+    with TickerProviderStateMixin {
   static const double _alignToleranceDeg = 5.0;
 
-  /// Compass events with a delta smaller than this are noise — ignore them so
-  /// the needle stays still when the phone is stationary.
-  static const double _headingDeadbandDeg = 0.8;
+  // ── Calibration ─────────────────────────────────────────────────────────────
+  bool _showCalibration = false;
+  int _sensorAccuracy = -1; // -1 = unknown, 0 = unreliable, 3 = high
+  StreamSubscription<CompassEvent>? _calibrationSub;
+  late final AnimationController _figure8Ctrl;
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulseAnim;
 
-  /// Only recompute the Qibla bearing when GPS moves at least this far.
-  static const double _minGpsMoveMeters = 20.0;
-
-  // ── Streams ────────────────────────────────────────────────────────────────
-
-  StreamSubscription<CompassEvent>? _compassSub;
+  // ── Main compass ─────────────────────────────────────────────────────────
+  StreamSubscription<QiblahDirection>? _qiblaSub;
   StreamSubscription<Position>? _positionSub;
-
-  // ── State ──────────────────────────────────────────────────────────────────
-
+  QiblahDirection? _qiblahDirection;
+  double? _distanceKm;
+  bool _wasAligned = false;
   bool _loading = true;
   String? _error;
-
-
-  /// Low-pass filtered heading used for all rendering.
-  double? _smoothedHeading;
-
-  /// True-north great-circle bearing from the current position to the Kaaba.
-  double? _qiblaBearing;
-
-  /// Haversine distance to the Kaaba in kilometres.
-  double? _distanceKm;
-
-
-  /// GPS coordinates at which [_qiblaBearing] was last computed.
-  double? _lastBearingLat;
-  double? _lastBearingLng;
-
-  /// Used to fire the haptic only on the unaligned → aligned transition.
-  bool _wasAligned = false;
-
-  /// Magnetometer accuracy reported by the OS (0 = unreliable, 3 = high).
-  /// Shown as a calibration banner when low.
-  int _sensorAccuracy = 3;
-
-  DateTime? _lastUiUpdate;
-  final Duration _uiThrottle = const Duration(milliseconds: 40);
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    _figure8Ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+    _startAccuracyWatch();
     _startQiblaTracking();
   }
 
-  @override
-  void dispose() {
-    _compassSub?.cancel();
-    _positionSub?.cancel();
-    super.dispose();
-  }
-
-  // ── Initialisation ─────────────────────────────────────────────────────────
-
   Future<void> _startQiblaTracking() async {
     try {
-      // 1 – Verify location services and permissions.
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
+      final status = await FlutterQiblah.checkLocationStatus();
+      if (!status.enabled) {
         _setError('qibla_error_location'.tr());
         return;
       }
 
-      var permission = await Geolocator.checkPermission();
+      var permission = status.status;
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        await FlutterQiblah.requestPermissions();
+        final s2 = await FlutterQiblah.checkLocationStatus();
+        permission = s2.status;
       }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         _setError('qibla_error_permission'.tr());
         return;
       }
 
-      // 2 – Grab an initial GPS fix so the bearing is ready before the first
-      //     compass event fires.
-      final initial = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-        ),
-      );
+      _qiblaSub = FlutterQiblah.qiblahStream.listen((dir) {
+        if (!mounted) return;
+        setState(() {
+          _qiblahDirection = dir;
+          _loading = false;
+        });
+        _handleAlignmentFeedback();
+      });
 
-      _applyLocation(lat: initial.latitude, lng: initial.longitude);
-
-      // 3 – Stream GPS updates; 15 m filter keeps battery use reasonable.
-      _positionSub?.cancel();
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           distanceFilter: 15,
         ),
       ).listen((pos) {
-
-        _applyLocation(lat: pos.latitude, lng: pos.longitude);
+        if (!mounted) return;
+        setState(() {
+          _distanceKm = Geolocator.distanceBetween(
+                pos.latitude,
+                pos.longitude,
+                21.422487,
+                39.826206,
+              ) /
+              1000.0;
+        });
       });
 
-      // 4 – Subscribe to the magnetometer/fusion heading stream.
-      _compassSub?.cancel();
-      _compassSub = FlutterCompass.events?.listen(_onCompassEvent);
-
-      if (_compassSub == null) {
-        _setError('qibla_error_sensor'.tr());
+      final initial = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _distanceKm = Geolocator.distanceBetween(
+                initial.latitude,
+                initial.longitude,
+                21.422487,
+                39.826206,
+              ) /
+              1000.0;
+        });
       }
-    } catch (_) {
+    } catch (e) {
       _setError('qibla_error_generic'.tr());
     }
   }
-
-  // ── Compass event ──────────────────────────────────────────────────────────
-
-  void _onCompassEvent(CompassEvent event) {
-    final heading = event.heading;
-    if (heading == null) return;
-
-    // Track sensor accuracy so we can show a calibration prompt when needed.
-    // accuracy: 0 = unreliable, 1 = low, 2 = medium, 3 = high.
-    final accuracy = event.accuracy?.toInt() ?? 3;
-    if (accuracy != _sensorAccuracy) {
-      _sensorAccuracy = accuracy;
-    }
-
-    final raw = QiblaMath.normalize360(heading);
-
-    if (_smoothedHeading == null) {
-      // Cold start: accept the first sample directly so there is no initial
-      // "fly-in" animation from 0° to the real heading.
-      _smoothedHeading = raw;
-    } else {
-      final absDelta = QiblaMath.shortestDelta(_smoothedHeading!, raw).abs();
-
-      // Dead-band: discard tiny fluctuations that are pure sensor noise.
-      if (absDelta < _headingDeadbandDeg) return;
-
-      // Adaptive alpha: snap fast for large rotations, damp heavily for small
-      // drifts so the needle does not oscillate when the phone is held still.
-      final alpha = QiblaMath.adaptiveAlpha(absDelta);
-      _smoothedHeading = QiblaMath.smoothAngle(_smoothedHeading!, raw, alpha);
-    }
-
-    _handleAlignmentFeedback();
-    _loading = false;
-    _error = null;
-    _throttledRebuild();
-  }
-
-  // ── GPS update ─────────────────────────────────────────────────────────────
-
-  /// Recalculates the Qibla bearing and distance only when the device has moved
-  /// more than [_minGpsMoveMeters] from the last calculation point.
-  void _applyLocation({required double lat, required double lng}) {
-    if (_lastBearingLat != null && _lastBearingLng != null) {
-      final moved = Geolocator.distanceBetween(
-        _lastBearingLat!,
-        _lastBearingLng!,
-        lat,
-        lng,
-      );
-      if (moved < _minGpsMoveMeters) return;
-    }
-
-    _qiblaBearing = QiblaMath.bearingToKaaba(lat, lng);
-    _distanceKm = QiblaMath.distanceToKaabaKm(lat, lng);
-    _lastBearingLat = lat;
-    _lastBearingLng = lng;
-
-    _handleAlignmentFeedback();
-    _loading = false;
-    _error = null;
-    _throttledRebuild(force: true);
-  }
-
-  // ── Alignment helpers ──────────────────────────────────────────────────────
-
-  /// Signed angular offset from the current phone heading to the Qibla
-  /// direction.  Positive = Qibla is clockwise from where the phone points.
-  double _qiblaDelta() {
-    if (_qiblaBearing == null || _smoothedHeading == null) return 999;
-    return QiblaMath.shortestDelta(_smoothedHeading!, _qiblaBearing!);
-  }
-
-  bool _isAligned() => _qiblaDelta().abs() <= _alignToleranceDeg;
-
-  /// Fires a single light haptic pulse on the unaligned → aligned transition.
-  void _handleAlignmentFeedback() {
-    final aligned = _isAligned();
-    if (aligned && !_wasAligned) HapticFeedback.lightImpact();
-    _wasAligned = aligned;
-  }
-
-  // ── Utility ────────────────────────────────────────────────────────────────
 
   void _setError(String message) {
     if (!mounted) return;
@@ -232,24 +136,64 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
     });
   }
 
-  void _throttledRebuild({bool force = false}) {
-    if (!mounted) return;
-    final now = DateTime.now();
-    if (force ||
-        _lastUiUpdate == null ||
-        now.difference(_lastUiUpdate!) >= _uiThrottle) {
-      _lastUiUpdate = now;
-      setState(() {});
-    }
+  @override
+  void dispose() {
+    _figure8Ctrl.dispose();
+    _pulseCtrl.dispose();
+    _calibrationSub?.cancel();
+    _qiblaSub?.cancel();
+    _positionSub?.cancel();
+    super.dispose();
+  }
+
+  /// Listens to the raw compass accuracy. Shows the calibration UI while
+  /// the magnetometer is unreliable (accuracy < 2) and hides it once ready.
+  void _startAccuracyWatch() {
+    _calibrationSub = FlutterCompass.events?.listen((event) {
+      final acc = (event.accuracy?.toInt() ?? 3).clamp(0, 3);
+      if (!mounted) return;
+      final needsCal = acc < 2;
+      setState(() {
+        _sensorAccuracy = acc;
+        _showCalibration = needsCal;
+      });
+      if (!needsCal) {
+        _figure8Ctrl.stop();
+        _calibrationSub?.cancel();
+        _calibrationSub = null;
+      }
+    });
+  }
+
+  bool _isAligned() {
+    if (_qiblahDirection == null) return false;
+    // `offset` = absolute Qibla bearing from North.
+    // `direction` = device heading from North.
+    // Aligned when the phone is pointed within ±tolerance of the Kaaba.
+    final delta = (_qiblahDirection!.direction - _qiblahDirection!.offset + 180) % 360 - 180;
+    return delta.abs() <= _alignToleranceDeg;
+  }
+
+  void _handleAlignmentFeedback() {
+    final aligned = _isAligned();
+    if (aligned && !_wasAligned) HapticFeedback.lightImpact();
+    _wasAligned = aligned;
+  }
+
+  String _cardinal(double deg) {
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    final normalized = deg % 360;
+    return dirs[((normalized < 0 ? normalized + 360 : normalized) / 45).round() % 8];
   }
 
   double _degToRad(double deg) => deg * math.pi / 180;
 
-  // ── Build ──────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Priority: calibration first, then loading, then error, then compass.
+    if (_showCalibration) return _buildCalibrationScreen();
 
     if (_loading) {
       return Container(
@@ -260,7 +204,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
       );
     }
 
-    final hasSensors = _smoothedHeading != null && _qiblaBearing != null;
+    final hasSensors = _qiblahDirection != null;
 
     if (!hasSensors && _error != null) {
       return Container(
@@ -295,32 +239,32 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
       );
     }
 
-    final heading = _smoothedHeading ?? 0;
-    final qibla = _qiblaBearing ?? 0;
+    // Compass rendering model:
+    //   • `direction` = phone heading (0–360, 0 = true North)
+    //   • `offset`    = absolute Qibla bearing from North (0–360)
+    //   • Dial rotates by -direction so N/E/S/W labels track real-world positions.
+    //   • Kaaba marker angle in screen-space = offset - direction (normalized).
+    //     When the phone points at the Kaaba (direction == offset), this is 0°
+    //     (marker at top = straight ahead), which is when alignment fires.
+    //   • Center arrow is always fixed at the top of the stack (points up = where
+    //     the phone is facing). User rotates the phone until this arrow is under
+    //     the Kaaba marker.
+    final heading = _qiblahDirection?.direction ?? 0;
+    final qiblaAbsoluteBearing = _qiblahDirection?.offset ?? 0;
+    // Positive angle = Kaaba is clockwise from the phone's current facing direction.
+    final qiblaScreenAngle = (qiblaAbsoluteBearing - heading + 360) % 360;
     final aligned = _isAligned();
-
-    // ── Core angle calculation ───────────────────────────────────────────────
-    //
-    // Compass model:
-    //   • The dial  rotates by (−heading) so N/E/S/W labels stay in their
-    //     real-world positions as the phone turns.
-    //   • The Qibla marker sits at the top of the dial.  Rotating it by
-    //     (qibla − heading) keeps it pointing at the real-world Kaaba direction
-    //     regardless of how the phone is oriented.
-    //
-    // When the phone is pointed exactly at the Qibla, heading == qibla, so the
-    // marker angle is 0° (straight up) and the needle is aligned.
-    final qiblaRelative = QiblaMath.qiblaScreenAngle(qibla, heading);
+    final delta = (_qiblahDirection != null)
+        ? ((_qiblahDirection!.direction - _qiblahDirection!.offset + 180) % 360 - 180).abs().round()
+        : 0;
 
     final arrowColor = aligned
-        ? const Color(0xFF2ECC71)  // green when aligned
-        : const Color(0xFFE67E22); // orange otherwise
+        ? const Color(0xFF2ECC71)
+        : const Color(0xFFE67E22);
 
     final glowColor = aligned
         ? const Color(0xFF2ECC71).withValues(alpha: 0.4)
         : Colors.transparent;
-
-    final needsCalibration = _sensorAccuracy < 2;
 
     return Container(
       color: const Color(0xFF09162D),
@@ -354,46 +298,6 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
               ),
             ),
 
-            // ── Calibration banner ─────────────────────────────────────
-            // Shown when the OS reports the magnetometer as unreliable.
-            // Guides the user through the figure-8 gesture without any
-            // external explanation needed.
-            if (needsCalibration)
-              Padding(
-                padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE67E22).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: const Color(0xFFE67E22).withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Symbols.explore,
-                        color: const Color(0xFFE67E22),
-                        size: 20.w,
-                      ),
-                      SizedBox(width: 10.w),
-                      Expanded(
-                        child: Text(
-                          'qibla_calibration_needed'.tr(),
-                          style: TextStyle(
-                            fontFamily: 'Lexend',
-                            fontSize: 12.sp,
-                            color: const Color(0xFFE67E22),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
             SizedBox(height: 16.h),
 
             // ── Compass ────────────────────────────────────────────────
@@ -421,7 +325,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                       // Qibla marker — always points at the Kaaba in
                       // screen-space regardless of phone orientation.
                       Transform.rotate(
-                        angle: _degToRad(qiblaRelative),
+                        angle: _degToRad(qiblaScreenAngle),
                         child: Align(
                           alignment: Alignment.topCenter,
                           child: Padding(
@@ -491,7 +395,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                       ),
                       SizedBox(width: 8.w),
                       Text(
-                        QiblaMath.cardinal(heading),
+                        _cardinal(heading),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 24.sp,
@@ -509,7 +413,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                       _InfoChip(
                         icon: Symbols.mosque,
                         label: 'qibla_label'.tr(),
-                        value: '${qibla.round()}°',
+                        value: '${qiblaAbsoluteBearing.round()}°',
                         isDark: isDark,
                       ),
                       if (_distanceKm != null)
@@ -524,7 +428,7 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
                             ? Symbols.check_circle
                             : Symbols.rotate_right,
                         label: 'qibla_offset'.tr(),
-                        value: '${_qiblaDelta().abs().round()}°',
+                        value: '$delta°',
                         isDark: isDark,
                         highlight: aligned,
                       ),
@@ -538,6 +442,240 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen> {
       ),
     );
   }
+
+  // ── Calibration screen ──────────────────────────────────────────────────
+  Widget _buildCalibrationScreen() {
+    final acc = _sensorAccuracy.clamp(0, 3);
+    final accentColor = acc == 0
+        ? const Color(0xFFE74C3C)
+        : acc == 1
+            ? const Color(0xFFE67E22)
+            : const Color(0xFF2ECC71);
+    final statusLabel = acc == 0
+        ? 'Unreliable'
+        : acc == 1
+            ? 'Low accuracy'
+            : 'Calibrating…';
+
+    return Container(
+      color: const Color(0xFF09162D),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 0),
+              child: Text(
+                'qibla_title'.tr(),
+                style: TextStyle(
+                  fontFamily: 'Lexend',
+                  fontSize: 26.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28.w),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Figure-8 animation
+                      AnimatedBuilder(
+                        animation: _figure8Ctrl,
+                        builder: (_, _) => CustomPaint(
+                          size: Size(260.w, 170.h),
+                          painter: _Figure8Painter(
+                            progress: _figure8Ctrl.value,
+                            accentColor: accentColor,
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: 36.h),
+
+                      // Accuracy pills
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (i) {
+                          final filled = i < acc;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            margin: EdgeInsets.symmetric(horizontal: 4.w),
+                            width: filled ? 36.w : 12.w,
+                            height: 10.h,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(5.r),
+                              color: filled
+                                  ? accentColor
+                                  : Colors.white.withValues(alpha: 0.15),
+                            ),
+                          );
+                        }),
+                      ),
+
+                      SizedBox(height: 22.h),
+
+                      Text(
+                        'Calibrating Compass',
+                        style: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+
+                      SizedBox(height: 10.h),
+
+                      Text(
+                        'Move your phone in a slow figure-8 pattern to calibrate the magnetic sensor.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontSize: 13.sp,
+                          color: Colors.white60,
+                          height: 1.6,
+                        ),
+                      ),
+
+                      SizedBox(height: 32.h),
+
+                      // Pulsing status badge
+                      AnimatedBuilder(
+                        animation: _pulseAnim,
+                        builder: (_, _) {
+                          final pulse = _pulseAnim.value;
+                          return Transform.scale(
+                            scale: 0.96 + 0.04 * pulse,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 20.w,
+                                vertical: 11.h,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24.r),
+                                border: Border.all(
+                                  color: accentColor.withValues(
+                                      alpha: 0.35 + 0.25 * pulse),
+                                  width: 1.5,
+                                ),
+                                color: accentColor.withValues(alpha: 0.08),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Symbols.explore,
+                                      color: accentColor, size: 18.w),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    statusLabel,
+                                    style: TextStyle(
+                                      fontFamily: 'Lexend',
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: accentColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Figure-8 Calibration Painter
+// Draws a lemniscate of Bernoulli path with a travelling glowing dot.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _Figure8Painter extends CustomPainter {
+  final double progress; // 0.0 → 1.0
+  final Color accentColor;
+
+  const _Figure8Painter({required this.progress, required this.accentColor});
+
+  // Lemniscate parametric position at angle t (radians).
+  Offset _lemniscate(double t, Offset center, double a) {
+    final denom = 1 + math.pow(math.sin(t), 2);
+    return Offset(
+      center.dx + a * math.cos(t) / denom,
+      center.dy + a * math.sin(t) * math.cos(t) / denom,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final a = size.width * 0.36;
+
+    // Draw faint path
+    final pathPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..color = accentColor.withValues(alpha: 0.18);
+
+    final path = Path();
+    for (int i = 0; i <= 360; i++) {
+      final t = i * math.pi / 180;
+      final pt = _lemniscate(t, center, a);
+      i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
+    }
+    canvas.drawPath(path, pathPaint);
+
+    // Trailing glow arc (last 20% of path)
+    final trailPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        colors: [Colors.transparent, accentColor.withValues(alpha: 0.7)],
+      ).createShader(Rect.fromCircle(center: center, radius: a));
+
+    final trailPath = Path();
+    final trailStart = (progress - 0.20).clamp(0.0, 1.0);
+    for (int i = 0; i <= 40; i++) {
+      final frac = trailStart + i / 40 * 0.20;
+      final t = frac * 2 * math.pi;
+      final pt = _lemniscate(t, center, a);
+      i == 0 ? trailPath.moveTo(pt.dx, pt.dy) : trailPath.lineTo(pt.dx, pt.dy);
+    }
+    canvas.drawPath(trailPath, trailPaint);
+
+    // Moving dot with glow
+    final t = progress * 2 * math.pi;
+    final dot = _lemniscate(t, center, a);
+
+    final glowPaint = Paint()
+      ..color = accentColor.withValues(alpha: 0.30)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawCircle(dot, 14, glowPaint);
+
+    final dotPaint = Paint()..color = accentColor;
+    canvas.drawCircle(dot, 7, dotPaint);
+
+    final dotCorePaint = Paint()..color = Colors.white;
+    canvas.drawCircle(dot, 3, dotCorePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _Figure8Painter old) =>
+      old.progress != progress || old.accentColor != accentColor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ class SuggestedArea {
   final double latitude;
   final double longitude;
   final DateTime createdAt;
+  final DateTime? meetpointTime;
+  final int? reminderMinutes;
 
   const SuggestedArea({
     required this.id,
@@ -23,6 +25,8 @@ class SuggestedArea {
     required this.latitude,
     required this.longitude,
     required this.createdAt,
+    this.meetpointTime,
+    this.reminderMinutes,
   });
 
   bool get isMeetpoint => areaType == 'meetpoint';
@@ -49,6 +53,8 @@ class SuggestedArea {
             (j['createdAt'] ?? j['created_at'] ?? '').toString(),
           ) ??
           DateTime.now(),
+      meetpointTime: j['meetpoint_time'] != null ? DateTime.tryParse(j['meetpoint_time'].toString()) : null,
+      reminderMinutes: (j['reminder_minutes'] as num?)?.toInt(),
     );
   }
 }

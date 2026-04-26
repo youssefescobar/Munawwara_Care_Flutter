@@ -18,6 +18,7 @@ import '../../../core/widgets/custom_dialog.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../shared/models/message_model.dart';
 import '../../shared/providers/message_provider.dart';
+import '../providers/moderator_provider.dart';
 import '../../shared/widgets/message_widgets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -531,6 +532,20 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (msg.recipientId != null)
+                Builder(
+                  builder: (context) {
+                    final modState = ref.watch(moderatorProvider);
+                    final pilgrim = modState.currentGroup?.pilgrims.firstWhere(
+                      (p) => p.id == msg.recipientId,
+                      orElse: () => PilgrimInGroup(id: '', fullName: 'msg_private_indicator'.tr()),
+                    );
+                    return PrivateIndicator(
+                      isForPilgrim: false,
+                      recipientName: pilgrim?.fullName,
+                    );
+                  },
+                ),
               // Header row: type badges + delete button
               Row(
                 children: [
@@ -696,13 +711,16 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
     final name = mp?['name']?.toString() ?? msg.content ?? 'Meetpoint';
     final lat = (mp?['latitude'] as num?)?.toDouble();
     final lng = (mp?['longitude'] as num?)?.toDouble();
+    final timeStr = mp?['meetpoint_time']?.toString();
+    final DateTime? meetTime =
+        timeStr != null ? DateTime.tryParse(timeStr) : null;
 
     return Container(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF3B1212) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(14.r),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        color: isDark ? const Color(0xFF2D1515) : const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: const Color(0xFFFECDD3), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,40 +728,44 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
           Row(
             children: [
               Container(
-                width: 34.w,
-                height: 34.w,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDC2626),
-                  shape: BoxShape.circle,
+                width: 42.w,
+                height: 42.w,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE11D48),
+                  borderRadius: BorderRadius.circular(12.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE11D48).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  Symbols.crisis_alert,
-                  color: Colors.white,
-                  size: 18.w,
-                ),
+                child:
+                    Icon(Symbols.crisis_alert, color: Colors.white, size: 22.w),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(width: 12.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'area_meetpoint'.tr(),
+                      'area_meetpoint'.tr().toUpperCase(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         fontSize: 10.sp,
-                        color: const Color(0xFFDC2626),
+                        letterSpacing: 0.5,
+                        color: const Color(0xFFE11D48),
                       ),
                     ),
-                    SizedBox(height: 2.h),
                     Text(
                       name,
                       style: TextStyle(
                         fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : AppColors.textDark,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16.sp,
+                        color: isDark ? Colors.white : const Color(0xFF9F1239),
                       ),
                     ),
                   ],
@@ -751,52 +773,76 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
               ),
             ],
           ),
+          if (meetTime != null) ...[
+            SizedBox(height: 16.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black26 : Colors.white70,
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Symbols.schedule,
+                    size: 18.w,
+                    color: const Color(0xFFE11D48),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      'msg_meetpoint_at'.tr(args: [
+                        DateFormat('hh:mm a').format(meetTime),
+                        DateFormat('MMM dd').format(meetTime),
+                      ]),
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.sp,
+                        color: isDark ? Colors.white : const Color(0xFF881337),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (msg.content != null &&
               msg.content!.isNotEmpty &&
               msg.content != name) ...[
-            SizedBox(height: 8.h),
+            SizedBox(height: 12.h),
             Text(
               msg.content!,
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 13.sp,
-                height: 1.4,
-                color: isDark ? Colors.white70 : AppColors.textDark,
+                height: 1.5,
+                color: isDark ? Colors.white70 : const Color(0xFF4C0519),
               ),
             ),
           ],
           if (lat != null && lng != null) ...[
-            SizedBox(height: 10.h),
-            GestureDetector(
-              onTap: () {
+            SizedBox(height: 16.h),
+            ElevatedButton.icon(
+              onPressed: () {
                 final url = Uri.parse(
                   'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
                 );
                 launchUrl(url, mode: LaunchMode.externalApplication);
               },
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDC2626),
-                  borderRadius: BorderRadius.circular(10.r),
+              icon: Icon(Symbols.navigation, size: 18.w, color: Colors.white),
+              label: Text(
+                'area_navigate'.tr(),
+                style: const TextStyle(fontFamily: 'Lexend'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+                foregroundColor: Colors.white,
+                minimumSize: Size(double.infinity, 44.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Symbols.navigation, size: 16.w, color: Colors.white),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'area_navigate'.tr(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12.sp,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                elevation: 0,
               ),
             ),
           ],
