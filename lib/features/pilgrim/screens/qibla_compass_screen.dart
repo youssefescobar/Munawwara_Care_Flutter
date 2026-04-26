@@ -188,6 +188,18 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen>
 
   double _degToRad(double deg) => deg * math.pi / 180;
 
+  String _getAccuracyLabel(int acc) {
+    if (acc <= 0) return 'qibla_accuracy_unreliable'.tr();
+    if (acc == 1) return 'qibla_accuracy_low'.tr();
+    if (acc == 2) return 'qibla_accuracy_medium'.tr();
+    return 'qibla_accuracy_high'.tr();
+  }
+
+  Color? _getAccuracyColor(int acc) {
+    if (acc < 2) return const Color(0xFFE74C3C); // Red for Low/Unreliable
+    return null; // Default theme color for Medium/High
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -424,13 +436,27 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen>
                           isDark: isDark,
                         ),
                       _InfoChip(
-                        icon: aligned
-                            ? Symbols.check_circle
-                            : Symbols.rotate_right,
-                        label: 'qibla_offset'.tr(),
-                        value: '$delta°',
+                        icon: Symbols.compass_calibration,
+                        label: 'qibla_accuracy'.tr(),
+                        value: _getAccuracyLabel(_sensorAccuracy),
+                        valueColor: _getAccuracyColor(_sensorAccuracy),
                         isDark: isDark,
-                        highlight: aligned,
+                        highlight: _sensorAccuracy >= 3,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'qibla_accuracy_hint'.tr(),
+                                style: const TextStyle(fontFamily: 'Lexend'),
+                              ),
+                              backgroundColor: const Color(0xFFE67E22),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -737,62 +763,76 @@ class _QiblaMarker extends StatelessWidget {
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
+  final String? value;
+  final Widget? valueWidget;
+  final Color? valueColor;
   final bool isDark;
   final bool highlight;
+  final VoidCallback? onTap;
 
   const _InfoChip({
     required this.icon,
     required this.label,
-    required this.value,
+    this.value,
+    this.valueWidget,
+    this.valueColor,
     required this.isDark,
     this.highlight = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 48.w,
-          height: 48.w,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: highlight
-                ? const Color(0xFF2ECC71).withValues(alpha: 0.15)
-                : isDark
-                    ? const Color(0xFF1A2640)
-                    : const Color(0xFFF0F2F5),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48.w,
+            height: 48.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: highlight
+                  ? const Color(0xFF2ECC71).withValues(alpha: 0.15)
+                  : isDark
+                      ? const Color(0xFF1A2640)
+                      : const Color(0xFFF0F2F5),
+            ),
+            child: Icon(
+              icon,
+              size: 22.w,
+              color: highlight
+                  ? const Color(0xFF2ECC71)
+                  : const Color(0xFFE67E22),
+            ),
           ),
-          child: Icon(
-            icon,
-            size: 22.w,
-            color: highlight
-                ? const Color(0xFF2ECC71)
-                : const Color(0xFFE67E22),
+          if (valueWidget != null)
+            Padding(
+              padding: EdgeInsets.only(top: 2.h, bottom: 2.h),
+              child: valueWidget!,
+            )
+          else if (value != null)
+            Text(
+              value!,
+              style: TextStyle(
+                fontFamily: 'Lexend',
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w800,
+                color: valueColor ?? (isDark ? Colors.white : const Color(0xFF09162D)),
+              ),
+            ),
+          SizedBox(height: valueWidget != null ? 4.h : 2.h),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 11.sp,
+              color: isDark ? Colors.white54 : AppColors.textMutedLight,
+            ),
           ),
-        ),
-        SizedBox(height: 6.h),
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : const Color(0xFF09162D),
-          ),
-        ),
-        SizedBox(height: 2.h),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 11.sp,
-            color: isDark ? Colors.white54 : AppColors.textMutedLight,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

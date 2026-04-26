@@ -1,4 +1,4 @@
-﻿{
+{
     "dialog_cancel":  "Cancel",
     "dialog_confirm":  "Confirm",
     "dialog_delete":  "Delete",
@@ -427,7 +427,13 @@
     "qibla_error_permission":  "Location permission is required to use Qibla compass.",
     "qibla_error_sensor":  "Compass sensor is unavailable on this device.",
     "qibla_error_generic":  "Unable to initialize Qibla compass.",
-    "qibla_calibration_needed":  "Compass needs calibration. Hold your phone and slowly move it in a figure-8 pattern âˆž until this banner disappears.",
+    "qibla_calibration_needed": "Compass needs calibration. Hold your phone and slowly move it in a figure-8 pattern âˆž until this banner disappears.",
+    "qibla_accuracy": "Accuracy",
+    "qibla_accuracy_unreliable": "Unreliable",
+    "qibla_accuracy_low": "Low",
+    "qibla_accuracy_medium": "Medium",
+    "qibla_accuracy_high": "High",
+    "qibla_accuracy_hint": "Move around and enable location services to improve accuracy",
     "tab_qibla":  "Qibla",
     "group_details_title":  "Group Details",
     "group_hotel_info":  "Hotel Information",
