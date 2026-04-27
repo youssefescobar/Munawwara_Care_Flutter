@@ -1,4 +1,4 @@
-{
+﻿{
     "dialog_cancel":  "Cancel",
     "dialog_confirm":  "Confirm",
     "dialog_delete":  "Delete",
@@ -97,6 +97,9 @@
     "settings_sign_out_confirm_title":  "Sign Out",
     "settings_sign_out_confirm_body":  "Are you sure you want to sign out?",
     "settings_cancel":  "Cancel",
+    "group_refresh_login_title": "Refresh Login Code",
+    "group_refresh_login_confirm": "Refresh",
+    "group_refresh_login_body": "Are you sure you want to refresh the login code for {}? This will immediately log them out of their current device.",
     "settings_role_moderator":  "Moderator",
     "edit_profile_title":  "Edit Profile",
     "edit_profile_section":  "PERSONAL INFO",
@@ -569,4 +572,26 @@
     "manage_pilgrims_subtitle":  "Assign, transfer, or remove pilgrims from groups.",
     "manage_pilgrims_title":  "Manage Pilgrims",
     "manage_pilgrims_search_hint":  "Search by name, phone, or ID…"
+,
+    "forgot_password_passwords_mismatch":  "Passwords do not match",
+    "forgot_password_email_subtitle":  "Enter the email address associated with your moderator account.",
+    "forgot_password_resend_countdown":  "Resend in {}s",
+    "forgot_password_title":  "Reset Password",
+    "forgot_password_password_too_short":  "Password must be at least 6 characters",
+    "forgot_password_new_password_subtitle":  "Choose a strong password for your account.",
+    "forgot_password_new_password":  "New Password",
+    "forgot_password_send_code":  "Send Reset Code",
+    "forgot_password_verify":  "Continue",
+    "forgot_password_code_label":  "Verification Code",
+    "forgot_password_email_hint":  "Enter your registered email",
+    "forgot_password_back_to_login":  "Back to Login",
+    "forgot_password_reset":  "Reset Password",
+    "forgot_password_email_label":  "Email Address",
+    "forgot_password_code_hint":  "Enter 6-digit code",
+    "forgot_password_confirm_password":  "Confirm Password",
+    "forgot_password_success":  "Password Reset!",
+    "forgot_password_code_invalid":  "Please enter a valid 6-digit code",
+    "forgot_password_resend_code":  "Resend Code",
+    "forgot_password_code_sent":  "A reset code has been sent to {}",
+    "forgot_password_email_required":  "Please enter your email address"
 }

@@ -36,7 +36,7 @@ class StandardDialog {
           : null),
         iconPadding: EdgeInsets.only(top: 24.h, bottom: 8.h),
         title: Text(
-          title,
+          title.tr(),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Lexend',
@@ -46,7 +46,7 @@ class StandardDialog {
           ),
         ),
         content: contentWidget ?? (content != null ? Text(
-          content,
+          content.tr(),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Lexend',
@@ -71,7 +71,7 @@ class StandardDialog {
                     ),
                   ),
                   child: Text(
-                    (cancelText ?? 'dialog_cancel'.tr()),
+                    (cancelText?.tr() ?? 'dialog_cancel'.tr()),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
@@ -91,7 +91,7 @@ class StandardDialog {
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                   ),
                   child: Text(
-                    (confirmText ?? 'dialog_confirm'.tr()),
+                    (confirmText?.tr() ?? 'dialog_confirm'.tr()),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w700,

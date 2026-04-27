@@ -52,16 +52,16 @@ class _ModeratorProfileScreenState
 
   // Language is applied immediately on tap — this just closes the screen
   void _saveChanges() {
-    Navigator.of(context).pop();
+    context.pop();
   }
 
   Future<void> _signOut() async {
     final confirmed = await StandardDialog.show<bool>(
       context: context,
-      title: 'settings_sign_out_confirm_title',
-      content: 'settings_sign_out_confirm_body',
-      confirmText: 'settings_sign_out',
-      cancelText: 'settings_cancel',
+      title: 'settings_sign_out_confirm_title'.tr(),
+      content: 'settings_sign_out_confirm_body'.tr(),
+      confirmText: 'settings_sign_out'.tr(),
+      cancelText: 'settings_cancel'.tr(),
       isDestructive: true,
     );
     if (confirmed == true && mounted) {
@@ -355,7 +355,7 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: () => context.pop(),
             child: Container(
               width: 42.w,
               height: 42.w,

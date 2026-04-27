@@ -432,6 +432,42 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  // ── Forgot Password ────────────────────────────────────────────────────────
+  Future<bool> requestPasswordReset(String email) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await ApiService.dio.post('/auth/forgot-password', data: {'email': email});
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      return false;
+    }
+  }
+
+  Future<String?> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await ApiService.dio.post(
+        '/auth/reset-password',
+        data: {
+          'email': email,
+          'code': code,
+          'new_password': newPassword,
+        },
+      );
+      state = state.copyWith(isLoading: false);
+      return (response.data as Map<String, dynamic>)['message']?.toString();
+    } on DioException catch (e) {
+      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      return null;
+    }
+  }
+
   // ── Update FCM Token ────────────────────────────────────────────────────────
   Future<void> updateFcmToken(String fcmToken) async {
     try {

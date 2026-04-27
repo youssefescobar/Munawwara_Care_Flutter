@@ -322,12 +322,9 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
 
     final confirmed = await StandardDialog.show(
       context: context,
-      title: 'Refresh Login Code',
-      confirmText: 'Refresh',
-      contentWidget: Text(
-        'Are you sure you want to refresh the login code for ${item.fullName}? This will immediately log them out of their current device.',
-        style: const TextStyle(fontFamily: 'Lexend'),
-      ),
+      title: 'group_refresh_login_title',
+      confirmText: 'group_refresh_login_confirm',
+      content: 'group_refresh_login_body'.tr(args: [item.fullName]),
     );
 
     if (confirmed != true) return;
