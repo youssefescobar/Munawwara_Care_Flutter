@@ -1963,7 +1963,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                     : AppColors.textDark,
                               ),
                               decoration: InputDecoration(
-                                hintText: 'Search pilgrims...',
+                                hintText: 'group_search_hint'.tr(),
                                 hintStyle: TextStyle(
                                   fontFamily: 'Lexend',
                                   fontSize: 13.sp,
@@ -2164,7 +2164,7 @@ class _QrShareSheetState extends State<_QrShareSheet> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to share: $e')));
+        ).showSnackBar(SnackBar(content: Text('group_share_failed'.tr(args: ['$e']))));
       }
     } finally {
       if (mounted) setState(() => _isSharing = false);
@@ -2557,7 +2557,7 @@ class _ModeratorManageSheet extends ConsumerWidget {
           if (!isCreator) ...[
             SizedBox(height: 4.h),
             Text(
-              'Only the group creator can add or remove moderators.'.tr(),
+              'group_moderators_sub'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 11.sp,
@@ -2608,7 +2608,7 @@ class _ModeratorManageSheet extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(20.r),
                       ),
                       child: Text(
-                        'Creator',
+                        'group_creator'.tr(),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 10.sp,
@@ -2798,8 +2798,10 @@ class _ModeratorManageSheet extends ConsumerWidget {
                               TextField(
                                 controller: ctrl,
                                 keyboardType: TextInputType.emailAddress,
+                                minLines: 1,
+                                maxLines: 4,
                                 decoration: InputDecoration(
-                                  hintText: 'Enter moderator email'.tr(),
+                                  hintText: 'group_invite_email_hint'.tr(),
                                   errorText: fieldError,
                                   filled: true,
                                   fillColor: isDark
@@ -2819,8 +2821,18 @@ class _ModeratorManageSheet extends ConsumerWidget {
                                   onPressed: loading
                                       ? null
                                       : () async {
-                                          final val = ctrl.text.trim();
-                                          if (val.isEmpty || !val.contains('@')) {
+                                          final raw = ctrl.text.trim();
+                                          final emails = raw
+                                              .split(RegExp(r'[,\n; ]+'))
+                                              .map((e) => e.trim())
+                                              .where((e) => e.isNotEmpty)
+                                              .toSet()
+                                              .toList();
+                                          final hasInvalid =
+                                              emails.isEmpty ||
+                                                  emails.any((e) => !e.contains('@'));
+
+                                          if (hasInvalid) {
                                             setSheetState(() => fieldError =
                                                 'email_invalid'.tr());
                                             return;
@@ -2831,7 +2843,7 @@ class _ModeratorManageSheet extends ConsumerWidget {
                                           });
                                           final (ok, err) = await ref
                                               .read(moderatorProvider.notifier)
-                                              .inviteModerator(g.id, val);
+                                              .inviteModerators(g.id, emails);
                                           if (sheetContext.mounted) {
                                             if (ok) {
                                               Navigator.pop(sheetContext);
@@ -2841,8 +2853,9 @@ class _ModeratorManageSheet extends ConsumerWidget {
                                             } else {
                                               setSheetState(() {
                                                 loading = false;
-                                                fieldError =
-                                                    err ?? 'An error occurred';
+                                                fieldError = err == 'email_invalid'
+                                                    ? 'email_invalid'.tr()
+                                                    : (err ?? 'error_generic'.tr());
                                               });
                                             }
                                           }

@@ -494,13 +494,13 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
                 ),
-                child: const Text('Use this location', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                child: Text('area_use_this_location'.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ),
             SizedBox(height: 12.h),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Keep searching', style: TextStyle(color: AppColors.textMutedLight, fontWeight: FontWeight.w600)),
+              child: Text('area_keep_searching'.tr(), style: TextStyle(color: AppColors.textMutedLight, fontWeight: FontWeight.w600)),
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
@@ -555,7 +555,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
                   Icon(Symbols.search, size: 20.w, color: AppColors.textMutedLight),
                   SizedBox(width: 12.w),
                   Text(
-                    'Search for a place...',
+                    'area_search_hint'.tr(),
                     style: TextStyle(fontFamily: 'Lexend', fontSize: 13.sp, color: AppColors.textMutedLight),
                   ),
                 ],
@@ -578,7 +578,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
                   Divider(height: 1, color: isDark ? Colors.white12 : Colors.grey.shade100),
                   ListTile(
                     leading: Icon(Symbols.explore, size: 18.w, color: accentColor),
-                    title: Text('Set location on map', style: TextStyle(fontFamily: 'Lexend', fontSize: 12.sp, fontWeight: FontWeight.w600, color: accentColor)),
+                    title: Text('area_set_location_on_map'.tr(), style: TextStyle(fontFamily: 'Lexend', fontSize: 12.sp, fontWeight: FontWeight.w600, color: accentColor)),
                     trailing: Icon(Symbols.chevron_right, size: 16.w, color: accentColor),
                     onTap: () {
                       setState(() {

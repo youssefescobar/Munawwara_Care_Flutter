@@ -90,6 +90,12 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     }
   }
 
+  void _refreshRealtimeState({bool forceDashboard = false}) {
+    if (!mounted) return;
+    ref.read(notificationProvider.notifier).refetch();
+    ref.read(pilgrimProvider.notifier).loadDashboard(force: forceDashboard);
+  }
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -300,15 +306,21 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         // Listen for notification refresh (new area/meetpoint/SOS notifications)
         // refetch() updates the full list + badge without auto-marking as read
         SocketService.on('notification_refresh', (_) {
-          if (!mounted) return;
-          ref.read(notificationProvider.notifier).refetch();
+          _refreshRealtimeState();
         });
 
 
         // Listen for missed calls — refresh notifications so badge + list update
         SocketService.on('missed-call-received', (_) {
-          if (!mounted) return;
-          ref.read(notificationProvider.notifier).refetch();
+          _refreshRealtimeState();
+        });
+
+        // Keep pilgrim dashboard synced when group composition/meta changes
+        SocketService.on('group_updated', (_) {
+          _refreshRealtimeState(forceDashboard: true);
+        });
+        SocketService.on('group_deleted', (_) {
+          _refreshRealtimeState(forceDashboard: true);
         });
 
         // Listen for remote force logout (e.g., code refreshed by moderator)
@@ -385,6 +397,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     SocketService.off('area_deleted');
     SocketService.off('notification_refresh');
     SocketService.off('missed-call-received');
+    SocketService.off('group_updated');
+    SocketService.off('group_deleted');
+    SocketService.off('added-to-group');
     SocketService.off('force_logout');
     SocketService.offConnected(_onSocketConnected);
     super.dispose();

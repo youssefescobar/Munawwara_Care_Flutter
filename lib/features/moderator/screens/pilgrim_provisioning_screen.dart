@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/provisioning/provisioning_tab.dart';
@@ -13,11 +14,11 @@ class PilgrimProvisioningScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           toolbarHeight: 0,
-          bottom: const TabBar(
+          bottom: TabBar(
             indicatorSize: TabBarIndicatorSize.label,
             tabs: [
-              Tab(text: 'Provision'),
-              Tab(text: 'Manage'),
+              Tab(text: 'provision_tab_provision'.tr()),
+              Tab(text: 'provision_tab_manage'.tr()),
             ],
           ),
         ),

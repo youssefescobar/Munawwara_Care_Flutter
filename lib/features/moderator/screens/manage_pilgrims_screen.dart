@@ -277,7 +277,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
         context: context,
         title: 'assign_to_group_title'.tr(),
         content: 'assign_to_group_no_available'.tr(),
-        confirmText: 'OK',
+        confirmText: 'confirm'.tr(),
       );
       return;
     }
@@ -305,7 +305,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                     onChanged: (v) => setDialogState(() => searchQuery = v),
                     style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp),
                     decoration: InputDecoration(
-                      hintText: 'Search groups...',
+                      hintText: 'manage_search_groups_hint'.tr(),
                       prefixIcon: Icon(Symbols.search, size: 20.w),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
@@ -351,7 +351,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                 if (filtered.isEmpty)
                   Padding(
                     padding: EdgeInsets.symmetric(vertical: 20.h),
-                    child: Text('No matching groups found.', 
+                    child: Text('manage_no_matching_groups'.tr(), 
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Lexend', color: AppColors.textMutedLight)),
                   ),
@@ -366,7 +366,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                     ),
                   ),
                   child: Text(
-                    'Cancel',
+                    'cancel'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
@@ -388,7 +388,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
       context: context,
       barrierDismissible: false,
       showActions: false,
-      title: 'Edit Logistics',
+      title: 'manage_edit_logistics_title'.tr(),
       contentWidget: _EditLogisticsContent(
         pilgrim: pilgrim,
         onSaved: _load,
@@ -479,7 +479,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                     Row(
                       children: [
                         _FilterChip(
-                          label: 'All (${_all.length})',
+                          label: 'manage_filter_all'.tr(args: ['${_all.length}']),
                           selected: _filter == 'all',
                           onTap: () => setState(() => _filter = 'all'),
                           isDark: isDark,
@@ -487,7 +487,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                         SizedBox(width: 8.w),
                         _FilterChip(
                           label:
-                              'Unassigned (${_all.where((p) => !p.isAssigned).length})',
+                              'manage_filter_unassigned'.tr(args: ['${_all.where((p) => !p.isAssigned).length}']),
                           selected: _filter == 'unassigned',
                           onTap: () =>
                               setState(() => _filter = 'unassigned'),
@@ -497,7 +497,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                         SizedBox(width: 8.w),
                         _FilterChip(
                           label:
-                              'Assigned (${_all.where((p) => p.isAssigned).length})',
+                              'manage_filter_assigned'.tr(args: ['${_all.where((p) => p.isAssigned).length}']),
                           selected: _filter == 'assigned',
                           onTap: () =>
                               setState(() => _filter = 'assigned'),
@@ -513,7 +513,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                         child: Row(
                           children: [
                             Text(
-                              'Type:',
+                              'manage_type'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontSize: 11.sp,
@@ -523,7 +523,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                             ),
                             SizedBox(width: 8.w),
                             _FilterChip(
-                              label: 'All Unassigned',
+                              label: 'manage_filter_all_unassigned'.tr(),
                               selected: _unassignedSubFilter == 'all',
                               onTap: () => setState(() => _unassignedSubFilter = 'all'),
                               isDark: isDark,
@@ -532,7 +532,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                             ),
                             SizedBox(width: 6.w),
                             _FilterChip(
-                              label: 'Manual',
+                              label: 'manage_filter_manual'.tr(),
                               selected: _unassignedSubFilter == 'manual',
                               onTap: () => setState(() => _unassignedSubFilter = 'manual'),
                               isDark: isDark,
@@ -541,7 +541,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                             ),
                             SizedBox(width: 6.w),
                             _FilterChip(
-                              label: 'From Deleted Groups',
+                              label: 'manage_filter_from_deleted_groups'.tr(),
                               selected: _unassignedSubFilter == 'deleted',
                               onTap: () => setState(() => _unassignedSubFilter = 'deleted'),
                               isDark: isDark,
@@ -581,7 +581,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                       TextButton.icon(
                         onPressed: _load,
                         icon: const Icon(Symbols.refresh),
-                        label: const Text('Retry'),
+                        label: Text('alerts_retry'.tr()),
                       ),
                     ],
                   ),
@@ -597,8 +597,8 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                       SizedBox(height: 12.h),
                       Text(
                         _search.isNotEmpty
-                            ? 'No pilgrims match your search.'
-                            : 'No pilgrims found.',
+                            ? 'manage_no_pilgrims_match_search'.tr()
+                            : 'manage_no_pilgrims_found'.tr(),
                         style: TextStyle(
                             fontFamily: 'Lexend',
                             fontSize: 14.sp,
@@ -754,8 +754,8 @@ class _PilgrimCard extends StatelessWidget {
                           pilgrim.isAssigned
                               ? pilgrim.currentGroupName!
                               : (pilgrim.limboReason == 'group_deleted'
-                                  ? 'Deleted Group: ${pilgrim.limboGroupName ?? '?'}'
-                                  : 'Unassigned'),
+                                  ? 'manage_deleted_group'.tr(args: [pilgrim.limboGroupName ?? '?'])
+                                  : 'manage_unassigned'.tr()),
                           style: TextStyle(
                             fontFamily: 'Lexend',
                             fontWeight: FontWeight.w600,
@@ -782,7 +782,7 @@ class _PilgrimCard extends StatelessWidget {
                               Icon(Symbols.apartment, size: 12.w, color: textMuted),
                               SizedBox(width: 4.w),
                               Text(
-                                '${pilgrim.hotelName}${pilgrim.roomNumber != null ? ' (Room: ${pilgrim.roomNumber})' : ''}',
+                                '${pilgrim.hotelName}${pilgrim.roomNumber != null ? ' (${ 'group_room_number'.tr() }: ${pilgrim.roomNumber})' : ''}',
                                 style: TextStyle(
                                   fontFamily: 'Lexend',
                                   fontSize: 10.sp,
@@ -951,13 +951,13 @@ class _ActionsSheet extends StatelessWidget {
 
           _ActionTile(
             icon: Symbols.person,
-            label: 'View Full Profile',
+            label: 'manage_view_full_profile'.tr(),
             isDark: isDark,
             onTap: onViewProfile,
           ),
           _ActionTile(
             icon: Symbols.edit_square,
-            label: 'Edit Logistics (Hotel, Visa, etc.)',
+            label: 'manage_edit_logistics'.tr(),
             isDark: isDark,
             onTap: onEdit,
           ),
@@ -965,14 +965,14 @@ class _ActionsSheet extends StatelessWidget {
           if (!pilgrim.isAssigned)
             _ActionTile(
               icon: Symbols.group_add,
-              label: 'Assign to Group',
+              label: 'assign_to_group_title'.tr(),
               isDark: isDark,
               onTap: onAssign,
             )
           else
             _ActionTile(
               icon: Symbols.group_remove,
-              label: 'Remove from Group',
+              label: 'manage_remove_from_group'.tr(),
               isDark: isDark,
               color: Colors.red.shade600,
               onTap: onRemove,
@@ -1177,9 +1177,9 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
     if (success) {
       widget.onSaved();
       StandardDialog.hide(context);
-      StandardSnackBar.showSuccess(context, 'Logistics updated');
+      StandardSnackBar.showSuccess(context, 'manage_logistics_updated'.tr());
     } else {
-      StandardSnackBar.showError(context, err ?? 'Update failed');
+      StandardSnackBar.showError(context, err ?? 'edit_profile_error_generic'.tr());
     }
   }
 
@@ -1200,12 +1200,12 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   DropdownButtonFormField<String?>(
                     initialValue: _selectedHotelId,
                     dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                    decoration: const InputDecoration(
-                      labelText: 'Hotel',
+                    decoration: InputDecoration(
+                      labelText: 'group_hotel_name'.tr(),
                       prefixIcon: Icon(Symbols.apartment),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('No Hotel')),
+                      DropdownMenuItem(value: null, child: Text('group_no_hotel'.tr())),
                       ..._hotels.map((h) => DropdownMenuItem(value: h.id, child: Text(h.name, overflow: TextOverflow.ellipsis))),
                     ],
                     onChanged: (v) => setState(() {
@@ -1216,14 +1216,14 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   SizedBox(height: 12.h),
                   DropdownButtonFormField<String?>(
                     initialValue: _selectedRoomId,
-                    disabledHint: const Text('Select Hotel first'),
+                    disabledHint: Text('manage_select_hotel_first'.tr()),
                     dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                    decoration: const InputDecoration(
-                      labelText: 'Room',
+                    decoration: InputDecoration(
+                      labelText: 'group_room_number'.tr(),
                       prefixIcon: Icon(Symbols.meeting_room),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('No Room')),
+                      DropdownMenuItem(value: null, child: Text('group_no_room'.tr())),
                       ...rooms.map((r) {
                         final current = r.currentOccupancy;
                         final isFull = current >= r.capacity;
@@ -1232,7 +1232,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                         return DropdownMenuItem(
                           value: r.id,
                           child: Text(
-                            '${r.roomNumber}${r.floor != null ? ' (F${r.floor})' : ''} - $current/${r.capacity}${isFull ? ' (Full)' : ''}',
+                            '${r.roomNumber}${r.floor != null ? ' (F${r.floor})' : ''} - $current/${r.capacity}${isFull ? ' (${ 'manage_full'.tr() })' : ''}',
                             style: TextStyle(
                               color: isFull ? Colors.green.shade400 : null,
                             ),
@@ -1246,12 +1246,12 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   DropdownButtonFormField<String?>(
                     initialValue: _selectedBusId,
                     dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                    decoration: const InputDecoration(
-                      labelText: 'Bus',
+                    decoration: InputDecoration(
+                      labelText: 'group_bus_number'.tr(),
                       prefixIcon: Icon(Symbols.directions_bus),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('No Bus')),
+                      DropdownMenuItem(value: null, child: Text('group_no_bus'.tr())),
                       ..._buses.map((b) => DropdownMenuItem(
                           value: b.id, child: Text('${b.busNumber} - ${b.destination}', overflow: TextOverflow.ellipsis))),
                     ],
@@ -1261,8 +1261,8 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   DropdownButtonFormField<String>(
                     initialValue: _selectedVisaStatus,
                     dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-                    decoration: const InputDecoration(
-                      labelText: 'Visa Status',
+                    decoration: InputDecoration(
+                      labelText: 'profile_visa_status'.tr(),
                       prefixIcon: Icon(Symbols.verified_user),
                     ),
                     items: ['pending', 'issued', 'rejected', 'expired', 'unknown']
@@ -1282,7 +1282,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                           onPressed: () => StandardDialog.hide(context),
                           style: TextButton.styleFrom(),
                           child: Text(
-                            'Cancel',
+                            'cancel'.tr(),
                             style: TextStyle(
                               fontFamily: 'Lexend',
                               fontWeight: FontWeight.w600,
@@ -1300,7 +1300,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                           child: _isLoading
                               ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : Text(
-                                  'Save',
+                                  'settings_save'.tr(),
                                   style: TextStyle(
                                     fontFamily: 'Lexend',
                                     fontWeight: FontWeight.w700,

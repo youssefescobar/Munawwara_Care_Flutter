@@ -76,7 +76,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
             final map = Map<String, dynamic>.from(g);
             return GroupOption(
               id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
-              name: map['group_name']?.toString() ?? 'Unnamed Group',
+              name: map['group_name']?.toString() ?? 'provisioning_unnamed_group'.tr(),
             );
           })
           .where((g) => g.id.isNotEmpty)
@@ -134,7 +134,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
           final roomsRaw = (map['rooms'] as List<dynamic>? ?? const []);
           return HotelOption(
             id: map['_id']?.toString() ?? '',
-            name: map['name']?.toString() ?? 'Hotel',
+            name: map['name']?.toString() ?? 'provisioning_default_hotel'.tr(),
             rooms: roomsRaw.whereType<Map>().map((r) {
               final room = Map<String, dynamic>.from(r);
               return RoomOption(
@@ -218,29 +218,29 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
         : _items.where((i) => i.status.toLowerCase() == 'pending').toList();
 
     if (itemsToShare.isEmpty) {
-      StandardSnackBar.showError(context, 'No valid accounts selected to share');
+      StandardSnackBar.showError(context, 'provisioning_no_valid_accounts'.tr());
       return;
     }
 
     final group = _groups.where((g) => g.id == _selectedGroupId).firstOrNull;
-    final groupName = group?.name ?? 'Group';
-    final modName = ref.read(authProvider).fullName ?? 'Moderator';
+    final groupName = group?.name ?? 'provisioning_fallback_group'.tr();
+    final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
 
     final StringBuffer buffer = StringBuffer();
-    buffer.writeln('🌙 *Munawwara Care - Login Credentials*');
-    buffer.writeln('Group: $groupName');
-    buffer.writeln('Invited by: $modName');
-    buffer.writeln('-----------------------------------');
+    buffer.writeln('provisioning_share_credentials_intro'.tr(args: ['app_title'.tr()]));
+    buffer.writeln('provisioning_share_line_group'.tr(args: [groupName]));
+    buffer.writeln('provisioning_share_line_invited'.tr(args: [modName]));
+    buffer.writeln('provisioning_share_separator'.tr());
     
     for (var item in itemsToShare) {
-      buffer.writeln('\n👤 Name: *${item.fullName}*');
-      buffer.writeln('🔑 Login Code: `${item.token ?? '---'}`');
+      buffer.writeln('\n${'provisioning_share_line_name'.tr(args: [item.fullName])}');
+      buffer.writeln('provisioning_share_line_code'.tr(args: [item.token ?? '---']));
     }
     
-    buffer.writeln('\n-----------------------------------');
-    buffer.writeln('⚠️ Do not share these codes with others.');
+    buffer.writeln('\n${'provisioning_share_separator'.tr()}');
+    buffer.writeln('provisioning_share_footer'.tr());
     
-    Share.share(buffer.toString(), subject: 'Login credentials for $groupName');
+    Share.share(buffer.toString(), subject: 'provisioning_share_subject'.tr(args: [groupName]));
   }
 
   Future<void> _handleShareSelectedImages() async {
@@ -249,7 +249,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
         : _items.where((i) => i.status.toLowerCase() == 'pending').toList();
 
     if (itemsToShare.isEmpty) {
-      StandardSnackBar.showError(context, 'No valid accounts selected to share');
+      StandardSnackBar.showError(context, 'provisioning_no_valid_accounts'.tr());
       return;
     }
 
@@ -259,8 +259,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
     });
 
     final group = _groups.where((g) => g.id == _selectedGroupId).firstOrNull;
-    final groupName = group?.name ?? 'Group';
-    final modName = ref.read(authProvider).fullName ?? 'Moderator';
+    final groupName = group?.name ?? 'provisioning_fallback_group'.tr();
+    final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final mediaQuery = MediaQuery.of(context);
@@ -305,10 +305,10 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
       }
 
       if (files.isNotEmpty) {
-        await Share.shareXFiles(files, text: 'Login credentials for $groupName');
+        await Share.shareXFiles(files, text: 'provisioning_share_caption_group'.tr(args: [groupName]));
       }
     } catch (e) {
-      if (mounted) StandardSnackBar.showError(context, 'Failed to generate images: $e');
+      if (mounted) StandardSnackBar.showError(context, 'provisioning_generate_images_failed'.tr(args: ['$e']));
     } finally {
       if (mounted) {
         setState(() {
@@ -343,8 +343,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
         await _loadProvisioningStatus();
         final newItem = item.copyWith(token: token);
         final group = _groups.where((g) => g.id == _selectedGroupId).firstOrNull;
-        final modName = ref.read(authProvider).fullName ?? 'Moderator';
-        _showCredentialDialog(newItem, group?.name ?? 'Group', modName);
+        final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
+        _showCredentialDialog(newItem, group?.name ?? 'provisioning_fallback_group'.tr(), modName);
       }
     } on DioException catch (e) {
       if (mounted) StandardSnackBar.showError(context, ApiService.parseError(e));
@@ -357,8 +357,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
 
     final confirmed = await StandardDialog.show(
       context: context,
-      title: 'group_delete_pilgrim_title'.tr(),
-      confirmText: 'group_delete'.tr(),
+      title: 'group_delete_pilgrim_title',
+      confirmText: 'group_delete',
       isDestructive: true,
       contentWidget: Text(
         'group_delete_pilgrim_body'.tr(args: [item.fullName]),
@@ -371,7 +371,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
     try {
       await ApiService.dio.delete('/auth/groups/$groupId/pilgrims/${item.pilgrimId}');
       await _loadProvisioningStatus();
-      if (mounted) StandardSnackBar.showSuccess(context, 'Pilgrim removed');
+      if (mounted) StandardSnackBar.showSuccess(context, 'provisioning_pilgrim_removed'.tr());
     } on DioException catch (e) {
       if (mounted) StandardSnackBar.showError(context, ApiService.parseError(e));
     }
@@ -379,9 +379,9 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
 
   Future<void> _handleShareQr(ProvisioningItem item) async {
     final group = _groups.where((g) => g.id == _selectedGroupId).firstOrNull;
-    final modName = ref.read(authProvider).fullName ?? 'Moderator';
+    final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
     
-    _showCredentialDialog(item, group?.name ?? 'Group', modName);
+    _showCredentialDialog(item, group?.name ?? 'provisioning_fallback_group'.tr(), modName);
   }
 
   void _showCredentialDialog(ProvisioningItem item, String groupName, String modName) {
@@ -410,7 +410,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                       child: ElevatedButton.icon(
                         onPressed: () => Navigator.pop(ctx),
                         icon: const Icon(Icons.close, size: 18),
-                        label: const Text('Close', style: TextStyle(fontSize: 13)),
+                        label: Text('group_close'.tr(), style: const TextStyle(fontSize: 13)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: AppColors.textDark,
@@ -454,9 +454,9 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                                 final imagePath = await File('${directory.path}/login_qr_${item.pilgrimId}.png').create();
                                 await imagePath.writeAsBytes(bytes);
                                 
-                                await Share.shareXFiles([XFile(imagePath.path)], text: 'Login credentials for ${item.fullName}');
+                                await Share.shareXFiles([XFile(imagePath.path)], text: 'provisioning_share_caption_person'.tr(args: [item.fullName]));
                               } catch (e) {
-                                if (context.mounted) StandardSnackBar.showError(context, 'Failed to generate image');
+                                if (context.mounted) StandardSnackBar.showError(context, 'provisioning_generate_image_failed'.tr());
                               } finally {
                                 if (context.mounted) setDialogState(() => _isSharing = false);
                               }
@@ -465,7 +465,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.share, size: 18),
                             label: Text(
-                              _isSharing ? 'Wait...' : 'Share',
+                              _isSharing ? 'provisioning_wait'.tr() : 'group_share_invite'.tr(),
                               style: const TextStyle(fontSize: 13),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -496,8 +496,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final groupName = _groups.firstWhere((g) => g.id == _selectedGroupId, orElse: () => const GroupOption(id: '', name: 'Group')).name;
-    final modName = ref.read(authProvider).fullName ?? 'Moderator';
+    final groupName = _groups.firstWhere((g) => g.id == _selectedGroupId, orElse: () => GroupOption(id: '', name: 'provisioning_fallback_group'.tr())).name;
+    final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
     
     final filteredItems = _items.where((i) {
       if (_filterStatus == 'pending') return i.status != 'activated';
@@ -604,7 +604,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                       ),
                       SizedBox(height: 24.h),
                       Text(
-                        'Generating Images',
+                        'provisioning_generating_images'.tr(),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontWeight: FontWeight.w800,
@@ -614,7 +614,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                       ),
                       SizedBox(height: 8.h),
                       Text(
-                        '${(_bulkCaptureProgress * 100).toInt()}% Complete',
+                        'provisioning_progress_complete'.tr(args: ['${(_bulkCaptureProgress * 100).toInt()}']),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 14.sp,
@@ -637,7 +637,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pilgrim Accounts',
+          'provisioning_header_title'.tr(),
           style: TextStyle(
             fontFamily: 'Lexend',
             fontWeight: FontWeight.w800,
@@ -646,7 +646,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
           ),
         ),
         Text(
-          'Provision and track pilgrim account activations.',
+          'provisioning_header_subtitle'.tr(),
           style: TextStyle(
             fontFamily: 'Lexend',
             fontSize: 14.sp,
@@ -669,7 +669,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
         child: DropdownButton<String>(
           value: _selectedGroupId,
           isExpanded: true,
-          hint: Text('Select Group', style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp)),
+          hint: Text('group_select'.tr(), style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp)),
           items: _groups.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
           onChanged: _isLoadingGroups ? null : (v) async {
             setState(() {
@@ -744,7 +744,7 @@ class _LoginCredentialCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Munawwara Care',
+                          'app_title'.tr(),
                           style: TextStyle(
                             fontFamily: 'Lexend',
                             fontWeight: FontWeight.w800,
@@ -753,7 +753,7 @@ class _LoginCredentialCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Pilgrim Companion',
+                          'provisioning_card_subtitle'.tr(),
                           style: TextStyle(
                             fontFamily: 'Lexend',
                             fontSize: 10,
@@ -785,7 +785,7 @@ class _LoginCredentialCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Invited by $modName',
+                    'group_moderated_by'.tr(args: [modName]),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontSize: 12,
@@ -841,8 +841,8 @@ class _LoginCredentialCard extends StatelessWidget {
                   const SizedBox(height: 20),
                   
                   // Login Code
-                  const Text(
-                    'LOGIN CODE',
+                  Text(
+                    'group_code'.tr().toUpperCase(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontSize: 11,
@@ -887,7 +887,7 @@ class _LoginCredentialCard extends StatelessWidget {
                             Icon(Symbols.warning, size: 14, color: Colors.orange.shade700),
                             const SizedBox(width: 6),
                             Text(
-                              'Security Warning',
+                              'provisioning_security_warning'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontSize: 11,
@@ -899,7 +899,7 @@ class _LoginCredentialCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Do not share this QR code with anyone else. If you see any errors while signing in, contact the moderator.',
+                          'provisioning_security_warning_body'.tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Lexend',

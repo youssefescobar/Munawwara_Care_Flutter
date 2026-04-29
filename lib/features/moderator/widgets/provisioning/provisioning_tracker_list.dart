@@ -60,7 +60,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Activation Tracker',
+                    'provisioning_tracker_title'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w700,
@@ -69,7 +69,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Monitor & manage account setup',
+                    'provisioning_tracker_subtitle'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontSize: 11.sp,
@@ -85,7 +85,7 @@ class ProvisioningTrackerList extends StatelessWidget {
               IconButton(
                 onPressed: onSelectAll,
                 icon: Icon(Symbols.checklist, size: 20.w, color: AppColors.primary),
-                tooltip: 'Select All',
+                tooltip: 'provisioning_select_all'.tr(),
               ),
               PopupMenuButton<String>(
                 onSelected: (val) {
@@ -93,7 +93,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                   if (val == 'images') onShareSelectedImages();
                 },
                 icon: Icon(Symbols.ios_share, size: 20.w, color: AppColors.primary),
-                tooltip: 'Bulk Share Selected',
+                tooltip: 'provisioning_bulk_share_selected'.tr(),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'images',
@@ -101,7 +101,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                       children: [
                         Icon(Symbols.image, size: 20.w, color: AppColors.primary),
                         SizedBox(width: 8.w),
-                        Text('Share Selected Images', style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
+                        Text('provisioning_share_selected_images'.tr(), style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
                       ],
                     ),
                   ),
@@ -111,7 +111,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                       children: [
                         Icon(Symbols.description, size: 20.w, color: AppColors.primary),
                         SizedBox(width: 8.w),
-                        Text('Share Selected (Text)', style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
+                        Text('provisioning_share_selected_text'.tr(), style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
                       ],
                     ),
                   ),
@@ -124,7 +124,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                   if (val == 'images') onShareSelectedImages();
                 },
                 icon: Icon(Symbols.ios_share, size: 20.w, color: AppColors.primary),
-                tooltip: 'Bulk Share Pending',
+                tooltip: 'provisioning_bulk_share_pending'.tr(),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'images',
@@ -132,7 +132,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                       children: [
                         Icon(Symbols.image, size: 20.w, color: AppColors.primary),
                         SizedBox(width: 8.w),
-                        Text('Share All Pending Images', style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
+                        Text('provisioning_share_pending_images'.tr(), style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
                       ],
                     ),
                   ),
@@ -142,7 +142,7 @@ class ProvisioningTrackerList extends StatelessWidget {
                       children: [
                         Icon(Symbols.description, size: 20.w, color: AppColors.primary),
                         SizedBox(width: 8.w),
-                        Text('Share All Pending (Text)', style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
+                        Text('provisioning_share_pending_text'.tr(), style: TextStyle(fontSize: 13.sp, fontFamily: 'Lexend')),
                       ],
                     ),
                   ),
@@ -152,7 +152,7 @@ class ProvisioningTrackerList extends StatelessWidget {
             IconButton(
               onPressed: onToggleSelectionMode,
               icon: Icon(isSelectionMode ? Symbols.cancel : Symbols.rule, size: 20.w, color: isSelectionMode ? Colors.red : AppColors.primary),
-              tooltip: isSelectionMode ? 'Cancel Selection' : 'Select Pilgrims',
+              tooltip: isSelectionMode ? 'provisioning_cancel_selection'.tr() : 'provisioning_select_pilgrims'.tr(),
             ),
             SizedBox(width: 4.w),
             _buildFilterDropdown(),
@@ -236,7 +236,7 @@ class ProvisioningTrackerList extends StatelessWidget {
           Icon(Symbols.search_off, size: 48.w, color: AppColors.textMutedLight),
           SizedBox(height: 12.h),
           Text(
-            'No matching pilgrims found',
+            'provisioning_no_matching_pilgrims'.tr(),
             style: TextStyle(
               fontFamily: 'Lexend',
               fontSize: 14.sp,
@@ -353,7 +353,7 @@ class _TrackerItemCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'LOGIN CODE: ',
+                        '${'group_code'.tr().toUpperCase()}: ',
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 11.sp,
@@ -528,7 +528,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8.r),
       ),
       child: Text(
-        isActivated ? 'ACTIVATED' : isExpired ? 'EXPIRED' : 'PENDING',
+        isActivated ? 'group_status_activated'.tr().toUpperCase() : isExpired ? 'status_expired'.tr().toUpperCase() : 'status_pending'.tr().toUpperCase(),
         style: TextStyle(
           fontFamily: 'Lexend',
           fontSize: 10.sp,

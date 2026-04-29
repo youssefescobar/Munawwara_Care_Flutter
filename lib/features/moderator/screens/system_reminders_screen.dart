@@ -49,15 +49,15 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
   int? _selectedIntervalMin; // null = custom
   bool _isCustomInterval = false;
   
-  final List<Map<String, dynamic>> _intervalOptions = [
-    {'label': '1 m', 'value': 1},
-    {'label': '5 m', 'value': 5},
-    {'label': '30 m', 'value': 30},
-    {'label': '1 hr', 'value': 60},
-    {'label': '6 hr', 'value': 360},
-    {'label': '12 hr', 'value': 720},
-    {'label': '1 d', 'value': 1440},
-  ];
+  List<Map<String, dynamic>> get _intervalOptions => [
+        {'labelKey': 'reminder_interval_chip_1m', 'value': 1},
+        {'labelKey': 'reminder_interval_chip_5m', 'value': 5},
+        {'labelKey': 'reminder_interval_chip_30m', 'value': 30},
+        {'labelKey': 'reminder_interval_chip_1h', 'value': 60},
+        {'labelKey': 'reminder_interval_chip_6h', 'value': 360},
+        {'labelKey': 'reminder_interval_chip_12h', 'value': 720},
+        {'labelKey': 'reminder_interval_chip_1d', 'value': 1440},
+      ];
 
   bool _isCreating = false;
 
@@ -90,7 +90,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
   Future<void> _createReminders() async {
     final msg = _messageController.text.trim();
     if (msg.isEmpty) {
-      StandardSnackBar.showError(context, 'Please enter a reminder message');
+      StandardSnackBar.showError(context, 'reminder_enter_message'.tr());
       return;
     }
 
@@ -109,7 +109,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
       targetType = 'group';
     } else {
       if (_selectedGroupIdForPilgrim == null || _selectedPilgrimId == null) {
-        StandardSnackBar.showWarning(context, 'Please select a group and a pilgrim');
+        StandardSnackBar.showWarning(context, 'reminder_select_group_and_pilgrim'.tr());
         return;
       }
       targetGroups = [_selectedGroupIdForPilgrim!];
@@ -117,7 +117,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     }
 
     if (targetGroups.isEmpty) {
-      StandardSnackBar.showWarning(context, 'No groups selected to send reminder to');
+      StandardSnackBar.showWarning(context, 'reminder_no_groups_selected'.tr());
       return;
     }
 
@@ -149,7 +149,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     setState(() => _isCreating = false);
 
     if (success) {
-      if (mounted) StandardSnackBar.showSuccess(context, 'Reminders created successfully!');
+      if (mounted) StandardSnackBar.showSuccess(context, 'reminder_create_success'.tr());
       _messageController.clear();
       _selectedGroupIds.clear();
       setState(() {
@@ -161,7 +161,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         _selectedPilgrimId = null;
       });
     } else {
-      if (mounted) StandardSnackBar.showError(context, 'Some reminders failed to create');
+      if (mounted) StandardSnackBar.showError(context, 'reminder_create_partial_fail'.tr());
     }
   }
 
@@ -180,7 +180,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Reminders',
+              'reminder_schedule_page_title'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontWeight: FontWeight.w800,
@@ -190,7 +190,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
             ),
             SizedBox(height: 8.h),
             Text(
-              'Schedule group reminders for coordinated care activities.',
+              'reminder_schedule_page_subtitle'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 14.sp,
@@ -210,7 +210,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'TARGET AUDIENCE',
+                    'reminder_target_audience'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
@@ -231,13 +231,17 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final segmentWidth = constraints.maxWidth / 3;
+                        final isRtl = Directionality.of(context).name == 'rtl';
+                        final visualIndex = isRtl
+                            ? (2 - _targetAudienceIndex)
+                            : _targetAudienceIndex;
                         return Stack(
                           children: [
                             // Animated Indicator
                             AnimatedPositioned(
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.fastOutSlowIn,
-                              left: _targetAudienceIndex * segmentWidth,
+                              left: visualIndex * segmentWidth,
                               width: segmentWidth,
                               top: 0,
                               bottom: 0,
@@ -260,9 +264,9 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             // Buttons
                             Row(
                               children: [
-                                _buildSegment(0, 'System Wide', isDark),
-                                _buildSegment(1, 'Groups', isDark),
-                                _buildSegment(2, 'Pilgrim', isDark),
+                                _buildSegment(0, 'reminder_audience_system_wide', isDark),
+                                _buildSegment(1, 'reminder_audience_groups_tab', isDark),
+                                _buildSegment(2, 'reminder_audience_pilgrim_tab', isDark),
                               ],
                             ),
                           ],
@@ -301,7 +305,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Select Recipient Groups',
+                      'reminder_select_recipient_groups'.tr(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w600,
@@ -381,7 +385,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           size: 18,
                         ),
                         label: Text(
-                          'Browse more groups',
+                          'reminder_browse_more_groups'.tr(),
                           style: TextStyle(
                             fontFamily: 'Lexend',
                             fontWeight: FontWeight.w600,
@@ -423,7 +427,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Select Pilgrim',
+                      'reminder_select_pilgrim_section'.tr(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w600,
@@ -436,7 +440,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                       key: ValueKey(_selectedGroupIdForPilgrim),
                       initialValue: _selectedGroupIdForPilgrim,
                       decoration: InputDecoration(
-                        labelText: 'Select Group',
+                        labelText: 'reminder_select_group_dropdown'.tr(),
                         labelStyle: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 14.sp,
@@ -501,13 +505,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           final group = allGroups.firstWhere((g) => g.id == _selectedGroupIdForPilgrim);
                           final pilgrims = group.pilgrims;
                           if (pilgrims.isEmpty) {
-                            return Text('No pilgrims in this group.', style: TextStyle(color: Colors.red, fontSize: 12.sp));
+                            return Text('reminder_no_pilgrims'.tr(), style: TextStyle(color: Colors.red, fontSize: 12.sp));
                           }
                           return DropdownButtonFormField<String>(
                             key: ValueKey(_selectedPilgrimId),
                             initialValue: _selectedPilgrimId,
                             decoration: InputDecoration(
-                              labelText: 'Select Pilgrim',
+                              labelText: 'reminder_select_pilgrim'.tr(),
                               labelStyle: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontSize: 14.sp,
@@ -596,7 +600,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Reminder Message',
+                    'reminder_text_label'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
@@ -627,7 +631,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                         color: isDark ? Colors.white : const Color(0xFF1A1A4E),
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Enter care reminder details here...',
+                        hintText: 'reminder_text_hint'.tr(),
                         hintStyle: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 14.sp,
@@ -680,7 +684,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Scheduling Options',
+                    'reminder_scheduling_section'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
@@ -696,7 +700,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'START DATE',
+                              'reminder_label_start_date'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontWeight: FontWeight.w600,
@@ -757,7 +761,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'START TIME',
+                              'reminder_label_start_time'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontWeight: FontWeight.w600,
@@ -818,7 +822,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Repeat Count',
+                        'reminder_repeat_count'.tr(),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontWeight: FontWeight.w600,
@@ -878,7 +882,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                   if (_repeatCount > 1) ...[
                     SizedBox(height: 20.h),
                     Text(
-                      'Interval',
+                      'reminder_interval_short'.tr(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w600,
@@ -894,7 +898,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                         final isSelected = _selectedIntervalMin == opt['value'];
                         return ChoiceChip(
                           label: Text(
-                            opt['label'],
+                            (opt['labelKey'] as String).tr(),
                             style: TextStyle(
                               fontFamily: 'Lexend',
                               fontWeight: FontWeight.w500,
@@ -950,7 +954,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                       )
                     : const Icon(Symbols.add_alert, size: 24),
                 label: Text(
-                  _isCreating ? 'Creating...' : 'Create Reminder',
+                  _isCreating ? 'reminder_creating'.tr() : 'reminder_create_btn'.tr(),
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontWeight: FontWeight.w700,
@@ -963,7 +967,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
             SizedBox(height: 48.h),
             
             Text(
-              'History',
+              'reminder_history_section'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontWeight: FontWeight.w700,
@@ -980,10 +984,10 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  _buildFilterChip(0, 'All', isDark),
-                  _buildFilterChip(1, 'System', isDark),
-                  _buildFilterChip(2, 'Groups', isDark),
-                  _buildFilterChip(3, 'Pilgrim', isDark),
+                  _buildFilterChip(0, 'reminder_hist_all', isDark),
+                  _buildFilterChip(1, 'reminder_hist_system', isDark),
+                  _buildFilterChip(2, 'reminder_hist_groups', isDark),
+                  _buildFilterChip(3, 'reminder_hist_pilgrim', isDark),
                 ],
               ),
             ),
@@ -1005,7 +1009,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 32.h),
                             child: Text(
-                              'No reminders found for this filter.',
+                              'reminder_empty_history_filter'.tr(),
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 color: AppColors.textMutedLight,
@@ -1094,7 +1098,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
 
 
 
-  Widget _buildFilterChip(int index, String label, bool isDark) {
+  Widget _buildFilterChip(int index, String labelKey, bool isDark) {
     final isSelected = _historyFilterIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _historyFilterIndex = index),
@@ -1114,7 +1118,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         ),
         child: Center(
           child: Text(
-            label,
+            labelKey.tr(),
             style: TextStyle(
               fontFamily: 'Lexend',
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -1127,7 +1131,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     );
   }
 
-  Widget _buildSegment(int index, String label, bool isDark) {
+  Widget _buildSegment(int index, String labelKey, bool isDark) {
     final isSelected = _targetAudienceIndex == index;
     return Expanded(
       child: GestureDetector(
@@ -1144,7 +1148,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                   ? (isDark ? Colors.white : const Color(0xFF1A1A4E))
                   : AppColors.textMutedLight,
             ),
-            child: Text(label),
+            child: Text(labelKey.tr()),
           ),
         ),
       ),

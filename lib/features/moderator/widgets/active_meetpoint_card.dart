@@ -84,7 +84,7 @@ class ActiveMeetpointCard extends StatelessWidget {
             IconButton(
               onPressed: onDelete,
               icon: Icon(Symbols.delete, color: const Color(0xFFDC2626), size: 22.w),
-              tooltip: 'Delete Meetpoint',
+              tooltip: 'area_delete_meetpoint_confirm_title'.tr(),
             ),
           ],
         ),

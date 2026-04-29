@@ -157,7 +157,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                                 ),
                                 SizedBox(width: 6.w),
                                 Text(
-                                  pilgrim.isOnline ? 'Online' : 'Offline',
+                                  pilgrim.isOnline ? 'dashboard_active'.tr() : 'profile_offline'.tr(),
                                   style: TextStyle(
                                     fontFamily: 'Lexend',
                                     fontSize: 12.sp,
@@ -199,7 +199,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                     Expanded(
                       child: _ActionButton(
                         icon: Symbols.chat,
-                        label: 'Message',
+                        label: 'tab_chat'.tr(),
                         color: AppColors.primary,
                         onTap: () {
                           Navigator.pop(context);
@@ -208,7 +208,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                             MaterialPageRoute(
                               builder: (_) => IndividualMessagesScreen(
                                 groupId: groupId,
-                                groupName: 'Group Chat',
+                                groupName: 'msg_private_header'.tr(),
                                 recipientId: pilgrim.id,
                                 recipientName: pilgrim.fullName,
                                 currentUserId: currentUserId,
@@ -222,7 +222,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                     Expanded(
                       child: _ActionButton(
                         icon: Symbols.call,
-                        label: 'Internet Call',
+                        label: 'call_internet'.tr(),
                         color: AppColors.success,
                         onTap: () {
                           Navigator.pop(context);
@@ -246,7 +246,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                   SizedBox(height: 12.h),
                   _ActionButton(
                     icon: Symbols.phone_forwarded,
-                    label: 'Call via Carrier (${pilgrim.phoneNumber})',
+                    label: 'profile_call_via_carrier'.tr(args: ['${pilgrim.phoneNumber}']),
                     color: textMuted,
                     isOutlined: true,
                     onTap: () async {
@@ -262,48 +262,48 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                 SizedBox(height: 32.h),
 
                 // Travel & Accommodation Section
-                _SectionTitle(title: 'Travel & Accommodation', isDark: isDark),
+                _SectionTitle(title: 'profile_travel_accommodation'.tr(), isDark: isDark),
                 _ProfileInfoRow(
                   icon: Symbols.apartment,
-                  label: 'Hotel',
-                  value: pilgrim.hotelName ?? 'Not Assigned',
+                  label: 'group_hotel_name'.tr(),
+                  value: pilgrim.hotelName ?? 'profile_not_assigned'.tr(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.meeting_room,
-                  label: 'Room Number',
-                  value: pilgrim.roomNumber ?? 'Not Assigned',
+                  label: 'group_room_number'.tr(),
+                  value: pilgrim.roomNumber ?? 'profile_not_assigned'.tr(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.directions_bus,
-                  label: 'Bus Info',
-                  value: pilgrim.busInfo ?? 'Not Assigned',
+                  label: 'group_bus_number'.tr(),
+                  value: pilgrim.busInfo ?? 'profile_not_assigned'.tr(),
                   isDark: isDark,
                 ),
 
                 SizedBox(height: 24.h),
 
                 // Visa Section
-                _SectionTitle(title: 'Visa Information', isDark: isDark),
+                _SectionTitle(title: 'profile_visa_information'.tr(), isDark: isDark),
                 _ProfileInfoRow(
                   icon: Symbols.verified_user,
-                  label: 'Visa Status',
-                  value: pilgrim.visaStatus?.toUpperCase() ?? 'UNKNOWN',
+                  label: 'profile_visa_status'.tr(),
+                  value: pilgrim.visaStatus?.toUpperCase() ?? 'status_unknown'.tr().toUpperCase(),
                   valueColor: _getVisaColor(pilgrim.visaStatus),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.description,
-                  label: 'Visa Number',
-                  value: pilgrim.visaNumber ?? 'Not Provided',
+                  label: 'profile_visa_number'.tr(),
+                  value: pilgrim.visaNumber ?? 'profile_not_provided'.tr(),
                   isDark: isDark,
                 ),
 
                 SizedBox(height: 24.h),
 
                 // Medical History
-                _SectionTitle(title: 'Medical History', isDark: isDark),
+                _SectionTitle(title: 'profile_medical_history'.tr(), isDark: isDark),
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(16.w),
@@ -318,7 +318,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                   ),
                   child: Text(
                     (pilgrim.medicalHistory == null || pilgrim.medicalHistory!.isEmpty)
-                        ? 'No medical history provided.'
+                        ? 'profile_no_medical_history'.tr()
                         : pilgrim.medicalHistory!,
                     style: TextStyle(
                       fontFamily: 'Lexend',
@@ -332,34 +332,34 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                 SizedBox(height: 24.h),
 
                 // Personal Details
-                _SectionTitle(title: 'Personal Details', isDark: isDark),
+                _SectionTitle(title: 'profile_personal_details'.tr(), isDark: isDark),
                 _ProfileInfoRow(
                   icon: Symbols.badge,
-                  label: 'National ID',
-                  value: pilgrim.nationalId ?? 'Not Provided',
+                  label: 'profile_national_id'.tr(),
+                  value: pilgrim.nationalId ?? 'profile_not_provided'.tr(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.cake,
-                  label: 'Age',
-                  value: pilgrim.age != null ? '${pilgrim.age} years' : 'Not Provided',
+                  label: 'reg_age'.tr(),
+                  value: pilgrim.age != null ? 'profile_age_years'.tr(args: ['${pilgrim.age}']) : 'profile_not_provided'.tr(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.person,
-                  label: 'Gender',
-                  value: pilgrim.gender != null ? 'profile_gender_${pilgrim.gender}'.tr() : 'Not Provided',
+                  label: 'reg_gender'.tr(),
+                  value: pilgrim.gender != null ? 'profile_gender_${pilgrim.gender}'.tr() : 'profile_not_provided'.tr(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.language,
-                  label: 'Language',
+                  label: 'settings_language'.tr(),
                   value: pilgrim.language.toUpperCase(),
                   isDark: isDark,
                 ),
                 _ProfileInfoRow(
                   icon: Symbols.public,
-                  label: 'Ethnicity',
+                  label: 'ethnicity'.tr(),
                   value: pilgrim.ethnicity,
                   isDark: isDark,
                 ),

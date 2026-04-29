@@ -41,6 +41,18 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
   String? _selectedHotelId;
   String? _selectedRoomId;
   String? _selectedBusId;
+  static const List<Map<String, String>> _ethnicityOptions = [
+    {'value': 'Arab', 'labelKey': 'ethnic_arab'},
+    {'value': 'South Asian', 'labelKey': 'ethnic_south_asian'},
+    {'value': 'Turkic', 'labelKey': 'ethnic_turkic'},
+    {'value': 'Persian', 'labelKey': 'ethnic_persian'},
+    {'value': 'Malay/Indonesian', 'labelKey': 'ethnic_malay_indo'},
+    {'value': 'African', 'labelKey': 'ethnic_african'},
+    {'value': 'Kurdish', 'labelKey': 'ethnic_kurdish'},
+    {'value': 'Berber', 'labelKey': 'ethnic_berber'},
+    {'value': 'European Muslim', 'labelKey': 'ethnic_european_muslim'},
+    {'value': 'Other', 'labelKey': 'ethnic_other'},
+  ];
 
   @override
   void dispose() {
@@ -126,7 +138,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                 ),
                 SizedBox(width: 12.w),
                 Text(
-                  'Provision Account',
+                  'provisioning_create_account_title'.tr(),
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontWeight: FontWeight.w700,
@@ -138,27 +150,27 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
             ),
             SizedBox(height: 20.h),
             
-            _buildSectionTitle('Basic Information'),
+            _buildSectionTitle('provisioning_basic_information'.tr()),
             SizedBox(height: 12.h),
             
             TextFormField(
               controller: _fullNameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
+              decoration: InputDecoration(
+                labelText: 'reg_full_name'.tr(),
                 prefixIcon: Icon(Symbols.person),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'provisioning_required'.tr() : null,
             ),
             SizedBox(height: 12.h),
             
             TextFormField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
+              decoration: InputDecoration(
+                labelText: 'reg_phone'.tr(),
                 prefixIcon: Icon(Symbols.phone),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'provisioning_required'.tr() : null,
             ),
             SizedBox(height: 12.h),
             
@@ -169,11 +181,11 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   child: TextFormField(
                     controller: _ageCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Age'),
+                    decoration: InputDecoration(labelText: 'reg_age'.tr()),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (v == null || v.trim().isEmpty) return 'provisioning_required'.tr();
                       final num = int.tryParse(v.trim());
-                      if (num == null || num < 1 || num > 120) return 'Invalid';
+                      if (num == null || num < 1 || num > 120) return 'provisioning_invalid'.tr();
                       return null;
                     },
                   ),
@@ -184,7 +196,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue: _selectedLanguage,
-                    decoration: const InputDecoration(labelText: 'Language'),
+                    decoration: InputDecoration(labelText: 'settings_language'.tr()),
                     items: [
                       DropdownMenuItem(value: 'en', child: Text('lang_english'.tr())),
                       DropdownMenuItem(value: 'ar', child: Text('lang_arabic'.tr())),
@@ -206,12 +218,15 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue: _selectedEthnicity,
-                    decoration: const InputDecoration(labelText: 'Ethnicity'),
-                    items: [
-                      'Arab', 'South Asian', 'Turkic', 'Persian', 
-                      'Malay/Indonesian', 'African', 'Kurdish', 
-                      'Berber', 'European Muslim', 'Other'
-                    ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    decoration: InputDecoration(labelText: 'ethnicity'.tr()),
+                    items: _ethnicityOptions
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e['value'],
+                            child: Text((e['labelKey'] ?? '').tr()),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) => setState(() => _selectedEthnicity = v!),
                   ),
                 ),
@@ -220,12 +235,12 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue: _selectedVisaStatus,
-                    decoration: const InputDecoration(labelText: 'Visa Status'),
+                    decoration: InputDecoration(labelText: 'profile_visa_status'.tr()),
                     items: ['unknown', 'pending', 'issued', 'rejected', 'expired']
                         .map((s) => DropdownMenuItem(
                           value: s, 
                           child: Text(
-                            s.toUpperCase(),
+                            'status_$s'.tr(),
                             style: TextStyle(fontSize: 12.sp, fontFamily: 'Lexend'),
                           ),
                         ))
@@ -244,14 +259,14 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                 tilePadding: EdgeInsets.zero,
                 iconColor: AppColors.primary,
                 collapsedIconColor: textPrimary,
-                title: _buildSectionTitle('Optional Logistics'),
+                title: _buildSectionTitle('provisioning_optional_logistics'.tr()),
                 children: [
                   SizedBox(height: 8.h),
                   DropdownButtonFormField<String>(
                     initialValue: _selectedHotelId,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Hotel',
+                    decoration: InputDecoration(
+                      labelText: 'group_hotel_name'.tr(),
                       prefixIcon: Icon(Symbols.apartment),
                     ),
                     items: [
@@ -272,8 +287,8 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                         child: DropdownButtonFormField<String>(
                           initialValue: _selectedRoomId,
                           isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Room',
+                          decoration: InputDecoration(
+                            labelText: 'group_room_number'.tr(),
                             prefixIcon: Icon(Symbols.meeting_room),
                           ),
                           items: [
@@ -298,8 +313,8 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                         child: DropdownButtonFormField<String>(
                           initialValue: _selectedBusId,
                           isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Bus',
+                          decoration: InputDecoration(
+                            labelText: 'group_bus_number'.tr(),
                             prefixIcon: Icon(Symbols.directions_bus),
                           ),
                           items: [
@@ -317,8 +332,8 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   SizedBox(height: 12.h),
                   TextFormField(
                     controller: _nationalIdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'National ID / Passport',
+                    decoration: InputDecoration(
+                      labelText: 'reg_passport'.tr(),
                       prefixIcon: Icon(Symbols.badge),
                     ),
                   ),
@@ -326,8 +341,8 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   TextFormField(
                     controller: _medicalHistoryCtrl,
                     maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Medical Conditions / Notes',
+                    decoration: InputDecoration(
+                      labelText: 'reg_medical'.tr(),
                       prefixIcon: Icon(Symbols.medical_services),
                     ),
                   ),
@@ -355,7 +370,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                           const Icon(Symbols.add_circle, color: Colors.white),
                           SizedBox(width: 8.w),
                           Text(
-                            'Create Account',
+                            'reg_create_account'.tr(),
                             style: TextStyle(
                               fontFamily: 'Lexend',
                               fontSize: 16.sp,

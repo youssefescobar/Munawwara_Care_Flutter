@@ -80,12 +80,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handlePilgrimLoginCode(String rawToken) async {
     if (rawToken.trim().isEmpty) {
-      setState(() => _loginError = 'Please enter your login code');
+      setState(() => _loginError = 'login_enter_code_error'.tr());
       return;
     }
     final token = _extractToken(rawToken).toUpperCase();
     if (token.isEmpty) {
-      setState(() => _loginError = 'Invalid login code');
+      setState(() => _loginError = 'login_invalid_code'.tr());
       return;
     }
 
@@ -105,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } else {
       setState(() {
-        _loginError = ref.read(authProvider).error ?? 'Invalid login code';
+        _loginError = ref.read(authProvider).error ?? 'login_invalid_code'.tr();
       });
       _scanHandled = false;
     }
@@ -238,7 +238,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                         // Title Text
                         Text(
-                          _isModeratorLogin ? 'Moderator Login' : 'Pilgrim Login',
+                          _isModeratorLogin ? 'login_moderator_title'.tr() : 'login_pilgrim_title'.tr(),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Lexend',
@@ -293,8 +293,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 child: Text.rich(
                                   TextSpan(
                                     text: _isModeratorLogin
-                                        ? 'Not a moderator? '
-                                        : 'Not a pilgrim? ',
+                                        ? 'login_not_moderator'.tr()
+                                        : 'login_not_pilgrim'.tr(),
                                     style: TextStyle(
                                       fontFamily: 'Lexend',
                                       color: isDark ? AppColors.textMutedLight : const Color(0xff64748b),
@@ -303,8 +303,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     children: [
                                       TextSpan(
                                         text: _isModeratorLogin
-                                            ? 'Log in as a pilgrim'
-                                            : 'Log in as a moderator',
+                                            ? 'login_as_pilgrim'.tr()
+                                            : 'login_as_moderator'.tr(),
                                         style: TextStyle(
                                           fontFamily: 'Lexend',
                                           color: isDark ? Colors.white : AppColors.textDark,
@@ -356,7 +356,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
             icon: const Icon(Symbols.keyboard_return, color: AppColors.primary),
             label: Text(
-              'Back to Code Entry',
+              'switch_to_manual'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 14.sp,
@@ -372,7 +372,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFieldLabel('Enter your login code', isDark),
+        _buildFieldLabel('enter_6_digit_code'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
           controller: _codeController,
@@ -382,8 +382,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             fontSize: 14.sp,
             color: isDark ? Colors.white : AppColors.textDark,
           ),
-          decoration: const InputDecoration(
-            hintText: 'Enter code',
+          decoration: InputDecoration(
+            hintText: 'Code'.tr(),
           ),
         ),
         _buildErrorUI(isDark),
@@ -392,7 +392,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onPressed: isLoading ? null : () => _handlePilgrimLoginCode(_codeController.text),
           child: isLoading
               ? _loadingIndicator()
-              : const Text('Continue'),
+              : Text('continue'.tr()),
         ),
         SizedBox(height: 16.h),
         OutlinedButton.icon(
@@ -404,7 +404,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
              });
           },
           icon: const Icon(Symbols.qr_code_scanner),
-          label: const Text('Scan QR Code'),
+          label: Text('join_group_title'.tr()),
         ),
       ],
     );
@@ -414,7 +414,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFieldLabel('Email or Phone', isDark),
+        _buildFieldLabel('Email'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
           controller: _identifierController,
@@ -424,12 +424,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             color: isDark ? Colors.white : AppColors.textDark,
           ),
           decoration: InputDecoration(
-            hintText: 'Email or Phone',
+            hintText: 'Email'.tr(),
             prefixIcon: Icon(Symbols.person, size: 20.w),
           ),
         ),
         SizedBox(height: 20.h),
-        _buildFieldLabel('Password', isDark),
+        _buildFieldLabel('label_password'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
           controller: _passwordController,
@@ -457,7 +457,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: GestureDetector(
             onTap: () => context.push('/forgot-password'),
             child: Text(
-              'Forgot Password?',
+              'forgot_password'.tr(),
               style: TextStyle(
                 fontFamily: 'Lexend',
                 fontSize: 13.sp,
@@ -473,7 +473,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onPressed: isLoading ? null : _handleModeratorLogin,
           child: isLoading
               ? _loadingIndicator()
-              : const Text('Log In'),
+              : Text('btn_login'.tr()),
         ),
       ],
     );

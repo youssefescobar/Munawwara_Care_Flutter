@@ -487,12 +487,26 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
     }
   }
 
-  // Invite a new moderator by email (sends email invite)
-  Future<(bool, String?)> inviteModerator(String groupId, String email) async {
+  // Invite one or more moderators by email (sends email invites)
+  Future<(bool, String?)> inviteModerators(
+    String groupId,
+    List<String> emails,
+  ) async {
     try {
+      final normalized = emails
+          .map((e) => e.trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+      if (normalized.isEmpty) {
+        return (false, 'email_invalid');
+      }
+
       await ApiService.dio.post(
         '/groups/$groupId/invite',
-        data: {'email': email.trim()},
+        data: normalized.length == 1
+            ? {'email': normalized.first}
+            : {'emails': normalized},
       );
       return (true, null);
     } on DioException catch (e) {
@@ -516,6 +530,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
         );
       }).toList();
       state = state.copyWith(groups: groups);
+      await loadDashboard(silently: true);
       return (true, null);
     } on DioException catch (e) {
       return (false, ApiService.parseError(e));
@@ -595,6 +610,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       await ApiService.dio.post('/groups/$groupId/leave', data: body);
       final updated = state.groups.where((g) => g.id != groupId).toList();
       state = state.copyWith(groups: updated, selectedGroupIndex: 0);
+      await loadDashboard(silently: true);
       return (true, null);
     } on DioException catch (e) {
       return (false, ApiService.parseError(e));
@@ -609,6 +625,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       await ApiService.dio.delete('/groups/$groupId');
       final updated = state.groups.where((g) => g.id != groupId).toList();
       state = state.copyWith(groups: updated, selectedGroupIndex: 0);
+      await loadDashboard(silently: true);
       return (true, null);
     } on DioException catch (e) {
       return (false, ApiService.parseError(e));

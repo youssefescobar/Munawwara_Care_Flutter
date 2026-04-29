@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../models/provisioning_models.dart';
 
@@ -20,7 +21,7 @@ class ProvisioningSummaryCards extends StatelessWidget {
       children: [
         Expanded(
           child: _ModernStatCard(
-            title: 'Total',
+            title: 'provisioning_total'.tr(),
             value: summary.totalProvisioned,
             icon: Symbols.group,
             color: AppColors.primary,
@@ -30,7 +31,7 @@ class ProvisioningSummaryCards extends StatelessWidget {
         SizedBox(width: 12.w),
         Expanded(
           child: _ModernStatCard(
-            title: 'Pending',
+            title: 'status_pending'.tr(),
             value: summary.pendingCount,
             icon: Symbols.pending_actions,
             color: const Color(0xFFF59E0B),
@@ -40,7 +41,7 @@ class ProvisioningSummaryCards extends StatelessWidget {
         SizedBox(width: 12.w),
         Expanded(
           child: _ModernStatCard(
-            title: 'Activated',
+            title: 'group_status_activated'.tr(),
             value: summary.activatedCount,
             icon: Symbols.verified,
             color: const Color(0xFF10B981),

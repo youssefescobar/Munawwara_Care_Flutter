@@ -28,6 +28,7 @@ import 'group_messages_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'system_reminders_screen.dart';
 import '../widgets/pilgrim_profile_sheet.dart';
+import '../../shared/helpers/chat_notification_helper.dart';
 import '../../shared/providers/message_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,13 +74,19 @@ class _ModeratorDashboardScreenState
     if (mounted) _joinAllGroupRooms();
   }
 
+  void _refreshRealtimeState() {
+    if (!mounted) return;
+    ref.read(notificationProvider.notifier).refetch();
+    ref.read(moderatorProvider.notifier).loadDashboard(silently: true);
+  }
+
   Future<void> _onSosAlertArrived(dynamic data) async {
     if (!mounted) return;
     // Refresh the alerts list immediately
     ref.read(notificationProvider.notifier).fetch();
     // Auto-navigate to Alerts tab so the moderator sees it
     setState(() => _currentTab = 4);
-    
+
     final map = data is Map ? data : <String, dynamic>{};
     final name = map['pilgrim_name'] as String? ?? 'A pilgrim';
     final pilgrimId = map['pilgrim_id'] as String?;
@@ -96,7 +103,7 @@ class _ModeratorDashboardScreenState
     await _alertTts.setVolume(1.0);
     await _alertTts.setSpeechRate(0.42);
     await _alertTts.speak('SOS Alert! $name needs immediate help!');
-    
+
     // Look up pilgrim from state to pass to profile sheet
     PilgrimInGroup? targetPilgrim;
     if (groupId != null && pilgrimId != null) {
@@ -123,7 +130,12 @@ class _ModeratorDashboardScreenState
       actionLabel: 'View',
       onAction: () {
         if (targetPilgrim != null && groupId != null) {
-          showPilgrimProfileSheet(context, targetPilgrim, groupId, currentUserId);
+          showPilgrimProfileSheet(
+            context,
+            targetPilgrim,
+            groupId,
+            currentUserId,
+          );
         } else {
           setState(() => _currentTab = 4);
         }
@@ -137,7 +149,8 @@ class _ModeratorDashboardScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Subscribe for RouteAware callbacks
       final route = ModalRoute.of(context);
-      if (route != null) AppRouter.moderatorRouteObserver.subscribe(this, route);
+      if (route != null)
+        AppRouter.moderatorRouteObserver.subscribe(this, route);
       await ref.read(moderatorProvider.notifier).loadDashboard();
       // Connect socket with this moderator's identity
       final auth = ref.read(authProvider);
@@ -180,27 +193,40 @@ class _ModeratorDashboardScreenState
         SocketService.on('sos-alert-cancelled', (data) {
           if (!mounted) return;
           _alertTts.stop();
-          
+
           if (data is Map) {
             final pilgrimId = data['pilgrim_id'] as String?;
             if (pilgrimId != null) {
-              ref.read(moderatorProvider.notifier).markPilgrimSOS(pilgrimId, active: false);
+              ref
+                  .read(moderatorProvider.notifier)
+                  .markPilgrimSOS(pilgrimId, active: false);
             }
           }
-          
+
           ref.read(notificationProvider.notifier).fetch();
         });
-        // Listen for missed calls — refresh notification badge + list
+        // Listen for missed calls — refresh notification/list + groups
         SocketService.on('missed-call-received', (_) {
-          if (!mounted) return;
-          ref.read(notificationProvider.notifier).refetch();
+          _refreshRealtimeState();
         });
         // Listen for notification refresh (invitations, areas, etc.)
         SocketService.on('notification_refresh', (_) {
-          if (!mounted) return;
-          ref.read(notificationProvider.notifier).refetch();
+          _refreshRealtimeState();
         });
-        
+        // Group membership/list changes from any device should refresh dashboard
+        SocketService.on('group_updated', (_) {
+          _refreshRealtimeState();
+        });
+        SocketService.on('group_deleted', (_) {
+          _refreshRealtimeState();
+        });
+        SocketService.on('added-to-group', (_) {
+          _refreshRealtimeState();
+        });
+        SocketService.on('removed-from-group', (_) {
+          _refreshRealtimeState();
+        });
+
         // Listen for new group messages globally
         SocketService.on('new_message', (data) {
           if (!mounted) return;
@@ -208,7 +234,9 @@ class _ModeratorDashboardScreenState
           try {
             // socket.io can deliver data as Map<dynamic,dynamic> — cast safely
             final map = Map<String, dynamic>.from(data as Map);
-            print('[ModeratorDashboard] is_urgent value in map: ${map['is_urgent']} (type: ${map['is_urgent'].runtimeType})');
+            print(
+              '[ModeratorDashboard] is_urgent value in map: ${map['is_urgent']} (type: ${map['is_urgent'].runtimeType})',
+            );
             final groupId = map['group_id']?.toString();
             if (groupId == null) {
               print('[ModeratorDashboard] Error: group_id is null in payload');
@@ -224,7 +252,7 @@ class _ModeratorDashboardScreenState
             final senderId = (senderRaw is Map)
                 ? senderRaw['_id']?.toString()
                 : senderRaw?.toString();
-            
+
             if (senderId == currentUserId) {
               print('[ModeratorDashboard] Message from self, skipping badge');
               return;
@@ -238,7 +266,9 @@ class _ModeratorDashboardScreenState
             }
 
             // Instantly increment unread count for UI badge
-            print('[ModeratorDashboard] Incrementing badge for group: $groupId');
+            print(
+              '[ModeratorDashboard] Incrementing badge for group: $groupId',
+            );
             ref.read(moderatorProvider.notifier).incrementUnreadCount(groupId);
           } catch (e) {
             debugPrint('[ModeratorDashboard] new_message handler error: $e');
@@ -257,6 +287,10 @@ class _ModeratorDashboardScreenState
     SocketService.off('sos-alert-cancelled');
     SocketService.off('missed-call-received');
     SocketService.off('notification_refresh');
+    SocketService.off('group_updated');
+    SocketService.off('group_deleted');
+    SocketService.off('added-to-group');
+    SocketService.off('removed-from-group');
     SocketService.off('new_message');
     SocketService.offConnected(_onSocketConnected);
     super.dispose();
@@ -288,59 +322,70 @@ class _ModeratorDashboardScreenState
         moderatorState.error == null &&
         !hasGroups;
 
-    return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.backgroundDark
-          : const Color(0xFFF0F0F8),
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _currentTab,
-            children: [
-              _GroupsHomeTab(
-                searchController: _searchController,
-                onNotificationTap: () => setState(() => _currentTab = 4),
-              ), // 0: Groups
-              const PilgrimProvisioningScreen(), // 1: Provisioning
-              const SystemRemindersScreen(), // 2: Reminders
-              const ModeratorProfileScreen(), // 3: Profile
-              const AlertsTab(), // 4: Alerts
-            ],
-          ),
-          if (showEmptyGroupsArrow)
-            IgnorePointer(
-              child: Align(
-                alignment: AlignmentDirectional.bottomEnd,
-                child: Padding(
-                  padding: EdgeInsetsDirectional.only(end: 64.w, bottom: 100.h),
-                  child: Transform.rotate(
-                    angle: Directionality.of(context) == ui.TextDirection.rtl ? 0.6 : -0.6,
-                    child: Icon(
-                      Symbols.arrow_downward,
-                      size: 32.w,
-                      color: isDark
-                          ? const Color(0xFFD4B896)
-                          : const Color(0xFF1A1A4E),
+    return WillPopScope(
+      onWillPop: () async {
+        if (_currentTab != 0) {
+          setState(() => _currentTab = 0);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: isDark
+            ? AppColors.backgroundDark
+            : const Color(0xFFF0F0F8),
+        body: Stack(
+          children: [
+            IndexedStack(
+              index: _currentTab,
+              children: [
+                _GroupsHomeTab(
+                  searchController: _searchController,
+                  onNotificationTap: () => setState(() => _currentTab = 4),
+                ), // 0: Groups
+                const PilgrimProvisioningScreen(), // 1: Provisioning
+                const SystemRemindersScreen(), // 2: Reminders
+                const ModeratorProfileScreen(), // 3: Profile
+                const AlertsTab(), // 4: Alerts
+              ],
+            ),
+            if (showEmptyGroupsArrow)
+              IgnorePointer(
+                child: Align(
+                  alignment: AlignmentDirectional.bottomEnd,
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.only(end: 64.w, bottom: 100.h),
+                    child: Transform.rotate(
+                      angle: Directionality.of(context) == ui.TextDirection.rtl
+                          ? 0.6
+                          : -0.6,
+                      child: Icon(
+                        Symbols.arrow_downward,
+                        size: 32.w,
+                        color: isDark
+                            ? const Color(0xFFD4B896)
+                            : const Color(0xFF1A1A4E),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
-      floatingActionButton: _currentTab == 0
-          ? _AnimatedFAB(
-              onCreateGroup: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
-              ),
-              onJoinGroup: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
-              ),
-            )
-          : null,
-      bottomNavigationBar: _ModBottomNav(
-        currentIndex: _currentTab,
-        onTap: (i) => setState(() => _currentTab = i),
+          ],
+        ),
+        floatingActionButton: _currentTab == 0
+            ? _AnimatedFAB(
+                onCreateGroup: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+                ),
+                onJoinGroup: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
+                ),
+              )
+            : null,
+        bottomNavigationBar: _ModBottomNav(
+          currentIndex: _currentTab,
+          onTap: (i) => setState(() => _currentTab = i),
+        ),
       ),
     );
   }
@@ -350,10 +395,7 @@ class _AnimatedFAB extends StatefulWidget {
   final VoidCallback onCreateGroup;
   final VoidCallback onJoinGroup;
 
-  const _AnimatedFAB({
-    required this.onCreateGroup,
-    required this.onJoinGroup,
-  });
+  const _AnimatedFAB({required this.onCreateGroup, required this.onJoinGroup});
 
   @override
   State<_AnimatedFAB> createState() => _AnimatedFABState();
@@ -364,8 +406,6 @@ class _AnimatedFABState extends State<_AnimatedFAB>
   bool _isOpen = false;
   late AnimationController _controller;
   late Animation<double> _expandAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
@@ -379,18 +419,6 @@ class _AnimatedFABState extends State<_AnimatedFAB>
       curve: Curves.fastOutSlowIn,
       reverseCurve: Curves.easeOutQuad,
       parent: _controller,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.0, 1.0, curve: Curves.easeIn),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.88, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInCubic,
-      ),
     );
   }
 
@@ -413,140 +441,122 @@ class _AnimatedFABState extends State<_AnimatedFAB>
 
   @override
   Widget build(BuildContext context) {
-    final fabSize = 56.w;
-    final optionHeight = 44.h;
-    final iconSize = 20.w;
-    final fabToFirstGap = 12.h;
-    final optionSpacing = 10.h;
+    return SizedBox(
+      width: 220.w,
+      height: 100.h,
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        clipBehavior: Clip.none,
+        children: [
+          _buildAnimatedOption(
+            index: 1,
+            child: _buildOption(
+              label: 'dashboard_create_group'.tr(),
+              icon: Symbols.group_add,
+              onTap: () {
+                _toggle();
+                widget.onCreateGroup();
+              },
+            ),
+          ),
+          _buildAnimatedOption(
+            index: 2,
+            child: _buildOption(
+              label: 'join_group'.tr(),
+              icon: Symbols.qr_code_scanner,
+              onTap: () {
+                _toggle();
+                widget.onJoinGroup();
+              },
+            ),
+          ),
+          FloatingActionButton(
+            onPressed: _toggle,
+            backgroundColor: const Color(0xFFF97316),
+            foregroundColor: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 6,
+            child: AnimatedRotation(
+              turns: _isOpen ? 0.125 : 0,
+              duration: const Duration(milliseconds: 250),
+              child: Icon(Symbols.add, size: 28.w),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(bottom: fabToFirstGap),
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return IgnorePointer(
-                ignoring: !_isOpen && _controller.value == 0,
-                child: Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: Transform.scale(
-                    scale: _scaleAnimation.value,
-                    alignment: Alignment.bottomRight,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Transform.translate(
-                          offset: Offset(
-                            0,
-                            (1 - _expandAnimation.value) * 16.h,
-                          ),
-                          child: _buildOption(
-                            label: 'join_group'.tr(),
-                            icon: Symbols.qr_code_scanner,
-                            height: optionHeight,
-                            iconSize: iconSize,
-                            fabSize: fabSize,
-                            onTap: () {
-                              _toggle();
-                              widget.onJoinGroup();
-                            },
-                          ),
-                        ),
-                        SizedBox(height: optionSpacing),
-                        Transform.translate(
-                          offset: Offset(
-                            0,
-                            (1 - _expandAnimation.value) * 8.h,
-                          ),
-                          child: _buildOption(
-                            label: 'dashboard_create_group'.tr(),
-                            icon: Symbols.group_add,
-                            height: optionHeight,
-                            iconSize: iconSize,
-                            fabSize: fabSize,
-                            onTap: () {
-                              _toggle();
-                              widget.onCreateGroup();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+  Widget _buildAnimatedOption({required int index, required Widget child}) {
+    final distance = (index * 52).h;
+    return AnimatedBuilder(
+      animation: _expandAnimation,
+      builder: (context, _) {
+        final t = _expandAnimation.value;
+        return IgnorePointer(
+          ignoring: t < 0.05,
+          child: Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, -distance * t),
+              child: Transform.scale(
+                scale: 0.82 + (0.18 * t),
+                alignment: Alignment.bottomRight,
+                child: child,
+              ),
+            ),
           ),
-        ),
-        FloatingActionButton(
-          onPressed: _toggle,
-          backgroundColor: const Color(0xFFF97316),
-          foregroundColor: Colors.white,
-          shape: const CircleBorder(),
-          elevation: 6,
-          child: AnimatedRotation(
-            turns: _isOpen ? 0.125 : 0,
-            duration: const Duration(milliseconds: 250),
-            child: Icon(Symbols.add, size: 28.w),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildOption({
     required String label,
     required IconData icon,
-    required double height,
-    required double iconSize,
-    required double fabSize,
     required VoidCallback onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.only(right: (fabSize - height) / 2),
-        child: Container(
-          height: height,
-          padding: EdgeInsets.symmetric(horizontal: 14.w),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(22.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: iconSize,
-                color: const Color(0xFFF97316),
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'Lexend',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.sp,
-                  color: isDark ? Colors.white : AppColors.textDark,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24.r),
+          onTap: onTap,
+          child: Container(
+            height: 46.h,
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDark : Colors.white,
+              borderRadius: BorderRadius.circular(24.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18.w, color: const Color(0xFFF97316)),
+                SizedBox(width: 8.w),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.sp,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -565,7 +575,7 @@ enum GroupSortType {
   pilgrimCount,
   moderatorCount,
   mostOnline,
-  lowBatteryPriority
+  lowBatteryPriority,
 }
 
 class _GroupsHomeTab extends ConsumerStatefulWidget {
@@ -649,19 +659,25 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
         });
         break;
       case GroupSortType.pilgrimCount:
-        list.sort((a, b) => _isAscending
-            ? a.totalPilgrims.compareTo(b.totalPilgrims)
-            : b.totalPilgrims.compareTo(a.totalPilgrims));
+        list.sort(
+          (a, b) => _isAscending
+              ? a.totalPilgrims.compareTo(b.totalPilgrims)
+              : b.totalPilgrims.compareTo(a.totalPilgrims),
+        );
         break;
       case GroupSortType.moderatorCount:
-        list.sort((a, b) => _isAscending
-            ? a.moderatorCount.compareTo(b.moderatorCount)
-            : b.moderatorCount.compareTo(a.moderatorCount));
+        list.sort(
+          (a, b) => _isAscending
+              ? a.moderatorCount.compareTo(b.moderatorCount)
+              : b.moderatorCount.compareTo(a.moderatorCount),
+        );
         break;
       case GroupSortType.mostOnline:
-        list.sort((a, b) => _isAscending
-            ? a.onlineCount.compareTo(b.onlineCount)
-            : b.onlineCount.compareTo(a.onlineCount));
+        list.sort(
+          (a, b) => _isAscending
+              ? a.onlineCount.compareTo(b.onlineCount)
+              : b.onlineCount.compareTo(a.onlineCount),
+        );
         break;
       case GroupSortType.lowBatteryPriority:
         list.sort((a, b) => b.batteryLowCount.compareTo(a.batteryLowCount));
@@ -724,7 +740,10 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                         Navigator.pop(ctx);
                       },
                       style: TextButton.styleFrom(
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 8.h,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -751,7 +770,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           icon: Symbols.sort_by_alpha,
                           isSelected: _sortType == GroupSortType.alphabetical,
                           onTap: () {
-                            setState(() => _sortType = GroupSortType.alphabetical);
+                            setState(
+                              () => _sortType = GroupSortType.alphabetical,
+                            );
                             _saveSortPreferences();
                             Navigator.pop(ctx);
                           },
@@ -762,7 +783,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           icon: Symbols.schedule,
                           isSelected: _sortType == GroupSortType.newestToOldest,
                           onTap: () {
-                            setState(() => _sortType = GroupSortType.newestToOldest);
+                            setState(
+                              () => _sortType = GroupSortType.newestToOldest,
+                            );
                             _saveSortPreferences();
                             Navigator.pop(ctx);
                           },
@@ -773,7 +796,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           icon: Symbols.calendar_month,
                           isSelected: _sortType == GroupSortType.oldestToNewest,
                           onTap: () {
-                            setState(() => _sortType = GroupSortType.oldestToNewest);
+                            setState(
+                              () => _sortType = GroupSortType.oldestToNewest,
+                            );
                             _saveSortPreferences();
                             Navigator.pop(ctx);
                           },
@@ -783,7 +808,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           label: 'sort_pilgrim_count'.tr(),
                           icon: Symbols.groups,
                           isSelected: _sortType == GroupSortType.pilgrimCount,
-                          isAscending: _sortType == GroupSortType.pilgrimCount ? _isAscending : null,
+                          isAscending: _sortType == GroupSortType.pilgrimCount
+                              ? _isAscending
+                              : null,
                           onTap: () {
                             if (_sortType == GroupSortType.pilgrimCount) {
                               setState(() => _isAscending = !_isAscending);
@@ -791,7 +818,8 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                             } else {
                               setState(() {
                                 _sortType = GroupSortType.pilgrimCount;
-                                _isAscending = false; // Default to Descending for counts
+                                _isAscending =
+                                    false; // Default to Descending for counts
                               });
                               Navigator.pop(ctx);
                             }
@@ -803,7 +831,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           label: 'sort_mod_count'.tr(),
                           icon: Symbols.shield_person,
                           isSelected: _sortType == GroupSortType.moderatorCount,
-                          isAscending: _sortType == GroupSortType.moderatorCount ? _isAscending : null,
+                          isAscending: _sortType == GroupSortType.moderatorCount
+                              ? _isAscending
+                              : null,
                           onTap: () {
                             if (_sortType == GroupSortType.moderatorCount) {
                               setState(() => _isAscending = !_isAscending);
@@ -823,7 +853,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                           label: 'sort_most_online'.tr(),
                           icon: Symbols.bolt,
                           isSelected: _sortType == GroupSortType.mostOnline,
-                          isAscending: _sortType == GroupSortType.mostOnline ? _isAscending : null,
+                          isAscending: _sortType == GroupSortType.mostOnline
+                              ? _isAscending
+                              : null,
                           onTap: () {
                             if (_sortType == GroupSortType.mostOnline) {
                               setState(() => _isAscending = !_isAscending);
@@ -842,9 +874,13 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                         _SortOption(
                           label: 'sort_low_battery'.tr(),
                           icon: Symbols.battery_alert,
-                          isSelected: _sortType == GroupSortType.lowBatteryPriority,
+                          isSelected:
+                              _sortType == GroupSortType.lowBatteryPriority,
                           onTap: () {
-                            setState(() => _sortType = GroupSortType.lowBatteryPriority);
+                            setState(
+                              () =>
+                                  _sortType = GroupSortType.lowBatteryPriority,
+                            );
                             _saveSortPreferences();
                             Navigator.pop(ctx);
                           },
@@ -883,7 +919,7 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
             // ── Header + search ──
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 0),
+                padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -940,8 +976,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.06),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.06,
+                                          ),
                                           blurRadius: 8,
                                           offset: const Offset(0, 2),
                                         ),
@@ -991,7 +1028,8 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                             GestureDetector(
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => const ModeratorProfileScreen(),
+                                  builder: (_) =>
+                                      const ModeratorProfileScreen(),
                                 ),
                               ),
                               child: Container(
@@ -1009,7 +1047,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.06),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.06,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -1292,7 +1332,7 @@ class _GroupsEmptyState extends StatelessWidget {
               color: isDark ? const Color(0xFFCBD5E1) : AppColors.textDark,
             ),
           ),
-          SizedBox(height: 72.h),
+          SizedBox(height: 96.h),
         ],
       ),
     );
@@ -1311,10 +1351,12 @@ class _SosAlertBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sosGroups = groups.where((g) => g.sosCount > 0).toList();
     if (sosGroups.isEmpty) return const SizedBox.shrink();
-    
+
     final first = sosGroups.first;
-    final targetPilgrim = first.pilgrims
-        .firstWhere((p) => p.hasSOS, orElse: () => first.pilgrims.first);
+    final targetPilgrim = first.pilgrims.firstWhere(
+      (p) => p.hasSOS,
+      orElse: () => first.pilgrims.first,
+    );
     final pilgrimName = targetPilgrim.fullName;
 
     return Container(
@@ -1378,7 +1420,12 @@ class _SosAlertBanner extends ConsumerWidget {
           GestureDetector(
             onTap: () {
               final currentUserId = ref.read(authProvider).userId ?? '';
-              showPilgrimProfileSheet(context, targetPilgrim, first.id, currentUserId);
+              showPilgrimProfileSheet(
+                context,
+                targetPilgrim,
+                first.id,
+                currentUserId,
+              );
             },
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
@@ -1630,15 +1677,22 @@ class _GroupCard extends ConsumerWidget {
                             );
                           },
                           child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 14.w),
+                            padding: EdgeInsets.symmetric(
+                              vertical: 11.h,
+                              horizontal: 14.w,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark 
-                                  ? const Color(0xFF6B7BAE).withValues(alpha: 0.1) 
+                              color: isDark
+                                  ? const Color(
+                                      0xFF6B7BAE,
+                                    ).withValues(alpha: 0.1)
                                   : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(12.r),
                               border: Border.all(
-                                color: isDark 
-                                    ? const Color(0xFF6B7BAE).withValues(alpha: 0.2)
+                                color: isDark
+                                    ? const Color(
+                                        0xFF6B7BAE,
+                                      ).withValues(alpha: 0.2)
                                     : const Color(0xFFE2E8F0),
                               ),
                             ),
@@ -1650,18 +1704,26 @@ class _GroupCard extends ConsumerWidget {
                                   color: const Color(0xFF6B7BAE),
                                 ),
                                 SizedBox(width: 8.w),
-                                Text(
-                                  'dashboard_view_on_map'.tr(),
-                                  style: TextStyle(
-                                    fontFamily: 'Lexend',
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13.sp,
-                                    color: const Color(0xFF6B7BAE),
+                                Expanded(
+                                  child: Text(
+                                    'dashboard_view_on_map'.tr(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontFamily: 'Lexend',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.sp,
+                                      color: const Color(0xFF6B7BAE),
+                                    ),
                                   ),
                                 ),
-                                const Spacer(),
+                                SizedBox(width: 8.w),
                                 Transform.scale(
-                                  scaleX: Directionality.of(context) == ui.TextDirection.rtl ? -1 : 1,
+                                  scaleX:
+                                      Directionality.of(context) ==
+                                          ui.TextDirection.rtl
+                                      ? -1
+                                      : 1,
                                   child: Icon(
                                     Symbols.arrow_forward,
                                     size: 14.w,
@@ -1673,78 +1735,95 @@ class _GroupCard extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      
+
                       SizedBox(width: 12.w),
 
                       // Chat Button
-                      GestureDetector(
-                        onTap: () {
-                          final userId = ref.read(authProvider).userId ?? '';
-                          // Clear unread count when opening
-                          ref.read(moderatorProvider.notifier).clearUnreadCount(group.id);
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => GroupMessagesScreen(
-                                groupId: group.id,
-                                groupName: group.groupName,
-                                currentUserId: userId,
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: GestureDetector(
+                          onTap: () {
+                            final userId = ref.read(authProvider).userId ?? '';
+                            // Clear unread count when opening
+                            ref
+                                .read(moderatorProvider.notifier)
+                                .clearUnreadCount(group.id);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => GroupMessagesScreen(
+                                  groupId: group.id,
+                                  groupName: group.groupName,
+                                  currentUserId: userId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 11.h,
+                              horizontal: 16.w,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF6B7BAE).withValues(alpha: 0.1)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12.r),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(
+                                        0xFF6B7BAE,
+                                      ).withValues(alpha: 0.2)
+                                    : const Color(0xFFE2E8F0),
                               ),
                             ),
-                          );
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 16.w),
-                          decoration: BoxDecoration(
-                            color: isDark 
-                                ? const Color(0xFF6B7BAE).withValues(alpha: 0.1) 
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12.r),
-                            border: Border.all(
-                              color: isDark 
-                                  ? const Color(0xFF6B7BAE).withValues(alpha: 0.2)
-                                  : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Symbols.chat_bubble,
-                                    size: 18.w,
-                                    color: const Color(0xFF6B7BAE),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Text(
-                                    'chat'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13.sp,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Symbols.chat_bubble,
+                                      size: 18.w,
                                       color: const Color(0xFF6B7BAE),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              if (group.unreadCount > 0)
-                                Positioned(
-                                  top: -2.h,
-                                  right: -2.w,
-                                  child: Container(
-                                    width: 10.w,
-                                    height: 10.w,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isDark ? AppColors.surfaceDark : Colors.white,
-                                        width: 1.5,
+                                    SizedBox(width: 8.w),
+                                    Flexible(
+                                      child: Text(
+                                        'chat'.tr(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13.sp,
+                                          color: const Color(0xFF6B7BAE),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (group.unreadCount > 0)
+                                  Positioned(
+                                    top: -2.h,
+                                    right: -2.w,
+                                    child: Container(
+                                      width: 10.w,
+                                      height: 10.w,
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isDark
+                                              ? AppColors.surfaceDark
+                                              : Colors.white,
+                                          width: 1.5,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2200,8 +2279,8 @@ class _SortOption extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : AppColors.primary.withValues(alpha: 0.05))
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : AppColors.primary.withValues(alpha: 0.05))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
