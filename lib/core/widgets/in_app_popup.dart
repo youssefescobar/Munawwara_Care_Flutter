@@ -144,9 +144,12 @@ class _PopupCardState extends State<_PopupCard>
       end: 1,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _scaleAnim = Tween<double>(
-      begin: 0.96,
+      begin: 0.85,
       end: 1,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: widget.isUrgent ? Curves.elasticOut : Curves.easeOutCubic,
+    ));
 
     _player.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _isPlaying = false);
@@ -251,7 +254,7 @@ class _PopupCardState extends State<_PopupCard>
     final accent = widget.isUrgent
         ? const Color(0xFFDC2626)
         : AppColors.primary;
-    final icon = widget.isUrgent ? Symbols.warning_rounded : Symbols.chat;
+    final icon = widget.isUrgent ? Symbols.emergency : Symbols.chat;
 
     return Material(
       color: Colors.transparent,
@@ -261,8 +264,17 @@ class _PopupCardState extends State<_PopupCard>
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(24.r),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(
+            color: widget.isUrgent ? const Color(0xFFDC2626) : const Color(0xFFE5E7EB),
+            width: widget.isUrgent ? 3.0 : 1.0,
+          ),
           boxShadow: [
+            if (widget.isUrgent)
+              BoxShadow(
+                color: const Color(0xFFDC2626).withValues(alpha: isDark ? 0.35 : 0.2),
+                blurRadius: 32,
+                spreadRadius: 2,
+              ),
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.38 : 0.14),
               blurRadius: 24,
@@ -456,7 +468,10 @@ class _PopupCardState extends State<_PopupCard>
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(24.r),
-          border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+          border: Border.all(
+            color: const Color(0xFFDC2626),
+            width: 3.0,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),

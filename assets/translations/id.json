@@ -490,8 +490,7 @@
     "dialog_confirm":  "Konfirmasi",
     "manage_pilgrims_title":  "Kelola Jemaah",
     "dialog_cancel":  "Batal",
-    "manage_pilgrims_search_hint":  "Cari berdasarkan nama, telepon, atau ID..."
-,
+    "manage_pilgrims_search_hint":  "Cari berdasarkan nama, telepon, atau ID...",
     "forgot_password_passwords_mismatch":  "Kata sandi tidak cocok",
     "forgot_password_email_subtitle":  "Masukkan alamat email yang terkait dengan akun moderator Anda.",
     "forgot_password_resend_countdown":  "Kirim ulang dalam {}d",
@@ -512,5 +511,6 @@
     "forgot_password_code_invalid":  "Silakan masukkan kode 6 digit yang valid",
     "forgot_password_resend_code":  "Kirim Ulang Kode",
     "forgot_password_code_sent":  "Kode telah dikirim ke {}",
-    "forgot_password_email_required":  "Silakan masukkan alamat email Anda"
+    "forgot_password_email_required":  "Silakan masukkan alamat email Anda",
+    "chat":  "Obrolan"
 }

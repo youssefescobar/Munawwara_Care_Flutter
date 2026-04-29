@@ -14,6 +14,7 @@ class MessageState {
   final bool isSending;
   final String? error;
   final int unreadCount;
+  final String? activeGroupId;
 
   const MessageState({
     this.messages = const [],
@@ -21,6 +22,7 @@ class MessageState {
     this.isSending = false,
     this.error,
     this.unreadCount = 0,
+    this.activeGroupId,
   });
 
   MessageState copyWith({
@@ -29,12 +31,14 @@ class MessageState {
     bool? isSending,
     String? error,
     int? unreadCount,
+    String? activeGroupId,
   }) => MessageState(
     messages: messages ?? this.messages,
     isLoading: isLoading ?? this.isLoading,
     isSending: isSending ?? this.isSending,
     error: error,
     unreadCount: unreadCount ?? this.unreadCount,
+    activeGroupId: activeGroupId ?? this.activeGroupId,
   );
 }
 
@@ -90,17 +94,30 @@ class MessageNotifier extends Notifier<MessageState> {
     } catch (_) {}
   }
 
+  void setActiveGroup(String? groupId) {
+    state = state.copyWith(activeGroupId: groupId);
+  }
+
   /// Silently appends a single message received from a socket event.
   /// No loading state is touched, so the list never flickers.
   void appendMessage(Map<String, dynamic> json) {
     try {
       final msg = GroupMessage.fromJson(json);
       if (state.messages.any((m) => m.id == msg.id)) return; // dedup
+      
+      bool isReadingNow = state.activeGroupId == msg.groupId;
+      
       state = state.copyWith(
         messages: [...state.messages, msg],
-        unreadCount: state.unreadCount + 1,
+        unreadCount: isReadingNow ? state.unreadCount : state.unreadCount + 1,
       );
-    } catch (_) {}
+
+      if (isReadingNow) {
+        markAllRead(msg.groupId);
+      }
+    } catch (e) {
+      print('[MessageNotifier] Error appending message: $e');
+    }
   }
 
   /// Silently removes a message received via socket (no loading state).
@@ -133,10 +150,14 @@ class MessageNotifier extends Notifier<MessageState> {
       final msg = GroupMessage.fromJson(
         response.data['data'] as Map<String, dynamic>,
       );
-      state = state.copyWith(
-        messages: [...state.messages, msg],
-        isSending: false,
-      );
+      if (state.messages.any((m) => m.id == msg.id)) {
+        state = state.copyWith(isSending: false);
+      } else {
+        state = state.copyWith(
+          messages: [...state.messages, msg],
+          isSending: false,
+        );
+      }
       return true;
     } catch (_) {
       state = state.copyWith(isSending: false);
@@ -167,10 +188,14 @@ class MessageNotifier extends Notifier<MessageState> {
       final msg = GroupMessage.fromJson(
         response.data['data'] as Map<String, dynamic>,
       );
-      state = state.copyWith(
-        messages: [...state.messages, msg],
-        isSending: false,
-      );
+      if (state.messages.any((m) => m.id == msg.id)) {
+        state = state.copyWith(isSending: false);
+      } else {
+        state = state.copyWith(
+          messages: [...state.messages, msg],
+          isSending: false,
+        );
+      }
       return true;
     } catch (_) {
       state = state.copyWith(isSending: false);
@@ -202,10 +227,14 @@ class MessageNotifier extends Notifier<MessageState> {
       final msg = GroupMessage.fromJson(
         response.data['data'] as Map<String, dynamic>,
       );
-      state = state.copyWith(
-        messages: [...state.messages, msg],
-        isSending: false,
-      );
+      if (state.messages.any((m) => m.id == msg.id)) {
+        state = state.copyWith(isSending: false);
+      } else {
+        state = state.copyWith(
+          messages: [...state.messages, msg],
+          isSending: false,
+        );
+      }
       return true;
     } catch (_) {
       state = state.copyWith(isSending: false);
@@ -240,10 +269,14 @@ class MessageNotifier extends Notifier<MessageState> {
       final msg = GroupMessage.fromJson(
         response.data['data'] as Map<String, dynamic>,
       );
-      state = state.copyWith(
-        messages: [...state.messages, msg],
-        isSending: false,
-      );
+      if (state.messages.any((m) => m.id == msg.id)) {
+        state = state.copyWith(isSending: false);
+      } else {
+        state = state.copyWith(
+          messages: [...state.messages, msg],
+          isSending: false,
+        );
+      }
       return true;
     } catch (_) {
       state = state.copyWith(isSending: false);

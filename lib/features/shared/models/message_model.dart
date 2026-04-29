@@ -9,11 +9,18 @@ class MessageSender {
 
   const MessageSender({required this.id, required this.fullName, this.role});
 
-  factory MessageSender.fromJson(Map<String, dynamic> j) => MessageSender(
-    id: j['_id']?.toString() ?? '',
-    fullName: j['full_name']?.toString() ?? 'Unknown',
-    role: j['role']?.toString(),
-  );
+  factory MessageSender.fromJson(Map<String, dynamic> j) {
+    try {
+      return MessageSender(
+        id: j['_id']?.toString() ?? '',
+        fullName: j['full_name']?.toString() ?? 'Unknown',
+        role: j['role']?.toString(),
+      );
+    } catch (e) {
+      print('[MessageSender] Error parsing fromJson: $e');
+      return const MessageSender(id: '', fullName: 'Unknown');
+    }
+  }
 
   String get initial => fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
 }
@@ -54,30 +61,41 @@ class GroupMessage {
   bool get isBroadcast => recipientId == null;
 
   factory GroupMessage.fromJson(Map<String, dynamic> j) {
-    final senderData = j['sender_id'];
-    MessageSender? sender;
-    if (senderData is Map<String, dynamic>) {
-      sender = MessageSender.fromJson(senderData);
-    }
+    try {
+      final senderRaw = j['sender_id'];
+      MessageSender? sender;
+      if (senderRaw is Map) {
+        sender = MessageSender.fromJson(Map<String, dynamic>.from(senderRaw));
+      }
 
-    return GroupMessage(
-      id: j['_id']?.toString() ?? '',
-      groupId: j['group_id']?.toString() ?? '',
-      recipientId: j['recipient_id']?.toString(),
-      sender: sender,
-      senderModel: j['sender_model']?.toString() ?? 'User',
-      type: j['type']?.toString() ?? 'text',
-      content: j['content']?.toString(),
-      mediaUrl: j['media_url']?.toString(),
-      originalText: j['original_text']?.toString(),
-      isUrgent: j['is_urgent'] as bool? ?? false,
-      duration: (j['duration'] as num?)?.toInt() ?? 0,
-      meetpointData: j['meetpoint_data'] is Map<String, dynamic>
-          ? j['meetpoint_data'] as Map<String, dynamic>
-          : null,
-      createdAt: j['created_at'] != null
-          ? DateTime.tryParse(j['created_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
-    );
+      final mpRaw = j['meetpoint_data'];
+      Map<String, dynamic>? meetpointData;
+      if (mpRaw is Map) {
+        meetpointData = Map<String, dynamic>.from(mpRaw);
+      }
+
+      return GroupMessage(
+        id: j['_id']?.toString() ?? '',
+        groupId: j['group_id']?.toString() ?? '',
+        recipientId: j['recipient_id']?.toString(),
+        sender: sender,
+        senderModel: j['sender_model']?.toString() ?? 'User',
+        type: j['type']?.toString() ?? 'text',
+        content: j['content']?.toString(),
+        mediaUrl: j['media_url']?.toString(),
+        originalText: j['original_text']?.toString(),
+        isUrgent: j['is_urgent'] == true ||
+            j['is_urgent'] == 1 ||
+            j['is_urgent']?.toString() == 'true',
+        duration: (j['duration'] as num?)?.toInt() ?? 0,
+        meetpointData: meetpointData,
+        createdAt: j['created_at'] != null
+            ? DateTime.tryParse(j['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+      );
+    } catch (e) {
+      print('[GroupMessage] Error parsing fromJson: $e');
+      rethrow;
+    }
   }
 }

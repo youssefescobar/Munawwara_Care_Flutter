@@ -172,6 +172,7 @@ class ModeratorGroup {
   final DateTime? checkInDate;
   final DateTime? checkOutDate;
   final DateTime? createdAt;
+  final int unreadCount;
   final List<GroupModerator> moderators;
   final List<PilgrimInGroup> pilgrims;
 
@@ -183,6 +184,7 @@ class ModeratorGroup {
     this.checkInDate,
     this.checkOutDate,
     this.createdAt,
+    this.unreadCount = 0,
     required this.moderators,
     required this.pilgrims,
   });
@@ -201,6 +203,7 @@ class ModeratorGroup {
       checkInDate: parseDate(j['check_in_date']),
       checkOutDate: parseDate(j['check_out_date']),
       createdAt: parseDate(j['createdAt']),
+      unreadCount: (j['unread_count'] as num?)?.toInt() ?? 0,
       moderators: (j['moderator_ids'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(GroupModerator.fromJson)
@@ -218,6 +221,7 @@ class ModeratorGroup {
     DateTime? checkInDate,
     DateTime? checkOutDate,
     DateTime? createdAt,
+    int? unreadCount,
   }) {
     return ModeratorGroup(
       id: id,
@@ -227,6 +231,7 @@ class ModeratorGroup {
       checkInDate: checkInDate ?? this.checkInDate,
       checkOutDate: checkOutDate ?? this.checkOutDate,
       createdAt: createdAt ?? this.createdAt,
+      unreadCount: unreadCount ?? this.unreadCount,
       moderators: moderators ?? this.moderators,
       pilgrims: pilgrims ?? this.pilgrims,
     );
@@ -306,8 +311,8 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
   ModeratorState build() => const ModeratorState();
 
   // Load all groups + their pilgrims
-  Future<void> loadDashboard() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+  Future<void> loadDashboard({bool silently = false}) async {
+    if (!silently) state = state.copyWith(isLoading: true, clearError: true);
     try {
       final resp = await ApiService.dio.get('/groups/dashboard');
       final data = resp.data['data'] as List<dynamic>? ?? [];
@@ -320,9 +325,9 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
         clearError: true,
       );
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      if (!silently) state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (!silently) state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -335,6 +340,26 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       state = state.copyWith(showSosOnly: !state.showSosOnly);
 
   void updateSearch(String q) => state = state.copyWith(searchQuery: q);
+
+  void incrementUnreadCount(String groupId) {
+    final groups = state.groups.map((g) {
+      if (g.id == groupId) {
+        return g.copyWith(unreadCount: g.unreadCount + 1);
+      }
+      return g;
+    }).toList();
+    state = state.copyWith(groups: groups);
+  }
+
+  void clearUnreadCount(String groupId) {
+    final groups = state.groups.map((g) {
+      if (g.id == groupId) {
+        return g.copyWith(unreadCount: 0);
+      }
+      return g;
+    }).toList();
+    state = state.copyWith(groups: groups);
+  }
 
   // Mark a specific pilgrim as having active SOS (called from FCM handler)
   void markPilgrimSOS(String pilgrimId, {bool active = true}) {

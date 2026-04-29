@@ -13,8 +13,12 @@ class AppRouter {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
+  static final RouteObserver<ModalRoute<void>> moderatorRouteObserver =
+      RouteObserver<ModalRoute<void>>();
+
   static final GoRouter router = GoRouter(
     navigatorKey: navigatorKey,
+    observers: [moderatorRouteObserver],
     initialLocation: '/',
     routes: [
       GoRoute(

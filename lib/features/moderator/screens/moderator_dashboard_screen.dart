@@ -14,6 +14,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../../main.dart' show isNavigatingToCall;
+import '../../../core/router/app_router.dart' show AppRouter;
 import '../../../core/services/notification_service.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/screens/alerts_tab.dart';
@@ -22,9 +23,12 @@ import 'pilgrim_provisioning_screen.dart';
 import 'create_group_screen.dart';
 import 'moderator_profile_screen.dart';
 import 'group_management_screen.dart';
+import 'group_messages_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'system_reminders_screen.dart';
 import '../widgets/pilgrim_profile_sheet.dart';
+import '../../shared/helpers/chat_notification_helper.dart';
+import '../../shared/providers/message_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Moderator Dashboard Screen
@@ -39,11 +43,21 @@ class ModeratorDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _ModeratorDashboardScreenState
-    extends ConsumerState<ModeratorDashboardScreen> {
+    extends ConsumerState<ModeratorDashboardScreen>
+    with RouteAware {
   int _currentTab =
       0; // 0=Groups, 1=Provisioning, 2=Reminders, 3=Profile, 4=Alerts
   final _searchController = TextEditingController();
   final _alertTts = FlutterTts();
+
+  // ── RouteAware: re-join group rooms when returning from sub-screens ────────
+  @override
+  void didPopNext() {
+    // Called when a route that was pushed on top of this one has been popped,
+    // returning focus to this screen. Re-join all rooms in case a sub-screen
+    // (e.g. GroupManagementScreen) cleared our socket room memberships.
+    _joinAllGroupRooms();
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -121,6 +135,9 @@ class _ModeratorDashboardScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Subscribe for RouteAware callbacks
+      final route = ModalRoute.of(context);
+      if (route != null) AppRouter.moderatorRouteObserver.subscribe(this, route);
       await ref.read(moderatorProvider.notifier).loadDashboard();
       // Connect socket with this moderator's identity
       final auth = ref.read(authProvider);
@@ -149,9 +166,13 @@ class _ModeratorDashboardScreenState
         }
         // Fetch unread notification count for badge
         ref.read(notificationProvider.notifier).fetchUnreadCount();
-        // Join all group rooms so we receive SOS events
-        _joinAllGroupRooms();
-        // Re-join on reconnect
+        // Join all group rooms — must happen AFTER socket handshake (register-user).
+        // If the socket is already connected, join right away; otherwise wait for the
+        // first connected event, then keep re-joining on every reconnect.
+        if (SocketService.isConnected) {
+          _joinAllGroupRooms();
+        }
+        // Re-join on every (re)connect including the first connection
         SocketService.onConnected(_onSocketConnected);
         // Listen for real-time SOS alerts
         SocketService.on('sos-alert-received', _onSosAlertArrived);
@@ -179,6 +200,50 @@ class _ModeratorDashboardScreenState
           if (!mounted) return;
           ref.read(notificationProvider.notifier).refetch();
         });
+        
+        // Listen for new group messages globally
+        SocketService.on('new_message', (data) {
+          if (!mounted) return;
+          print('[ModeratorDashboard] Socket event: new_message | Data: $data');
+          try {
+            // socket.io can deliver data as Map<dynamic,dynamic> — cast safely
+            final map = Map<String, dynamic>.from(data as Map);
+            print('[ModeratorDashboard] is_urgent value in map: ${map['is_urgent']} (type: ${map['is_urgent'].runtimeType})');
+            final groupId = map['group_id']?.toString();
+            if (groupId == null) {
+              print('[ModeratorDashboard] Error: group_id is null in payload');
+              return;
+            }
+
+            // Append to message provider so chat is up-to-date if viewed
+            ref.read(messageProvider.notifier).appendMessage(map);
+
+            // Ignore own messages — don't badge for what we sent
+            final currentUserId = ref.read(authProvider).userId ?? '';
+            final senderRaw = map['sender_id'];
+            final senderId = (senderRaw is Map)
+                ? senderRaw['_id']?.toString()
+                : senderRaw?.toString();
+            
+            if (senderId == currentUserId) {
+              print('[ModeratorDashboard] Message from self, skipping badge');
+              return;
+            }
+
+            // If the user is actively reading this chat, clear count
+            if (ref.read(messageProvider).activeGroupId == groupId) {
+              ref.read(moderatorProvider.notifier).clearUnreadCount(groupId);
+              print('[ModeratorDashboard] User reading chat, skipping badge');
+              return;
+            }
+
+            // Instantly increment unread count for UI badge
+            print('[ModeratorDashboard] Incrementing badge for group: $groupId');
+            ref.read(moderatorProvider.notifier).incrementUnreadCount(groupId);
+          } catch (e) {
+            debugPrint('[ModeratorDashboard] new_message handler error: $e');
+          }
+        });
       }
     });
   }
@@ -187,10 +252,12 @@ class _ModeratorDashboardScreenState
   void dispose() {
     _searchController.dispose();
     _alertTts.stop();
+    AppRouter.moderatorRouteObserver.unsubscribe(this);
     SocketService.off('sos-alert-received');
     SocketService.off('sos-alert-cancelled');
     SocketService.off('missed-call-received');
     SocketService.off('notification_refresh');
+    SocketService.off('new_message');
     SocketService.offConnected(_onSocketConnected);
     super.dispose();
   }
@@ -1342,41 +1409,125 @@ class _GroupCard extends ConsumerWidget {
 
                   SizedBox(height: 14.h),
 
-                  // View on Map link
-                  GestureDetector(
-                    onTap: () {
-                      final userId = ref.read(authProvider).userId ?? '';
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => GroupManagementScreen(
-                            groupId: group.id,
-                            currentUserId: userId,
+                  SizedBox(height: 14.h),
+
+                  // Actions Row: View on Map & Chat
+                  Row(
+                    children: [
+                      // View on Map
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            final userId = ref.read(authProvider).userId ?? '';
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => GroupManagementScreen(
+                                  groupId: group.id,
+                                  currentUserId: userId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'dashboard_view_on_map'.tr(),
+                                  style: TextStyle(
+                                    fontFamily: 'Lexend',
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.sp,
+                                    color: const Color(0xFF6B7BAE),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Transform.scale(
+                                  scaleX: Directionality.of(context) == ui.TextDirection.rtl ? -1 : 1,
+                                  child: Icon(
+                                    Symbols.arrow_forward,
+                                    size: 16.w,
+                                    color: const Color(0xFF6B7BAE),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      );
-                    },
-                    child: Row(
-                      children: [
-                        Text(
-                          'dashboard_view_on_map'.tr(),
-                          style: TextStyle(
-                            fontFamily: 'Lexend',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13.sp,
-                            color: const Color(0xFF6B7BAE),
+                      ),
+                      
+                      SizedBox(width: 12.w),
+
+                      // Chat Button
+                      GestureDetector(
+                        onTap: () {
+                          final userId = ref.read(authProvider).userId ?? '';
+                          // Clear unread count when opening
+                          ref.read(moderatorProvider.notifier).clearUnreadCount(group.id);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => GroupMessagesScreen(
+                                groupId: group.id,
+                                groupName: group.groupName,
+                                currentUserId: userId,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 16.w),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Symbols.chat_bubble,
+                                    size: 18.w,
+                                    color: const Color(0xFF6B7BAE),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    'chat'.tr(),
+                                    style: TextStyle(
+                                      fontFamily: 'Lexend',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.sp,
+                                      color: const Color(0xFF6B7BAE),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (group.unreadCount > 0)
+                                Positioned(
+                                  top: -2.h,
+                                  right: -2.w,
+                                  child: Container(
+                                    width: 10.w,
+                                    height: 10.w,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark ? AppColors.surfaceDark : Colors.white,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
-                        Transform.scale(
-                          scaleX: Directionality.of(context) == ui.TextDirection.rtl ? -1 : 1,
-                          child: Icon(
-                            Symbols.arrow_forward,
-                            size: 18.w,
-                            color: const Color(0xFF6B7BAE),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1414,6 +1565,29 @@ class _StatusBadge extends StatelessWidget {
           fontSize: 12.sp,
           color: Colors.white,
         ),
+      ),
+    );
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12.w,
+      height: 12.w,
+      decoration: BoxDecoration(
+        color: Colors.red,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withValues(alpha: 0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
     );
   }

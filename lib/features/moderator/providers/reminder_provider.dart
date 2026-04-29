@@ -65,7 +65,7 @@ class ReminderNotifier extends Notifier<ReminderState> {
 
   // ── Create reminder ───────────────────────────────────────────────────────
   Future<bool> create({
-    required String groupId,
+    required List<String> groupIds,
     required String targetType,
     String? pilgrimId,
     required String text,
@@ -77,7 +77,7 @@ class ReminderNotifier extends Notifier<ReminderState> {
       final response = await ApiService.dio.post(
         '/reminders',
         data: {
-          'group_ids': [groupId],   // backend expects an array
+          'group_ids': groupIds,
           'target_type': targetType,
           'pilgrim_id': pilgrimId,
           'text': text,

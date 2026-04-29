@@ -16,6 +16,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../shared/helpers/chat_notification_helper.dart';
+
 import '../../../core/services/api_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -116,11 +118,19 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
     // Load data after first frame so the provider is ready
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await ref.read(pilgrimProvider.notifier).loadDashboard();
-      final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
-      if (groupId != null) {
-        ref.read(messageProvider.notifier).fetchUnreadCount(groupId);
+      print('[PilgrimDashboard] Starting loadDashboard...');
+      try {
+        await ref.read(pilgrimProvider.notifier).loadDashboard();
+        final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
+        print('[PilgrimDashboard] Dashboard loaded. GroupId: $groupId');
+        
+        if (groupId != null) {
+          ref.read(messageProvider.notifier).fetchUnreadCount(groupId);
+        }
+      } catch (e) {
+        print('[PilgrimDashboard] Error loading dashboard: $e');
       }
+
       // Connect socket with this pilgrim's identity
       final auth = ref.read(authProvider);
       if (auth.userId != null) {
@@ -131,6 +141,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           role: auth.role ?? 'pilgrim',
         );
         ref.read(callProvider.notifier).reRegisterListeners();
+        
+        print('[PilgrimDashboard] Socket status: ${SocketService.isConnected ? 'Connected' : 'Connecting...'}');
+
         // Check if there's a pending call accepted from native call screen.
         // Must run AFTER the socket handshake so the call-answer emit goes through.
         if (SocketService.isConnected) {
@@ -147,95 +160,140 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         }
         // Join group socket room so we receive group-scoped events
         final gId = ref.read(pilgrimProvider).groupInfo?.groupId;
-        if (gId != null) SocketService.emit('join_group', gId);
+        if (gId != null) {
+          print('[PilgrimDashboard] Emitting join_group for $gId');
+          SocketService.emit('join_group', gId);
+        } else {
+          print('[PilgrimDashboard] Warning: Cannot join room, groupId is null');
+        }
         // Re-join group room on every reconnect (so beacon state is re-synced)
         SocketService.onConnected(_onSocketConnected);
         // Listen for moderator navigation beacon
         SocketService.on('mod_nav_beacon', (data) {
           if (!mounted) return;
-          // Note: no groupInfo null-guard here — the server only sends
-          // mod_nav_beacon to sockets that are in the group room, so if
-          // we receive it we are legitimately in the group. A null-guard
-          // causes a race condition where the beacon sync sent immediately
-          // after join_group arrives before the async provider refresh
-          // completes, causing the beacon to be silently dropped.
-          final map = data as Map<String, dynamic>;
-          final modId = map['moderatorId'] as String? ?? '';
-          final modName = map['moderatorName'] as String? ?? 'Moderator';
-          final enabled = map['enabled'] as bool? ?? false;
-          final lat = (map['lat'] as num?)?.toDouble();
-          final lng = (map['lng'] as num?)?.toDouble();
-          ref
-              .read(pilgrimProvider.notifier)
-              .updateModeratorBeacon(modId, modName, enabled, lat, lng);
+          try {
+            // socket.io can deliver data as Map<dynamic,dynamic> — cast safely
+            final map = Map<String, dynamic>.from(data as Map);
+            final modId = map['moderatorId'] as String? ?? '';
+            final modName = map['moderatorName'] as String? ?? 'Moderator';
+            final enabled = map['enabled'] as bool? ?? false;
+            final lat = (map['lat'] as num?)?.toDouble();
+            final lng = (map['lng'] as num?)?.toDouble();
+            ref
+                .read(pilgrimProvider.notifier)
+                .updateModeratorBeacon(modId, modName, enabled, lat, lng);
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] mod_nav_beacon handler error: $e');
+          }
         });
 
         // Listen for removal from group
         SocketService.on('removed-from-group', (data) {
           if (!mounted) return;
-          
-          final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
-          final groupId = map['group_id']?.toString();
-          if (groupId != null) {
-            SocketService.emit('leave_group', groupId);
-          }
+          try {
+            final map = Map<String, dynamic>.from(data as Map);
+            final groupId = map['group_id']?.toString();
+            if (groupId != null) {
+              SocketService.emit('leave_group', groupId);
+            }
 
-          // Clear all group-related state immediately
-          ref.read(pilgrimProvider.notifier).clearGroupState();
-          // Clear suggested areas
-          ref.read(suggestedAreaProvider.notifier).clear();
-          // Show notification to user
-          final groupName = map['group_name'] as String? ?? 'the group';
-          StandardSnackBar.showWarning(
-            context,
-            'You have been removed from $groupName',
-            duration: const Duration(seconds: 5),
-          );
-          // Reload from server to confirm state (force bypasses throttle)
-          ref.read(pilgrimProvider.notifier).loadDashboard(force: true);
+            // Clear all group-related state immediately
+            ref.read(pilgrimProvider.notifier).clearGroupState();
+            // Clear suggested areas
+            ref.read(suggestedAreaProvider.notifier).clear();
+            // Show notification to user
+            final groupName = map['group_name'] as String? ?? 'the group';
+            StandardSnackBar.showWarning(
+              context,
+              'You have been removed from $groupName',
+              duration: const Duration(seconds: 5),
+            );
+            // Reload from server to confirm state (force bypasses throttle)
+            ref.read(pilgrimProvider.notifier).loadDashboard(force: true);
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] removed-from-group handler error: $e');
+          }
         });
 
         // Listen for new group messages — append silently to avoid flicker
         SocketService.on('new_message', (data) {
           if (!mounted) return;
-          final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
-          if (groupId == null) return;
-          final map = data as Map<String, dynamic>;
-          // Append the single message without a full reload (no spinner)
-          ref.read(messageProvider.notifier).appendMessage(map);
-          if (_currentTab == 3) {
-            // User is on Chat tab → mark as read immediately
-            ref.read(messageProvider.notifier).markAllRead(groupId);
+          print('[PilgrimDashboard] Socket event: new_message | Data: $data');
+          try {
+            final map = Map<String, dynamic>.from(data as Map);
+            print('[PilgrimDashboard] is_urgent value in map: ${map['is_urgent']} (type: ${map['is_urgent'].runtimeType})');
+            final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
+            if (groupId == null) {
+              print('[PilgrimDashboard] Error: groupInfo.groupId is null');
+              return;
+            }
+            // Append the single message without a full reload (no spinner)
+            ref.read(messageProvider.notifier).appendMessage(map);
+
+            // Don't show popup or play sound when app is not in foreground
+            if (_lifecycleState != AppLifecycleState.resumed) {
+              print('[PilgrimDashboard] App not resumed, skipping popup');
+              return;
+            }
+
+            // Don't show popup if user is actively reading this chat
+            if (ref.read(messageProvider).activeGroupId == groupId) {
+              print('[PilgrimDashboard] User is reading chat, skipping popup');
+              return;
+            }
+
+            // Show in-app popup for the incoming message
+            ChatNotificationHelper.showIncomingMessage(
+              context: context,
+              ref: ref,
+              map: map,
+              onViewChat: () {
+                setState(() => _currentTab = 3);
+                ref.read(messageProvider.notifier).markAllRead(groupId);
+                _chatScrollNotifier.value++;
+              },
+            );
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] new_message handler error: $e');
           }
-          // Show in-app popup for the incoming message
-          _showMessagePopup(map);
         });
 
         // Listen for deleted messages — remove silently to avoid flicker
         SocketService.on('message_deleted', (data) {
           if (!mounted) return;
-          final map = data as Map<String, dynamic>;
-          final messageId = map['message_id'] as String?;
-          if (messageId != null) {
-            ref.read(messageProvider.notifier).removeMessage(messageId);
+          try {
+            final map = Map<String, dynamic>.from(data as Map);
+            final messageId = map['message_id'] as String?;
+            if (messageId != null) {
+              ref.read(messageProvider.notifier).removeMessage(messageId);
+            }
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] message_deleted handler error: $e');
           }
         });
 
         // Listen for suggested area / meetpoint additions
         SocketService.on('area_added', (data) {
           if (!mounted) return;
-          ref
-              .read(suggestedAreaProvider.notifier)
-              .appendArea(data as Map<String, dynamic>);
+          try {
+            final map = Map<String, dynamic>.from(data as Map);
+            ref.read(suggestedAreaProvider.notifier).appendArea(map);
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] area_added handler error: $e');
+          }
         });
 
         // Listen for suggested area / meetpoint deletions
         SocketService.on('area_deleted', (data) {
           if (!mounted) return;
-          final map = data as Map<String, dynamic>;
-          final areaId = map['area_id'] as String?;
-          if (areaId != null) {
-            ref.read(suggestedAreaProvider.notifier).removeArea(areaId);
+          try {
+            final map = Map<String, dynamic>.from(data as Map);
+            final areaId = map['area_id'] as String?;
+            if (areaId != null) {
+              ref.read(suggestedAreaProvider.notifier).removeArea(areaId);
+            }
+          } catch (e) {
+            debugPrint('[PilgrimDashboard] area_deleted handler error: $e');
           }
         });
 
@@ -318,6 +376,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     WidgetsBinding.instance.removeObserver(this);
     _locationSub?.cancel();
     _sfxPlayer.dispose();
+    ChatNotificationHelper.dispose();
     SocketService.off('mod_nav_beacon');
     SocketService.off('removed-from-group');
     SocketService.off('new_message');
@@ -332,122 +391,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
   }
 
   // ── In-app popup for incoming messages ───────────────────────────────────
-  void _showMessagePopup(Map<String, dynamic> map) {
-    if (!mounted) return;
-
-    // Don't play SFX or show popup when app is not in foreground
-    if (_lifecycleState != AppLifecycleState.resumed) return;
-
-    // Don't show popup if user is already on the chat tab
-    if (_currentTab == 3) return;
-
-    try {
-      final msg = GroupMessage.fromJson(map);
-
-      // Don't show popup for our own messages
-      final myId = ref.read(authProvider).userId;
-      if (msg.sender?.id == myId) return;
-
-      // ── Play SFX for every incoming message (regardless of urgency) ─────────
-      _sfxPlayer.play(AssetSource('static/in_app.mp3'));
-
-      final senderName = msg.sender?.fullName ?? 'notification_title'.tr();
-
-      if (msg.type == 'meetpoint') {
-        // Meetpoint message → special popup with Navigate button
-        final mpName =
-            msg.meetpointData?['name']?.toString() ?? 'meetpoint'.tr();
-        final lat = msg.meetpointData?['latitude'];
-        final lng = msg.meetpointData?['longitude'];
-        final mTimeRaw = msg.meetpointData?['meetpoint_time'];
-        String? displayTime;
-        if (mTimeRaw != null) {
-          try {
-            final dt = DateTime.parse(mTimeRaw.toString());
-            displayTime = DateFormat('hh:mm a').format(dt);
-          } catch (_) {}
-        }
-        InAppPopup.showMeetpoint(
-          context,
-          name: mpName,
-          body: msg.content,
-          time: displayTime,
-          onNavigate: (lat != null && lng != null)
-              ? () {
-                  final url = Uri.parse(
-                    'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-                  );
-                  launchUrl(url, mode: LaunchMode.externalApplication);
-                }
-              : null,
-        );
-      } else {
-        // Only show popup for urgent messages
-        if (!msg.isUrgent) {
-          // Non-urgent: brief auto-dismissing popup (no lock, no TTS)
-          final body =
-              msg.content ??
-              (msg.type == 'voice'
-                  ? '\ud83c\udfa4 ${'voice_message'.tr()}'
-                  : '');
-          InAppPopup.show(
-            context,
-            title: senderName,
-            body: body,
-            isUrgent: false,
-            lockUntilDismiss: false,
-            duration: const Duration(seconds: 4),
-            onViewChat: () {
-              setState(() => _currentTab = 3);
-              final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
-              if (groupId != null) {
-                ref.read(messageProvider.notifier).markAllRead(groupId);
-              }
-              _chatScrollNotifier.value++;
-            },
-          );
-          return;
-        }
-
-        final body =
-            msg.content ??
-            (msg.type == 'voice' ? '🎤 ${'voice_message'.tr()}' : '');
-
-        String? playType;
-        String? playValue;
-        if (msg.isUrgent && msg.type == 'voice' && msg.mediaUrl != null) {
-          playType = 'voice';
-          playValue = ref
-              .read(messageProvider.notifier)
-              .buildUploadUrl(msg.mediaUrl!);
-        } else if (msg.isUrgent && msg.type == 'tts') {
-          playType = 'tts';
-          playValue = msg.originalText ?? msg.content ?? '';
-        }
-
-        InAppPopup.show(
-          context,
-          title: senderName,
-          body: body,
-          isUrgent: msg.isUrgent,
-          lockUntilDismiss: true,
-          playType: playType,
-          playValue: playValue,
-          onViewChat: () {
-            // Navigate to chat tab, mark read, and scroll to latest
-            setState(() => _currentTab = 3);
-            final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
-            if (groupId != null) {
-              ref.read(messageProvider.notifier).markAllRead(groupId);
-            }
-            _chatScrollNotifier.value++;
-          },
-        );
-      }
-    } catch (e) {
-      debugPrint('[InAppPopup] Error showing popup: $e');
-    }
-  }
+  // Extracted to ChatNotificationHelper
 
 
 

@@ -170,7 +170,8 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     SocketService.off('location_update');
     SocketService.off('status_update');
     SocketService.offConnected(_onSocketConnected);
-    SocketService.emit('leave_group', widget.groupId);
+    // Do NOT emit leave_group here — the moderator dashboard still needs
+    // to receive new_message and other group events while on the groups list.
     super.dispose();
   }
 

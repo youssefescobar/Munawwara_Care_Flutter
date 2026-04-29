@@ -54,10 +54,15 @@ class SocketService {
     _socket = null;
     _connectedUserId = userId;
 
-    debugPrint('[SocketService] Connecting to $serverUrl as $userId ($role)');
+    // Clean URL: remove trailing slashes if present
+    final cleanUrl = serverUrl.endsWith('/') 
+        ? serverUrl.substring(0, serverUrl.length - 1) 
+        : serverUrl;
+
+    debugPrint('[SocketService] Connecting to $cleanUrl as $userId ($role)');
 
     _socket = io.io(
-      serverUrl,
+      cleanUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
           .setReconnectionDelay(2000)

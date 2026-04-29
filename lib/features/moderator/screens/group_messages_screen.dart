@@ -108,6 +108,9 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(messageProvider.notifier).setActiveGroup(widget.groupId);
+      ref.read(messageProvider.notifier).markAllRead(widget.groupId);
+      ref.read(moderatorProvider.notifier).loadDashboard(silently: true);
       _load().then((_) => _scrollToBottom(jump: true));
     });
   }
@@ -120,6 +123,12 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
     _recorder.dispose();
     _player.dispose();
     _tts.stop();
+    // Use addPostFrameCallback or delay to prevent state updates during build/dispose
+    Future.microtask(() {
+      if (ref.exists(messageProvider)) {
+        ref.read(messageProvider.notifier).setActiveGroup(null);
+      }
+    });
     super.dispose();
   }
 

@@ -35,6 +35,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
   }
 
   int _targetAudienceIndex = 0; // 0 = System Wide, 1 = Specific Groups, 2 = Specific Pilgrim
+  int _historyFilterIndex = 0; // 0 = All, 1 = System, 2 = Groups, 3 = Pilgrim
   final Set<String> _selectedGroupIds = {};
   String? _selectedGroupIdForPilgrim;
   String? _selectedPilgrimId;
@@ -96,18 +97,23 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     final state = ref.read(moderatorProvider);
     final allGroups = state.groups;
 
-    // Determine target groups
+    // Determine target groups and type
     List<String> targetGroups = [];
+    String targetType = 'group';
+
     if (_targetAudienceIndex == 0) {
       targetGroups = allGroups.map((g) => g.id).toList();
+      targetType = 'system';
     } else if (_targetAudienceIndex == 1) {
       targetGroups = _selectedGroupIds.toList();
+      targetType = 'group';
     } else {
       if (_selectedGroupIdForPilgrim == null || _selectedPilgrimId == null) {
         StandardSnackBar.showWarning(context, 'Please select a group and a pilgrim');
         return;
       }
       targetGroups = [_selectedGroupIdForPilgrim!];
+      targetType = 'pilgrim';
     }
 
     if (targetGroups.isEmpty) {
@@ -128,21 +134,17 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     int intervalMin = _isCustomInterval ? 15 : (_selectedIntervalMin ?? 15);
     int count = _repeatCount;
 
-    bool success = true;
-    for (String groupId in targetGroups) {
-      final ok = await ref
-          .read(reminderProvider.notifier)
-          .create(
-            groupId: groupId,
-            targetType: _targetAudienceIndex == 2 ? 'pilgrim' : 'group',
-            pilgrimId: _targetAudienceIndex == 2 ? _selectedPilgrimId : null,
-            text: msg,
-            scheduledAt: sched,
-            repeatCount: count,
-            repeatIntervalMin: intervalMin,
-          );
-      if (!ok) success = false;
-    }
+    final success = await ref
+        .read(reminderProvider.notifier)
+        .create(
+          groupIds: targetGroups,
+          targetType: targetType,
+          pilgrimId: _targetAudienceIndex == 2 ? _selectedPilgrimId : null,
+          text: msg,
+          scheduledAt: sched,
+          repeatCount: count,
+          repeatIntervalMin: intervalMin,
+        );
 
     setState(() => _isCreating = false);
 
@@ -971,28 +973,55 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
             ),
             SizedBox(height: 16.h),
             
+            // HISTORY FILTER
+            Container(
+              height: 38.h,
+              margin: EdgeInsets.only(bottom: 16.h),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _buildFilterChip(0, 'All', isDark),
+                  _buildFilterChip(1, 'System', isDark),
+                  _buildFilterChip(2, 'Groups', isDark),
+                  _buildFilterChip(3, 'Pilgrim', isDark),
+                ],
+              ),
+            ),
+            
             remState.isLoading && remState.reminders.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : remState.reminders.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 32.h),
-                          child: Text(
-                            'No reminders created yet.',
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              color: AppColors.textMutedLight,
-                              fontSize: 14.sp,
+                : Builder(
+                    builder: (context) {
+                      final filtered = remState.reminders.where((r) {
+                        if (_historyFilterIndex == 0) return true;
+                        if (_historyFilterIndex == 1) return r.targetType == 'system';
+                        if (_historyFilterIndex == 2) return r.targetType == 'group';
+                        if (_historyFilterIndex == 3) return r.targetType == 'pilgrim';
+                        return true;
+                      }).toList();
+
+                      if (filtered.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32.h),
+                            child: Text(
+                              'No reminders found for this filter.',
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                color: AppColors.textMutedLight,
+                                fontSize: 14.sp,
+                              ),
                             ),
                           ),
-                        ),
-                      )
-                    : ListView.builder(
+                        );
+                      }
+
+                      return ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: remState.reminders.length,
+                        itemCount: filtered.length,
                         itemBuilder: (_, i) {
-                          final reminder = remState.reminders[i];
+                          final reminder = filtered[i];
                           return Dismissible(
                             key: ValueKey(reminder.id),
                             direction: DismissDirection.endToStart,
@@ -1054,8 +1083,45 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             ),
                           );
                         },
-                      ),
+                      );
+                    },
+                  ),
           ],
+        ),
+      ),
+    );
+  }
+
+
+
+  Widget _buildFilterChip(int index, String label, bool isDark) {
+    final isSelected = _historyFilterIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _historyFilterIndex = index),
+      child: Container(
+        margin: EdgeInsets.only(right: 8.w),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFF97316)
+              : (isDark ? const Color(0xFF2A2A3C) : const Color(0xFFF3F4F6)),
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFF97316)
+                : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12.sp,
+              color: isSelected ? Colors.white : AppColors.textMutedLight,
+            ),
+          ),
         ),
       ),
     );
