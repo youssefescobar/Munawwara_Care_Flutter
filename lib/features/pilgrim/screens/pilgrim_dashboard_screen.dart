@@ -824,12 +824,17 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
   }
 
   void _cancelSOS() {
+    final pilgrimState = ref.read(pilgrimProvider);
+    final groupId = pilgrimState.groupInfo?.groupId;
+    final sosId = pilgrimState.activeSosId;
+    
     ref.read(pilgrimProvider.notifier).cancelSOS();
-    final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
+    
     if (groupId != null) {
       SocketService.emit('sos_cancel', {
         'groupId': groupId,
         'pilgrimId': ref.read(authProvider).userId,
+        if (sosId != null) 'sos_id': sosId,
       });
     }
     if (!mounted) return;

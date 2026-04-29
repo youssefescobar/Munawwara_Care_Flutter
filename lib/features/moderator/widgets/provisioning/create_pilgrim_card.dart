@@ -280,7 +280,14 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                             DropdownMenuItem<String>(value: null, child: Text('group_no_room'.tr())),
                             ...rooms.map((r) => DropdownMenuItem(
                               value: r.id, 
-                              child: Text(r.floor == null ? r.roomNumber : '${r.roomNumber} (F${r.floor})')
+                              child: Text(
+                                '${r.roomNumber}${r.floor != null ? ' (F${r.floor})' : ''} - ${r.currentOccupancy}/${r.capacity}',
+                                style: TextStyle(
+                                  fontSize: 13.sp,
+                                  fontFamily: 'Lexend',
+                                  color: r.currentOccupancy >= r.capacity ? Colors.green.shade400 : null,
+                                ),
+                              )
                             )),
                           ],
                           onChanged: selectedHotel == null ? null : (v) => setState(() => _selectedRoomId = v),

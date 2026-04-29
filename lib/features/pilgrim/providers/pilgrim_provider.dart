@@ -171,6 +171,7 @@ class PilgrimState {
   final bool isSharingLocation;
   final int? batteryLevel;
   final bool sosActive;
+  final String? activeSosId;
   // key = moderatorId, value = active beacon info
   final Map<String, ModeratorBeacon> navBeacons;
 
@@ -183,6 +184,7 @@ class PilgrimState {
     this.isSharingLocation = true,
     this.batteryLevel,
     this.sosActive = false,
+    this.activeSosId,
     this.navBeacons = const {},
   });
 
@@ -196,8 +198,10 @@ class PilgrimState {
     int? batteryLevel,
     bool? sosActive,
     Map<String, ModeratorBeacon>? navBeacons,
+    String? activeSosId,
     bool clearError = false,
     bool clearGroup = false,
+    bool clearSosId = false,
   }) => PilgrimState(
     isLoading: isLoading ?? this.isLoading,
     isSosLoading: isSosLoading ?? this.isSosLoading,
@@ -207,6 +211,7 @@ class PilgrimState {
     isSharingLocation: isSharingLocation ?? this.isSharingLocation,
     batteryLevel: batteryLevel ?? this.batteryLevel,
     sosActive: sosActive ?? this.sosActive,
+    activeSosId: clearSosId ? null : (activeSosId ?? this.activeSosId),
     navBeacons: navBeacons ?? this.navBeacons,
   );
 }
@@ -301,12 +306,18 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
   Future<bool> triggerSOS() async {
     state = state.copyWith(isSosLoading: true);
     try {
-      await ApiService.dio.post('/pilgrim/sos');
-      state = state.copyWith(isSosLoading: false, sosActive: true);
-      // Auto clear SOS status after 10 s
+      final response = await ApiService.dio.post('/pilgrim/sos');
+      final activeSosId = response.data?['data']?['sos_id']?.toString();
+      
+      state = state.copyWith(
+        isSosLoading: false, 
+        sosActive: true,
+        activeSosId: activeSosId,
+      );
+      // Auto clear SOS status after 10 s (locally)
       Future.delayed(const Duration(seconds: 10), () {
         if (state.sosActive) {
-          state = state.copyWith(sosActive: false);
+          state = state.copyWith(sosActive: false, clearSosId: true);
         }
       });
       return true;
@@ -352,7 +363,7 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
   }
 
   void cancelSOS() {
-    state = state.copyWith(sosActive: false);
+    state = state.copyWith(sosActive: false, clearSosId: true);
   }
 
   /// Clear all group-related state when pilgrim is removed from group
@@ -361,6 +372,7 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
       clearGroup: true,
       navBeacons: const {},
       sosActive: false,
+      clearSosId: true,
     );
   }
 

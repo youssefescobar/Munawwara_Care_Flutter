@@ -460,94 +460,151 @@ class _NotificationTile extends ConsumerWidget {
                     // Join Group button for group invitations
                     if (n.type == 'group_invitation') ...[
                       SizedBox(height: 8.h),
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              final invId = n.data?['invitation_id']?.toString();
-                              if (invId != null && onAcceptInvitation != null) {
-                                onAcceptInvitation!(invId);
-                              } else {
-                                StandardSnackBar.showError(context, 'Invalid invitation data');
-                              }
-                            },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.w,
-                                vertical: 7.h,
+                      if (n.data?['status'] != null)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 5.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: n.data!['status'] == 'accepted'
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8.r),
+                            border: Border.all(
+                              color: n.data!['status'] == 'accepted'
+                                  ? Colors.green.shade400
+                                  : Colors.red.shade400,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                n.data!['status'] == 'accepted'
+                                    ? Symbols.check_circle
+                                    : Symbols.cancel,
+                                size: 14.w,
+                                color: n.data!['status'] == 'accepted'
+                                    ? Colors.green.shade400
+                                    : Colors.red.shade400,
+                                fill: 1,
                               ),
-                              decoration: BoxDecoration(
-                                color: n.iconColor,
-                                borderRadius: BorderRadius.circular(10.r),
+                              SizedBox(width: 6.w),
+                              Text(
+                                (n.data!['status'] == 'accepted'
+                                        ? 'invite_status_accepted'
+                                        : 'invite_status_declined')
+                                    .tr(),
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.sp,
+                                  color: n.data!['status'] == 'accepted'
+                                      ? Colors.green.shade400
+                                      : Colors.red.shade400,
+                                ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Symbols.group_add,
-                                    size: 14.w,
-                                    color: Colors.white,
-                                    fill: 1,
-                                  ),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'invite_accept'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11.sp,
+                            ],
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                final invId =
+                                    n.data?['invitation_id']?.toString();
+                                if (invId != null &&
+                                    onAcceptInvitation != null) {
+                                  onAcceptInvitation!(invId);
+                                } else {
+                                  StandardSnackBar.showError(
+                                      context, 'Invalid invitation data');
+                                }
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 7.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: n.iconColor,
+                                  borderRadius: BorderRadius.circular(10.r),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Symbols.group_add,
+                                      size: 14.w,
                                       color: Colors.white,
+                                      fill: 1,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 4.w),
+                                    Text(
+                                      'invite_accept'.tr(),
+                                      style: TextStyle(
+                                        fontFamily: 'Lexend',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11.sp,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          SizedBox(width: 8.w),
-                          GestureDetector(
-                            onTap: () {
-                              final invId = n.data?['invitation_id']?.toString();
-                              if (invId != null && onDeclineInvitation != null) {
-                                onDeclineInvitation!(invId);
-                              } else {
-                                StandardSnackBar.showError(context, 'Invalid invitation data');
-                              }
-                            },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.w,
-                                vertical: 7.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                border: Border.all(color: Colors.red.shade400, width: 1.5),
-                                borderRadius: BorderRadius.circular(10.r),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Symbols.close,
-                                    size: 14.w,
-                                    color: Colors.red.shade400,
-                                    fill: 1,
-                                  ),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'invite_decline'.tr(),
-                                    style: TextStyle(
-                                      fontFamily: 'Lexend',
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11.sp,
+                            SizedBox(width: 8.w),
+                            GestureDetector(
+                              onTap: () {
+                                final invId =
+                                    n.data?['invitation_id']?.toString();
+                                if (invId != null &&
+                                    onDeclineInvitation != null) {
+                                  onDeclineInvitation!(invId);
+                                } else {
+                                  StandardSnackBar.showError(
+                                      context, 'Invalid invitation data');
+                                }
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 7.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
+                                  border: Border.all(
+                                      color: Colors.red.shade400, width: 1.5),
+                                  borderRadius: BorderRadius.circular(10.r),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Symbols.close,
+                                      size: 14.w,
                                       color: Colors.red.shade400,
+                                      fill: 1,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 4.w),
+                                    Text(
+                                      'invite_decline'.tr(),
+                                      style: TextStyle(
+                                        fontFamily: 'Lexend',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11.sp,
+                                        color: Colors.red.shade400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ],
                 ),

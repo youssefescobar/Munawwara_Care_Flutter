@@ -75,6 +75,8 @@ dependency_overrides:
   # taps Decline on the system notification while the app is killed.
   flutter_callkit_incoming:
     path: ./plugins/flutter_callkit_incoming
+  flutter_compass_v2:
+    path: ./plugins/flutter_compass_v2
 
 dev_dependencies:
   flutter_test:

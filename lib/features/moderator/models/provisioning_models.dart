@@ -132,12 +132,16 @@ class RoomOption {
   final String roomNumber;
   final String? floor;
   final bool active;
+  final int capacity;
+  final int currentOccupancy;
 
   const RoomOption({
     required this.id,
     required this.roomNumber,
     this.floor,
     this.active = true,
+    this.capacity = 1,
+    this.currentOccupancy = 0,
   });
 }
 

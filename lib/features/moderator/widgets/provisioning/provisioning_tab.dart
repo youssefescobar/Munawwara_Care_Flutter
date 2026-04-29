@@ -142,6 +142,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                 roomNumber: room['room_number']?.toString() ?? '-',
                 floor: room['floor']?.toString(),
                 active: room['active'] != false,
+                capacity: (room['capacity'] as num?)?.toInt() ?? 1,
+                currentOccupancy: (room['current_occupancy'] as num?)?.toInt() ?? 0,
               );
             }).toList(),
           );

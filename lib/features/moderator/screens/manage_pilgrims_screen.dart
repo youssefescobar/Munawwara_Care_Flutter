@@ -1033,7 +1033,14 @@ class _RoomOption {
   final String roomNumber;
   final String? floor;
   final int capacity;
-  const _RoomOption({required this.id, required this.roomNumber, this.floor, required this.capacity});
+  final int currentOccupancy;
+  const _RoomOption({
+    required this.id,
+    required this.roomNumber,
+    this.floor,
+    required this.capacity,
+    this.currentOccupancy = 0,
+  });
 }
 
 class _BusOption {
@@ -1074,25 +1081,16 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
   }
 
   void _calculateOccupancy() {
-    final modState = ref.read(moderatorProvider);
-    final group = modState.groups.where((g) => g.id == widget.pilgrim.currentGroupId).firstOrNull;
-    if (group == null) return;
-
-    final Map<String, int> occupancy = {};
-    for (final p in group.pilgrims) {
-      if (p.id == widget.pilgrim.id) continue; // Don't count current pilgrim
-      if (p.hotelName != null && p.roomNumber != null) {
-        final key = '${p.hotelName}_${p.roomNumber}';
-        occupancy[key] = (occupancy[key] ?? 0) + 1;
-      }
-    }
-    setState(() => _roomOccupancy = occupancy);
+    // Backend now handles global occupancy calculation and filtering
   }
 
   Future<void> _loadResources() async {
     setState(() => _isLoading = true);
     try {
-      final resp = await ApiService.dio.get('/groups/${widget.pilgrim.currentGroupId}/resource-options');
+      final resp = await ApiService.dio.get(
+        '/groups/${widget.pilgrim.currentGroupId}/resource-options',
+        queryParameters: {'exclude_pilgrim_id': widget.pilgrim.id},
+      );
       final raw = resp.data;
       final payload = raw is Map<String, dynamic> 
           ? (raw['data'] as Map<String, dynamic>? ?? raw) 
@@ -1114,6 +1112,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
               roomNumber: rMap['room_number']?.toString() ?? '-',
               floor: rMap['floor']?.toString(),
               capacity: (rMap['capacity'] as num?)?.toInt() ?? 1,
+              currentOccupancy: (rMap['current_occupancy'] as num?)?.toInt() ?? 0,
             );
           }).toList(),
         );
@@ -1226,15 +1225,16 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                     items: [
                       const DropdownMenuItem(value: null, child: Text('No Room')),
                       ...rooms.map((r) {
-                        final current = _roomOccupancy['${hotel?.name}_${r.roomNumber}'] ?? 0;
+                        final current = r.currentOccupancy;
                         final isFull = current >= r.capacity;
+                        // Note: Backend filters out rooms that are full for OTHERS, 
+                        // so if a room is here and isFull, it means the CURRENT pilgrim is in it.
                         return DropdownMenuItem(
-                          value: isFull ? null : r.id,
-                          enabled: !isFull,
+                          value: r.id,
                           child: Text(
                             '${r.roomNumber}${r.floor != null ? ' (F${r.floor})' : ''} - $current/${r.capacity}${isFull ? ' (Full)' : ''}',
                             style: TextStyle(
-                              color: isFull ? Colors.red.shade400 : null,
+                              color: isFull ? Colors.green.shade400 : null,
                             ),
                           ),
                         );

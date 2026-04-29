@@ -1,9 +1,15 @@
-﻿{
+{
     "dialog_cancel":  "Cancel",
     "dialog_confirm":  "Confirm",
     "dialog_delete":  "Delete",
     "dialog_yes":  "Yes",
     "dialog_no":  "No",
+    "invite_accept": "Accept",
+    "invite_decline": "Decline",
+    "invite_status_accepted": "Accepted",
+    "invite_status_declined": "Declined",
+    "invite_msg_accepted": "You have joined this group.",
+    "invite_msg_declined": "You declined this invitation.",
     "welcome_back":  "Welcome back",
     "login_subtitle":  "Log in to Munawwara Care,\nyour companion for a blessed journey.",
     "tab_email":  "Email",
