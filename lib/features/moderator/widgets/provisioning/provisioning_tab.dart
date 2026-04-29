@@ -326,7 +326,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
       context: context,
       title: 'group_refresh_login_title',
       confirmText: 'group_refresh_login_confirm',
-      content: 'group_refresh_login_body'.tr(args: [item.fullName]),
+      content: 'group_refresh_login_body',
+      contentArgs: [item.fullName],
     );
 
     if (confirmed != true) return;

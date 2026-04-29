@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/rendering.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/api_service.dart';
@@ -2710,7 +2711,6 @@ class _ModeratorManageSheet extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ctrl = TextEditingController();
 
-    // Variables must be outside the builder so they aren't reset on keyboard toggles
     bool loading = false;
     String? fieldError;
 
@@ -2718,175 +2718,251 @@ class _ModeratorManageSheet extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          Future<void> submit() async {
-            final val = ctrl.text.trim();
-            if (val.isEmpty || !val.contains('@')) {
-              setSheetState(() => fieldError = 'email_invalid'.tr());
-              return;
-            }
-            setSheetState(() {
-              loading = true;
-              fieldError = null;
-            });
-            final (ok, err) = await ref
-                .read(moderatorProvider.notifier)
-                .inviteModerator(g.id, val);
-            if (sheetContext.mounted) {
-              if (ok) {
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.pop(sheetContext);
-                messenger.clearSnackBars();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'group_invite_success'.tr(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    backgroundColor: Colors.green.shade600,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
-              } else {
-                setSheetState(() {
-                  loading = false;
-                  fieldError = err ?? 'group_not_found'.tr();
-                });
-              }
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-            ),
-            child: Container(
+      builder: (sheetContext) => DefaultTabController(
+        length: 3,
+        child: StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                20.w,
+                20.h,
+                20.w,
+                MediaQuery.of(ctx).viewInsets.bottom + 32.h,
+              ),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.surfaceDark : Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
               ),
-              padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 28.h),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Handle
                   Center(
                     child: Container(
                       width: 40.w,
                       height: 4.h,
+                      margin: EdgeInsets.only(bottom: 20.h),
                       decoration: BoxDecoration(
                         color: isDark ? Colors.white24 : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2.r),
                       ),
                     ),
                   ),
-                  SizedBox(height: 20.h),
-                  Text(
-                    'group_invite_mod'.tr(),
-                    style: TextStyle(
+
+                  TabBar(
+                    labelStyle: TextStyle(
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w700,
-                      fontSize: 18.sp,
-                      color: isDark ? Colors.white : AppColors.textDark,
+                      fontSize: 13.sp,
                     ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    'group_invite_mod_sub'.tr(),
-                    style: TextStyle(
+                    unselectedLabelStyle: TextStyle(
                       fontFamily: 'Lexend',
-                      fontSize: 12.sp,
-                      color: AppColors.textMutedLight,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13.sp,
                     ),
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor:
+                        isDark ? AppColors.textMutedLight : Colors.grey,
+                    indicatorColor: AppColors.primary,
+                    indicatorWeight: 3,
+                    dividerColor: Colors.transparent,
+                    tabs: [
+                      Tab(text: 'Email'.tr()),
+                      Tab(text: 'QR Code'.tr()),
+                      Tab(text: 'Code'.tr()),
+                    ],
                   ),
-                  SizedBox(height: 20.h),
-                  TextField(
-                    controller: ctrl,
-                    autofocus: true,
-                    keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontSize: 14.sp,
-                      color: isDark ? Colors.white : AppColors.textDark,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'group_invite_mod'.tr().toLowerCase(),
-                      hintStyle: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 13.sp,
-                        color: AppColors.textMutedLight,
-                      ),
-                      errorText: fieldError,
-                      prefixIcon: Icon(
-                        Symbols.email,
-                        size: 20.w,
-                        color: AppColors.textMutedLight,
-                      ),
-                      filled: true,
-                      fillColor: isDark
-                          ? AppColors.backgroundDark
-                          : const Color(0xFFF0F0F8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF6C63FF),
-                          width: 1.5,
-                        ),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        vertical: 14.h,
-                        horizontal: 16.w,
-                      ),
-                    ),
-                    onSubmitted: (_) => submit(),
-                  ),
-                  SizedBox(height: 16.h),
+
                   SizedBox(
-                    width: double.infinity,
-                    height: 52.h,
-                    child: ElevatedButton(
-                      onPressed: loading ? null : submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63FF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.r),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: loading
-                          ? SizedBox(
-                              width: 20.w,
-                              height: 20.w,
-                              child: const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
+                    height: 340.h,
+                    child: TabBarView(
+                      children: [
+                        // Email Tab
+                        SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              SizedBox(height: 24.h),
+                              Text(
+                                'group_invite_mod_desc'.tr(),
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontSize: 13.sp,
+                                  color: isDark
+                                      ? AppColors.textMutedLight
+                                      : Colors.grey.shade600,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                            )
-                          : Text(
-                              'group_invite_send'.tr(),
-                              style: TextStyle(
-                                fontFamily: 'Lexend',
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15.sp,
+                              SizedBox(height: 24.h),
+                              TextField(
+                                controller: ctrl,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter moderator email'.tr(),
+                                  errorText: fieldError,
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.backgroundDark
+                                      : Colors.grey.shade50,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 24.h),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50.h,
+                                child: ElevatedButton(
+                                  onPressed: loading
+                                      ? null
+                                      : () async {
+                                          final val = ctrl.text.trim();
+                                          if (val.isEmpty || !val.contains('@')) {
+                                            setSheetState(() => fieldError =
+                                                'email_invalid'.tr());
+                                            return;
+                                          }
+                                          setSheetState(() {
+                                            loading = true;
+                                            fieldError = null;
+                                          });
+                                          final (ok, err) = await ref
+                                              .read(moderatorProvider.notifier)
+                                              .inviteModerator(g.id, val);
+                                          if (sheetContext.mounted) {
+                                            if (ok) {
+                                              Navigator.pop(sheetContext);
+                                              StandardSnackBar.showSuccess(
+                                                  context,
+                                                  'group_invite_success'.tr());
+                                            } else {
+                                              setSheetState(() {
+                                                loading = false;
+                                                fieldError =
+                                                    err ?? 'An error occurred';
+                                              });
+                                            }
+                                          }
+                                        },
+                                  child: loading
+                                      ? SizedBox(
+                                          width: 20.w,
+                                          height: 20.w,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text('invite_send'.tr()),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // QR Code Tab
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12.w),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: QrImageView(
+                                data: g.groupCode,
+                                version: QrVersions.auto,
+                                size: 180.w,
                               ),
                             ),
+                            SizedBox(height: 20.h),
+                            Text(
+                              'scan_to_join_mod'.tr(),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 13.sp,
+                                color: isDark
+                                    ? AppColors.textMutedLight
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Manual Code Tab
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'share_this_code'.tr(),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 13.sp,
+                                color: isDark
+                                    ? AppColors.textMutedLight
+                                    : Colors.grey.shade600,
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 24.h),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24.w, vertical: 16.h),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                              child: Text(
+                                g.groupCode,
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontSize: 32.sp,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 8,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 24.h),
+                            TextButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(
+                                    ClipboardData(text: g.groupCode));
+                                StandardSnackBar.showSuccess(
+                                    context, 'create_group_code_copied'.tr());
+                              },
+                              icon: Icon(Symbols.content_copy, size: 18.w),
+                              label: Text('copy_code'.tr()),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                textStyle: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

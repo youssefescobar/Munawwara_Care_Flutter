@@ -21,6 +21,7 @@ import '../../notifications/screens/alerts_tab.dart';
 import '../providers/moderator_provider.dart';
 import 'pilgrim_provisioning_screen.dart';
 import 'create_group_screen.dart';
+import 'join_group_screen.dart';
 import 'moderator_profile_screen.dart';
 import 'group_management_screen.dart';
 import 'group_messages_screen.dart';
@@ -329,24 +330,195 @@ class _ModeratorDashboardScreenState
         ],
       ),
       floatingActionButton: _currentTab == 0
-          ? SizedBox(
-              width: 56.w,
-              height: 56.w,
-              child: FloatingActionButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
-                ),
-                backgroundColor: const Color(0xFFF97316),
-                foregroundColor: Colors.white,
-                shape: const CircleBorder(),
-                elevation: 6,
-                child: Icon(Symbols.add, size: 28.w),
+          ? _AnimatedFAB(
+              onCreateGroup: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+              ),
+              onJoinGroup: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
               ),
             )
           : null,
       bottomNavigationBar: _ModBottomNav(
         currentIndex: _currentTab,
         onTap: (i) => setState(() => _currentTab = i),
+      ),
+    );
+  }
+}
+
+class _AnimatedFAB extends StatefulWidget {
+  final VoidCallback onCreateGroup;
+  final VoidCallback onJoinGroup;
+
+  const _AnimatedFAB({
+    required this.onCreateGroup,
+    required this.onJoinGroup,
+  });
+
+  @override
+  State<_AnimatedFAB> createState() => _AnimatedFABState();
+}
+
+class _AnimatedFABState extends State<_AnimatedFAB>
+    with SingleTickerProviderStateMixin {
+  bool _isOpen = false;
+  late AnimationController _controller;
+  late Animation<double> _expandAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      value: 0.0,
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _expandAnimation = CurvedAnimation(
+      curve: Curves.fastOutSlowIn,
+      reverseCurve: Curves.easeOutQuad,
+      parent: _controller,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() {
+      _isOpen = !_isOpen;
+      if (_isOpen) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        SizeTransition(
+          sizeFactor: _expandAnimation,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 18.h, right: 4.w), // Precisely aligned with FAB center (56w vs 48w)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildOption(
+                  label: 'join_group'.tr(),
+                  icon: Symbols.qr_code_scanner,
+                  onTap: () {
+                    _toggle();
+                    widget.onJoinGroup();
+                  },
+                ),
+                SizedBox(height: 14.h), // Equal vertical spacing
+                _buildOption(
+                  label: 'dashboard_create_group'.tr(),
+                  icon: Symbols.group_add,
+                  onTap: () {
+                    _toggle();
+                    widget.onCreateGroup();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        FloatingActionButton(
+          onPressed: _toggle,
+          backgroundColor: const Color(0xFFF97316),
+          foregroundColor: Colors.white,
+          shape: const CircleBorder(),
+          elevation: 6,
+          child: AnimatedRotation(
+            turns: _isOpen ? 0.125 : 0,
+            duration: const Duration(milliseconds: 250),
+            child: Icon(Symbols.add, size: 28.w),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOption({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 180.w, // Reduced width to prevent "too far left" appearance
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Label Container
+            Expanded(
+              child: Container(
+                height: 48.h, // Identical height for buttons
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                alignment: Alignment.centerRight,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.sp,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 10.w), // Equal spacing between text and icon
+            // Icon Circle
+            Container(
+              width: 48.h, // Height match for consistency
+              height: 48.h,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  size: 20.w,
+                  color: const Color(0xFFF97316),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1246,13 +1418,14 @@ class _GroupCard extends ConsumerWidget {
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(24.r),
           border: Border.all(
-            color: isDark ? AppColors.backgroundDark : const Color(0xFFEEEEF8),
+            color: isDark ? AppColors.backgroundDark : const Color(0xFFE2E2F0),
+            width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1407,9 +1580,7 @@ class _GroupCard extends ConsumerWidget {
                     ),
                   ),
 
-                  SizedBox(height: 14.h),
-
-                  SizedBox(height: 14.h),
+                  SizedBox(height: 18.h),
 
                   // Actions Row: View on Map & Chat
                   Row(
@@ -1429,13 +1600,26 @@ class _GroupCard extends ConsumerWidget {
                             );
                           },
                           child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+                            padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 14.w),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10.r),
+                              color: isDark 
+                                  ? const Color(0xFF6B7BAE).withValues(alpha: 0.1) 
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12.r),
+                              border: Border.all(
+                                color: isDark 
+                                    ? const Color(0xFF6B7BAE).withValues(alpha: 0.2)
+                                    : const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
+                                Icon(
+                                  Symbols.map,
+                                  size: 16.w,
+                                  color: const Color(0xFF6B7BAE),
+                                ),
+                                SizedBox(width: 8.w),
                                 Text(
                                   'dashboard_view_on_map'.tr(),
                                   style: TextStyle(
@@ -1450,7 +1634,7 @@ class _GroupCard extends ConsumerWidget {
                                   scaleX: Directionality.of(context) == ui.TextDirection.rtl ? -1 : 1,
                                   child: Icon(
                                     Symbols.arrow_forward,
-                                    size: 16.w,
+                                    size: 14.w,
                                     color: const Color(0xFF6B7BAE),
                                   ),
                                 ),
@@ -1479,10 +1663,17 @@ class _GroupCard extends ConsumerWidget {
                           );
                         },
                         child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 16.w),
+                          padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 16.w),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10.r),
+                            color: isDark 
+                                ? const Color(0xFF6B7BAE).withValues(alpha: 0.1) 
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: isDark 
+                                  ? const Color(0xFF6B7BAE).withValues(alpha: 0.2)
+                                  : const Color(0xFFE2E8F0),
+                            ),
                           ),
                           child: Stack(
                             clipBehavior: Clip.none,
@@ -1830,7 +2021,7 @@ class _ModBottomNav extends ConsumerWidget {
           Expanded(
             child: _NavItem(
               icon: Symbols.groups,
-              label: 'GROUPS',
+              label: 'nav_groups'.tr(),
               index: 0,
               current: currentIndex,
               onTap: onTap,
@@ -1841,7 +2032,7 @@ class _ModBottomNav extends ConsumerWidget {
           Expanded(
             child: _NavItem(
               icon: Symbols.inbox,
-              label: 'PROVISIONING',
+              label: 'nav_provisioning'.tr(),
               index: 1,
               current: currentIndex,
               onTap: onTap,
@@ -1852,7 +2043,7 @@ class _ModBottomNav extends ConsumerWidget {
           Expanded(
             child: _NavItem(
               icon: Symbols.notifications_active,
-              label: 'REMINDERS',
+              label: 'nav_reminders'.tr(),
               index: 2,
               current: currentIndex,
               onTap: onTap,
@@ -1863,7 +2054,7 @@ class _ModBottomNav extends ConsumerWidget {
           Expanded(
             child: _NavItem(
               icon: Symbols.person,
-              label: 'PROFILE',
+              label: 'nav_profile'.tr(),
               index: 3,
               current: currentIndex,
               onTap: onTap,

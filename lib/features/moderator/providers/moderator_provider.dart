@@ -571,6 +571,23 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
     }
   }
 
+  // Join a group using a code
+  Future<(bool, String?)> joinGroup(String code) async {
+    try {
+      await ApiService.dio.post(
+        '/groups/join',
+        data: {'group_code': code.trim().toUpperCase()},
+      );
+      // Refresh dashboard to show the new group
+      await loadDashboard();
+      return (true, null);
+    } on DioException catch (e) {
+      return (false, ApiService.parseError(e));
+    } catch (e) {
+      return (false, e.toString());
+    }
+  }
+
   // Leave a group — returns (success, errorMessage)
   Future<(bool, String?)> leaveGroup(String groupId, {String? newCreatorId}) async {
     try {
