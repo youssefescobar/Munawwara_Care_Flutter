@@ -1,9 +1,13 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../utils/app_logger.dart';
+
+/// Shown on CallKit / prefs when a pilgrim receives a moderator call (native asset path).
+const String kCallKitSupportAvatarAsset = 'assets/static/app_icon.png';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CallKitService — Shows native incoming call screen (like WhatsApp)
@@ -22,10 +26,21 @@ class CallKitService {
   static const _pendingChannelNameKey = 'pending_call_channel_name';
   static const _pendingCreatedAtMsKey = 'pending_call_created_at_ms';
   static const _pendingCallUuidKey = 'pending_call_uuid';
+  static const _prefsUserRoleKey = 'user_role';
 
   // Track the current call UUID so we can end it later
   String? _currentCallId;
   String? get currentCallId => _currentCallId;
+
+  /// Native CallKit / Android notification id (matches [SharedPreferences] when
+  /// Dart-side [_currentCallId] was cleared after tray hide).
+  Future<String?> peekCallKitNotificationId() async {
+    if (_currentCallId != null && _currentCallId!.isNotEmpty) return _currentCallId;
+    final prefs = await SharedPreferences.getInstance();
+    final fromPrefs = prefs.getString(_pendingCallUuidKey);
+    if (fromPrefs != null && fromPrefs.isNotEmpty) return fromPrefs;
+    return null;
+  }
 
   /// Timestamp of the last showIncomingCall invocation — used to reject
   /// rapid duplicate invocations that slip past the _currentCallId guard.
@@ -87,17 +102,40 @@ class CallKitService {
     _currentCallId = _uuid.v4();
     _lastShowTime = now;
 
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString(_prefsUserRoleKey) ?? '';
+    final useSupportBranding = role == 'pilgrim';
+    final nativeCallerLine = useSupportBranding
+        ? _supportDisplayName()
+        : callerName;
+    final avatarAsset = useSupportBranding ? kCallKitSupportAvatarAsset : null;
+
     await _savePendingIncomingCall(
       callerId: callerId,
-      callerName: callerName,
+      callerName: nativeCallerLine,
       callerRole: callerRole ?? '',
       channelName: channelName,
     );
 
+    final androidParams = AndroidParams(
+      isCustomNotification: false,
+      // Keep only [avatar] in the large ring; isShowLogo + logoUrl duplicates the same asset uptop.
+      isShowLogo: false,
+      logoUrl: null,
+      ringtonePath: 'system_ringtone_default',
+      backgroundColor: '#0B1220',
+      actionColor: '#F97316',
+      textColor: '#FFFFFF',
+      isShowFullLockedScreen: true,
+      incomingCallNotificationChannelName: 'Incoming Calls',
+      isShowCallID: true,
+    );
+
     final params = CallKitParams(
       id: _currentCallId!,
-      nameCaller: callerName,
+      nameCaller: nativeCallerLine,
       appName: 'Munawwara Care',
+      avatar: avatarAsset,
       handle: callerRole ?? 'Voice Call',
       type: 0, // 0 = audio call, 1 = video call
       duration: 30000, // Ring for 30 seconds max
@@ -111,22 +149,13 @@ class CallKitService {
       ),
       extra: <String, dynamic>{
         'callerId': callerId,
-        'callerName': callerName,
+        'callerName': nativeCallerLine,
+        'peerCallerName': callerName,
         'callerRole': callerRole ?? '',
         'channelName': channelName,
       },
       headers: <String, dynamic>{},
-      android: const AndroidParams(
-        isCustomNotification: false,
-        isShowLogo: false,
-        ringtonePath: 'system_ringtone_default',
-        backgroundColor: '#0D1B2A',
-        actionColor: '#F97316', // AppColors.primary
-        textColor: '#FFFFFF',
-        isShowFullLockedScreen: true,
-        incomingCallNotificationChannelName: 'Incoming Calls',
-        isShowCallID: false,
-      ),
+      android: androidParams,
       ios: const IOSParams(
         iconName: 'AppIcon',
         supportsVideo: false,
@@ -140,24 +169,120 @@ class CallKitService {
     );
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
-    AppLogger.i('📞 Native incoming call screen shown for $callerName');
+    AppLogger.i('📞 Native incoming call screen shown ($nativeCallerLine)');
+  }
+
+  static String _supportDisplayName() {
+    try {
+      return 'call_support_display_name'.tr();
+    } catch (_) {
+      return 'Munawwara Care';
+    }
+  }
+
+  /// Android: `endCall` alone does not remove the incoming-call tray notification;
+  /// the plugin expects [FlutterCallkitIncoming.hideCallkitIncoming] to run
+  /// [clearIncomingNotification] (see Kotlin `hideCallkitIncoming`).
+  static Future<void> _hideIncomingTrayForId(String id) async {
+    if (id.isEmpty) return;
+    try {
+      await FlutterCallkitIncoming.hideCallkitIncoming(
+        CallKitParams(
+          id: id,
+          nameCaller: '',
+          appName: 'Munawwara Care',
+          handle: '',
+          type: 0,
+        ),
+      );
+    } catch (e) {
+      AppLogger.w('📞 [CallKit] hideCallkitIncoming failed: $e');
+    }
+  }
+
+  /// Hides the Android incoming notification only — keeps SharedPreferences so
+  /// a cold-start accept can still read `channelName` / caller from prefs.
+  static Future<void> hideIncomingTrayFromPersistedUuidOnly() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final uuid = prefs.getString(_pendingCallUuidKey);
+      if (uuid != null && uuid.isNotEmpty) {
+        await _hideIncomingTrayForId(uuid);
+      }
+    } catch (e) {
+      AppLogger.w('📞 hideIncomingTrayFromPersistedUuidOnly: $e');
+    }
+  }
+
+  Future<String?> _resolveActiveCallId() async {
+    if (_currentCallId != null && _currentCallId!.isNotEmpty) {
+      return _currentCallId;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fromPrefs = prefs.getString(_pendingCallUuidKey);
+      if (fromPrefs != null && fromPrefs.isNotEmpty) return fromPrefs;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Hides the Android incoming notification after the user **accepts** (we do
+  /// not send [endCall] here — that is for decline/teardown).
+  ///
+  /// Does **not** clear SharedPreferences: the persisted CallKit UUID must stay
+  /// until [endCurrentCall] runs when the conversation ends (local hang-up or
+  /// remote `call-end`). Otherwise Android keeps a stale "incoming/upcoming"
+  /// notification because [hideCallkitIncoming] cannot be matched to an id.
+  Future<void> dismissIncomingCallNotification() async {
+    final id = await _resolveActiveCallId();
+    if (id != null && id.isNotEmpty) {
+      await _hideIncomingTrayForId(id);
+    }
+    _currentCallId = null;
+    _lastShowTime = null;
   }
 
   /// End/dismiss the current incoming call UI.
   Future<void> endCurrentCall() async {
-    if (_currentCallId != null) {
-      await FlutterCallkitIncoming.endCall(_currentCallId!);
+    final id = await _resolveActiveCallId();
+    if (id != null && id.isNotEmpty) {
+      await _hideIncomingTrayForId(id);
+      try {
+        await FlutterCallkitIncoming.endCall(id);
+      } catch (e) {
+        AppLogger.w('📞 [CallKit] endCall failed: $e');
+      }
     }
-    // Also end ALL calls as belt-and-suspenders (catches stale calls)
-    await FlutterCallkitIncoming.endAllCalls();
+    try {
+      await FlutterCallkitIncoming.endAllCalls();
+    } catch (e) {
+      AppLogger.w('📞 [CallKit] endAllCalls failed: $e');
+    }
     _currentCallId = null;
+    _lastShowTime = null;
     await clearPendingIncomingCall();
   }
 
   /// End all calls (cleanup).
   Future<void> endAllCalls() async {
+    try {
+      final raw = await FlutterCallkitIncoming.activeCalls();
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final cid = item['id']?.toString();
+            if (cid != null && cid.isNotEmpty) {
+              await _hideIncomingTrayForId(cid);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.w('📞 [CallKit] activeCalls before endAllCalls: $e');
+    }
     await FlutterCallkitIncoming.endAllCalls();
     _currentCallId = null;
+    _lastShowTime = null;
     await clearPendingIncomingCall();
   }
 
@@ -246,29 +371,15 @@ class CallKitService {
 
     if (type == 'call_cancel') {
       AppLogger.i('📞 FCM call_cancel detected — dismissing native call UI');
-      // 1. Try ending by persisted UUID (most reliable cross-isolate approach)
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final uuid = prefs.getString(_pendingCallUuidKey);
-        if (uuid != null && uuid.isNotEmpty) {
-          AppLogger.i('📞 Ending call by persisted UUID: $uuid');
-          await FlutterCallkitIncoming.endCall(uuid);
-        }
+        await CallKitService.instance.endCurrentCall();
       } catch (e) {
-        AppLogger.e('📞 endCall(uuid) failed: $e');
+        AppLogger.e('📞 call_cancel endCurrentCall failed: $e');
       }
-      // 2. Belt-and-suspenders: also endAllCalls
-      try {
-        await FlutterCallkitIncoming.endAllCalls();
-      } catch (e) {
-        AppLogger.e('📞 endAllCalls() failed: $e');
-      }
-      // 3. Retry after short delay (Samsung OneUI sometimes needs this)
       try {
         await Future.delayed(const Duration(milliseconds: 500));
         await FlutterCallkitIncoming.endAllCalls();
       } catch (_) {}
-      await clearPendingIncomingCall();
       return true;
     }
 

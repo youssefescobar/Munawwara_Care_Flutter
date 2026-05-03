@@ -224,9 +224,14 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       final last = await Geolocator.getLastKnownPosition();
       if (last != null && mounted) {
         final age = DateTime.now().difference(last.timestamp);
-        if (age.inMinutes < 30) {
+        final acc = last.accuracy;
+        final accOk = !acc.isInfinite && acc >= 0 && acc <= 8000;
+        if (age <= const Duration(hours: 8) && accOk) {
           setState(() => _myLocation = LatLng(last.latitude, last.longitude));
-          _mapController.move(_myLocation!, 15);
+          _mapController.move(
+            _myLocation!,
+            AppMapTiles.clampMapZoom(15),
+          );
         }
       }
     } catch (_) {}
@@ -235,12 +240,15 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 20),
+          timeLimit: Duration(seconds: 12),
         ),
       );
       if (!mounted) return;
       setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
-      _mapController.move(_myLocation!, 15);
+      _mapController.move(
+        _myLocation!,
+        AppMapTiles.clampMapZoom(15),
+      );
 
       if (_navBeaconEnabled) {
         final auth = ref.read(authProvider);
@@ -260,8 +268,8 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     _locationSub =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 30,
+            accuracy: LocationAccuracy.medium,
+            distanceFilter: 25,
           ),
         ).listen((pos) {
           if (mounted) {
@@ -293,7 +301,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       return;
     }
     setState(() => _focusedPilgrimId = p.id);
-    _mapController.move(LatLng(p.lat!, p.lng!), 17);
+    _mapController.move(
+      LatLng(p.lat!, p.lng!),
+      AppMapTiles.clampMapZoom(17),
+    );
     _dssController.animateTo(
       0.28,
       duration: const Duration(milliseconds: 300),
@@ -1215,7 +1226,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                       Navigator.pop(ctx);
                                       _mapController.move(
                                         LatLng(area.latitude, area.longitude),
-                                        17,
+                                        AppMapTiles.clampMapZoom(17),
                                       );
                                     },
                                     child: Container(
@@ -1391,7 +1402,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
               GestureDetector(
                 onTap: () {
                   if (_myLocation != null) {
-                    _mapController.move(_myLocation!, 16);
+                    _mapController.move(
+                      _myLocation!,
+                      AppMapTiles.clampMapZoom(16),
+                    );
                   }
                 },
                 child: AnimatedContainer(
@@ -1506,7 +1520,9 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _myLocation ?? const LatLng(21.3891, 39.8579),
-              initialZoom: 14,
+              initialZoom: AppMapTiles.clampMapZoom(14),
+              minZoom: AppMapTiles.mapMinZoom,
+              maxZoom: AppMapTiles.mapMaxZoom,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all,
               ),
@@ -1929,7 +1945,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                     areaState.activeMeetpoint!.latitude,
                                     areaState.activeMeetpoint!.longitude,
                                   ),
-                                  17,
+                                  AppMapTiles.clampMapZoom(17),
                                 );
                                 _dssController.animateTo(
                                   0.08,

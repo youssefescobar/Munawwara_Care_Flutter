@@ -26,8 +26,10 @@ import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
+import '../../calling/providers/missed_calls_unread_provider.dart';
+import '../../calling/screens/call_history_screen.dart';
 import '../../calling/screens/voice_call_screen.dart';
-import '../../../main.dart' show isNavigatingToCall;
+import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/screens/alerts_tab.dart';
 import '../../shared/providers/message_provider.dart';
@@ -102,6 +104,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
       _loadWeatherAlert(force: true);
+      ref.read(missedCallsUnreadProvider.notifier).refresh();
     }
   }
 
@@ -317,6 +320,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         // Listen for missed calls — refresh notifications so badge + list update
         SocketService.on('missed-call-received', (_) {
           _refreshRealtimeState();
+          ref.read(missedCallsUnreadProvider.notifier).refresh();
         });
 
         // Keep pilgrim dashboard synced when group composition/meta changes
@@ -363,6 +367,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       }
       // Fetch notification badge count
       ref.read(notificationProvider.notifier).fetchUnreadCount();
+      ref.read(missedCallsUnreadProvider.notifier).refresh();
       // Fire weather load immediately (don't await — let it run in parallel)
       _loadWeatherAlert(force: true);
       _initLocation();
@@ -420,39 +425,69 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
   // ── Location ────────────────────────────────────────────────────────────────
 
+  bool _isUsableLastKnown(Position p) {
+    final age = DateTime.now().difference(p.timestamp);
+    if (age > const Duration(hours: 8)) return false;
+    final acc = p.accuracy;
+    if (acc.isInfinite || acc < 0) return false;
+    return acc <= 8000;
+  }
+
+  Future<void> _applyPilgrimGpsPosition(Position pos) async {
+    if (!mounted) return;
+    final ll = LatLng(pos.latitude, pos.longitude);
+    setState(() => _myLatLng = ll);
+    _loadWeatherAlert(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      force: false,
+    );
+    int? battery;
+    try {
+      final lvl = await _battery.batteryLevel;
+      battery = lvl;
+      ref.read(pilgrimProvider.notifier).setBattery(lvl);
+    } catch (_) {}
+    ref.read(pilgrimProvider.notifier).updateLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          batteryPercent: battery,
+        );
+  }
+
   Future<void> _initLocation() async {
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) return;
     if (!mounted) return;
 
-    _locationSub =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 20, // metres
-          ),
-        ).listen((pos) async {
-          final ll = LatLng(pos.latitude, pos.longitude);
-          setState(() => _myLatLng = ll);
-          _loadWeatherAlert(
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            force: false,
-          );
-          int? battery;
-          try {
-            final lvl = await _battery.batteryLevel;
-            battery = lvl;
-            ref.read(pilgrimProvider.notifier).setBattery(lvl);
-          } catch (_) {}
-          ref
-              .read(pilgrimProvider.notifier)
-              .updateLocation(
-                latitude: pos.latitude,
-                longitude: pos.longitude,
-                batteryPercent: battery,
-              );
-        });
+    // 1) Cached / fused location — map + backend update immediately when usable.
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null && _isUsableLastKnown(last)) {
+        await _applyPilgrimGpsPosition(last);
+      }
+    } catch (_) {}
+
+    // 2) Fast network-assisted fix (avoids waiting on cold GPS alone).
+    try {
+      final quick = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      await _applyPilgrimGpsPosition(quick);
+    } catch (_) {}
+
+    // 3) Ongoing updates — medium accuracy reaches first fix much faster than high.
+    _locationSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 12,
+      ),
+    ).listen((pos) {
+      unawaited(_applyPilgrimGpsPosition(pos));
+    });
   }
 
   Future<void> _loadWeatherAlert({
@@ -677,33 +712,19 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           onInternetCall: () {
             final mods = ref.read(pilgrimProvider).groupInfo?.moderators ?? [];
             if (mods.isNotEmpty) {
-              final shuffledMods = List.of(mods)..shuffle();
-              
-              // Map to List<Map<String, String>>
-              final autoRouteMods = shuffledMods.map((m) => {
-                'id': m.id,
-                'name': m.fullName,
-              }).toList();
-              
-              final firstMod = autoRouteMods.removeAt(0);
+              final modMaps = mods
+                  .map((m) => {'id': m.id, 'name': m.fullName})
+                  .toList();
 
               Navigator.pop(ctx);
-              
-              ref.read(callProvider.notifier).startCall(
-                remoteUserId: firstMod['id']!,
-                remoteUserName: firstMod['name']!,
-              );
-              
+
+              ref.read(callProvider.notifier).startGroupModeratorCall(modMaps);
+
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => VoiceCallScreen(
-                  autoRouteMods: autoRouteMods,
-                  onAllBusy: () {
-                    if (mounted) {
-                      StandardSnackBar.showError(context, 'sos_all_busy_warning');
-                    }
-                  },
-                )),
+                MaterialPageRoute(
+                  builder: (_) => const VoiceCallScreen(),
+                ),
               );
             } else {
               StandardSnackBar.showWarning(context, 'dash_no_moderator_call');
@@ -831,6 +852,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final notifCount = ref.watch(notificationProvider).unreadCount;
+    final missedCallUnread = ref.watch(missedCallsUnreadProvider);
 
     // Fallback: if an incoming call was accepted and we're connected,
     // navigate to VoiceCallScreen from here.
@@ -899,6 +921,18 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
                 ref.read(notificationProvider.notifier).fetchUnreadCount();
               });
         },
+        missedCallUnreadCount: missedCallUnread,
+        onMissedCallsTap: () {
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const CallHistoryScreen(missedOnly: true),
+                ),
+              )
+              .then((_) {
+                ref.read(missedCallsUnreadProvider.notifier).refresh();
+              });
+        },
         onSettingsTap: () => setState(() => _currentTab = 4),
         onGroupCardTap: () {
           if (pilgrimState.groupInfo != null) {
@@ -928,7 +962,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         },
         onHotspotsTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MeccaHotspotsScreen()),
+            MaterialPageRoute(
+              builder: (_) => MeccaHotspotsScreen(anchorLocation: _myLatLng),
+            ),
           );
         },
       ),
@@ -1006,6 +1042,8 @@ class _HomeTab extends StatelessWidget {
   final void Function(ModeratorBeacon) onNavigateToModerator;
   final int notificationCount;
   final VoidCallback onNotificationTap;
+  final int missedCallUnreadCount;
+  final VoidCallback onMissedCallsTap;
   final VoidCallback onSettingsTap;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
@@ -1027,6 +1065,8 @@ class _HomeTab extends StatelessWidget {
     required this.onNavigateToModerator,
     required this.notificationCount,
     required this.onNotificationTap,
+    required this.missedCallUnreadCount,
+    required this.onMissedCallsTap,
     required this.onSettingsTap,
     required this.onGroupCardTap,
     required this.onHotspotsTap,
@@ -1086,6 +1126,56 @@ class _HomeTab extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
+                          GestureDetector(
+                            onTap: onMissedCallsTap,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(10.w),
+                                  decoration: BoxDecoration(
+                                    color: iconContainerBg,
+                                    borderRadius: BorderRadius.circular(14.r),
+                                  ),
+                                  child: Icon(
+                                    Symbols.notifications,
+                                    size: 22.w,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                if (missedCallUnreadCount > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: -2,
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 5.w,
+                                        vertical: 2.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade600,
+                                        borderRadius: BorderRadius.circular(10.r),
+                                      ),
+                                      constraints: BoxConstraints(minWidth: 16.w),
+                                      child: Text(
+                                        missedCallUnreadCount > 9
+                                            ? '9+'
+                                            : '$missedCallUnreadCount',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9.sp,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'Lexend',
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
                           GestureDetector(
                             onTap: onSettingsTap,
                             child: Container(
@@ -2266,7 +2356,9 @@ class _PilgrimMapTab extends StatelessWidget {
           mapController: mapController,
           options: MapOptions(
             initialCenter: myLocation ?? const LatLng(21.3891, 39.8579),
-            initialZoom: 15,
+            initialZoom: AppMapTiles.clampMapZoom(15),
+            minZoom: AppMapTiles.mapMinZoom,
+            maxZoom: AppMapTiles.mapMaxZoom,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
@@ -2404,7 +2496,10 @@ class _PilgrimMapTab extends StatelessWidget {
           child: GestureDetector(
             onTap: () {
               if (myLocation != null) {
-                mapController.move(myLocation!, 15);
+                mapController.move(
+                  myLocation!,
+                  AppMapTiles.clampMapZoom(15),
+                );
               }
             },
             child: Container(
@@ -2438,7 +2533,10 @@ class _PilgrimMapTab extends StatelessWidget {
             child: GestureDetector(
               onTap: () {
                 final mp = areas.firstWhere((a) => a.isMeetpoint);
-                mapController.move(LatLng(mp.latitude, mp.longitude), 17);
+                mapController.move(
+                  LatLng(mp.latitude, mp.longitude),
+                  AppMapTiles.clampMapZoom(17),
+                );
                 _showAreaInfo(context, mp);
               },
               child: Container(
@@ -2651,9 +2749,11 @@ class _SuggestionsCycleButtonState extends State<_SuggestionsCycleButton> {
                             Navigator.pop(ctx);
                             widget.mapController.move(
                               LatLng(area.latitude, area.longitude),
-                              widget.mapController.camera.zoom > 16.0
-                                  ? widget.mapController.camera.zoom
-                                  : 16.5,
+                              AppMapTiles.clampMapZoom(
+                                widget.mapController.camera.zoom > 16.0
+                                    ? widget.mapController.camera.zoom
+                                    : 16.5,
+                              ),
                             );
                             widget.onAreaSelected(area);
                           },

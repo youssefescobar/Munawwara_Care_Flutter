@@ -284,6 +284,12 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                                 )
                             )
                         }
+                    } else if (context != null && data.id.isNotEmpty()) {
+                        // No ACTIVE_CALLS match (e.g. accepted only from Flutter / prefs cleared).
+                        // Still cancel incoming + ongoing notifications and stop foreground service.
+                        getCallkitNotificationManager()?.clearIncomingNotification(data.toBundle(), false)
+                        CallkitNotificationService.stopService(requireNotNull(context))
+                        removeCall(context, data)
                     }
                     result.success(true)
                 }
@@ -293,6 +299,9 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                     val data = Data(call.arguments() ?: HashMap())
                     val currentCall = calls.firstOrNull { it.id == data.id }
                     if (currentCall != null && context != null) {
+                        // Flutter accepted in-app: native never got ACTION_CALL_ACCEPT — fix
+                        // isAccepted so endCall routes to ENDED and tears down ongoing FGS.
+                        addCall(requireNotNull(context), currentCall, true)
                         context?.sendBroadcast(
                             CallkitIncomingBroadcastReceiver.getIntentConnected(
                                 requireNotNull(context),
@@ -305,21 +314,26 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
 
                 "endAllCalls" -> {
                     val calls = getDataActiveCalls(context)
-                    calls.forEach {
-                        if (it.isAccepted) {
-                            context?.sendBroadcast(
-                                CallkitIncomingBroadcastReceiver.getIntentEnded(
-                                    requireNotNull(context),
-                                    it.toBundle()
+                    if (calls.isEmpty() && context != null) {
+                        // Nothing in prefs but foreground / tray may still be visible.
+                        CallkitNotificationService.stopService(requireNotNull(context))
+                    } else {
+                        calls.forEach {
+                            if (it.isAccepted) {
+                                context?.sendBroadcast(
+                                    CallkitIncomingBroadcastReceiver.getIntentEnded(
+                                        requireNotNull(context),
+                                        it.toBundle()
+                                    )
                                 )
-                            )
-                        } else {
-                            context?.sendBroadcast(
-                                CallkitIncomingBroadcastReceiver.getIntentDecline(
-                                    requireNotNull(context),
-                                    it.toBundle()
+                            } else {
+                                context?.sendBroadcast(
+                                    CallkitIncomingBroadcastReceiver.getIntentDecline(
+                                        requireNotNull(context),
+                                        it.toBundle()
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                     removeAllCalls(context)

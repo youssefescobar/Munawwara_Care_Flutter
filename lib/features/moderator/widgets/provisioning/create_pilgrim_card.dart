@@ -227,7 +227,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                   flex: 2,
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
-                    value: _selectedLanguage,
+                    initialValue: _selectedLanguage,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: widget.isDark,
                       labelText: 'settings_language'.tr(),
@@ -294,7 +294,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
-                    value: _selectedEthnicity,
+                    initialValue: _selectedEthnicity,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: widget.isDark,
                       labelText: 'ethnicity'.tr(),
@@ -323,7 +323,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
-                    value: _selectedVisaStatus,
+                    initialValue: _selectedVisaStatus,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: widget.isDark,
                       labelText: 'profile_visa_status'.tr(),
@@ -363,7 +363,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                 children: [
                   SizedBox(height: 8.h),
                   DropdownButtonFormField<String?>(
-                    value: _selectedHotelId,
+                    initialValue: _selectedHotelId,
                     isExpanded: true,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: widget.isDark,
@@ -408,7 +408,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String?>(
-                          value: _selectedRoomId,
+                          initialValue: _selectedRoomId,
                           isExpanded: true,
                           decoration: AppDropdownTheme.formFieldDecoration(
                             isDark: widget.isDark,
@@ -461,7 +461,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                       SizedBox(width: 12.w),
                       Expanded(
                         child: DropdownButtonFormField<String?>(
-                          value: _selectedBusId,
+                          initialValue: _selectedBusId,
                           isExpanded: true,
                           decoration: AppDropdownTheme.formFieldDecoration(
                             isDark: widget.isDark,

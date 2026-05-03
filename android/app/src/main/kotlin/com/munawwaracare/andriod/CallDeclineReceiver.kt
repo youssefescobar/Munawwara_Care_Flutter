@@ -70,8 +70,9 @@ class CallDeclineReceiver : BroadcastReceiver() {
         Log.i(TAG, "📵 Declining callerId=$callerId via $baseUrl")
 
         // BroadcastReceivers must not block the main thread.
+        val noAnswer = action == ACTION_TIMEOUT
         thread(name = "CallDeclineHTTP") {
-            sendDeclineHttp(baseUrl, callerId)
+            sendDeclineHttp(baseUrl, callerId, noAnswer)
         }
     }
 
@@ -117,7 +118,7 @@ class CallDeclineReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun sendDeclineHttp(baseUrl: String, callerId: String) {
+    private fun sendDeclineHttp(baseUrl: String, callerId: String, noAnswer: Boolean) {
         repeat(2) { attempt -> // retry once on failure
             try {
                 val url = URL("$baseUrl/call-history/decline")
@@ -128,7 +129,9 @@ class CallDeclineReceiver : BroadcastReceiver() {
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
 
-                val body = """{"callerId":"$callerId"}"""
+                val body =
+                    if (noAnswer) """{"callerId":"$callerId","noAnswer":true}"""
+                    else """{"callerId":"$callerId"}"""
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body) }
 
                 val code = conn.responseCode

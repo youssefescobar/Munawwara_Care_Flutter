@@ -2,6 +2,8 @@
 // GroupMessage  &  MessageSender  –  shared message data models
 // ─────────────────────────────────────────────────────────────────────────────
 
+import '../../../core/utils/app_logger.dart';
+
 class MessageSender {
   final String id;
   final String fullName;
@@ -17,7 +19,7 @@ class MessageSender {
         role: j['role']?.toString(),
       );
     } catch (e) {
-      print('[MessageSender] Error parsing fromJson: $e');
+      AppLogger.w('[MessageSender] Error parsing fromJson: $e');
       return const MessageSender(id: '', fullName: 'Unknown');
     }
   }
@@ -94,7 +96,7 @@ class GroupMessage {
             : DateTime.now(),
       );
     } catch (e) {
-      print('[GroupMessage] Error parsing fromJson: $e');
+      AppLogger.w('[GroupMessage] Error parsing fromJson: $e');
       rethrow;
     }
   }

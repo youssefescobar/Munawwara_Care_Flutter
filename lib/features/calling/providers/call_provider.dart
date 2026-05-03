@@ -1,22 +1,28 @@
+// Voice-call stack (Flutter side):
+// • [NativeCallCoordinator] — CallKit events, cold-start pending accept, FCM
+//   call_cancel / call_declined (foreground), navigation to [VoiceCallScreen].
+// • [CallSignaling] — socket emits with reconnect queue + HTTP answer/decline.
+// • [CallKitService] — native incoming UI + prefs for UUID / dismiss.
+// • [CallNotifier] (this file) — Riverpod state + Agora join/leave lifecycle.
 import 'dart:async';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../auth/providers/auth_provider.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/router/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../main.dart'
-    show
-        consumePendingAcceptedCall,
-        consumePendingDeclinedCallerId,
-        isNavigatingToCall;
+import '../call_signaling.dart';
+import '../native_call_coordinator.dart';
 import '../screens/voice_call_screen.dart';
 
 /// Read at first use (after dotenv.load has run in main).
@@ -32,6 +38,12 @@ class CallState {
   final CallStatus status;
   final String? remoteUserId;
   final String? remoteUserName;
+  /// When non-null (pilgrim incoming), use for in-app ringing UI instead of [remoteUserName].
+  final String? incomingDisplayName;
+  /// Pilgrim SOS: parallel ring to all group moderators until one answers.
+  final bool isGroupRingingOut;
+  /// Pilgrim receiving a moderator call: show support name + app logo in-app (not peer personal name).
+  final bool displayPeerAsSupportBranding;
   final bool isMuted;
   final bool isSpeakerOn;
   final int durationSeconds;
@@ -42,6 +54,9 @@ class CallState {
     this.status = CallStatus.idle,
     this.remoteUserId,
     this.remoteUserName,
+    this.incomingDisplayName,
+    this.isGroupRingingOut = false,
+    this.displayPeerAsSupportBranding = false,
     this.isMuted = false,
     this.isSpeakerOn = false,
     this.durationSeconds = 0,
@@ -63,6 +78,10 @@ class CallState {
     CallStatus? status,
     String? remoteUserId,
     String? remoteUserName,
+    String? incomingDisplayName,
+    bool? clearIncomingDisplayName,
+    bool? isGroupRingingOut,
+    bool? displayPeerAsSupportBranding,
     bool? isMuted,
     bool? isSpeakerOn,
     int? durationSeconds,
@@ -72,6 +91,12 @@ class CallState {
       status: status ?? this.status,
       remoteUserId: remoteUserId ?? this.remoteUserId,
       remoteUserName: remoteUserName ?? this.remoteUserName,
+      incomingDisplayName: clearIncomingDisplayName == true
+          ? null
+          : (incomingDisplayName ?? this.incomingDisplayName),
+      isGroupRingingOut: isGroupRingingOut ?? this.isGroupRingingOut,
+      displayPeerAsSupportBranding:
+          displayPeerAsSupportBranding ?? this.displayPeerAsSupportBranding,
       isMuted: isMuted ?? this.isMuted,
       isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
       durationSeconds: durationSeconds ?? this.durationSeconds,
@@ -118,16 +143,78 @@ class CallNotifier extends Notifier<CallState> {
   // PUBLIC API
   // ════════════════════════════════════════════════════════════════════════════
 
+  /// Pilgrim SOS: ring every moderator in [moderators] in parallel (server
+  /// fans out); first answer wins. Uses one Agora [channelName].
+  Future<void> startGroupModeratorCall(
+    List<Map<String, String>> moderators,
+  ) async {
+    if (state.isInCall) return;
+    final ids = moderators
+        .map((m) => m['id'] ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (ids.isEmpty) return;
+
+    final supportLabel = 'call_support_display_name'.tr();
+
+    state = CallState(
+      status: CallStatus.calling,
+      remoteUserId: ids.first,
+      remoteUserName: supportLabel,
+      isGroupRingingOut: true,
+      displayPeerAsSupportBranding: true,
+    );
+
+    try {
+      await [Permission.microphone].request();
+      final channelName = 'call_${DateTime.now().millisecondsSinceEpoch}';
+      AppLogger.i('[CallProvider] Group moderator ring on $channelName → $ids');
+      await _setupEngine();
+      await _engine!.joinChannel(
+        token: '',
+        channelId: channelName,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        ),
+      );
+      CallSignaling.emitWhenConnected('call-offer-group', {
+        'targets': ids,
+        'channelName': channelName,
+      });
+      _startRingPoll(ids.first);
+    } catch (e) {
+      _stopRingPoll();
+      _cleanup();
+      state = CallState(
+        status: CallStatus.ended,
+        endReason: 'error',
+        remoteUserId: state.remoteUserId,
+        remoteUserName: state.remoteUserName,
+      );
+      _scheduleReset();
+    }
+  }
+
   /// Moderator initiates an internet call to [remoteUserId].
+  /// Pilgrim one-to-one ring (e.g. SOS auto-route): show support branding, not
+  /// the moderator’s personal name or raw id in UI.
   Future<void> startCall({
     required String remoteUserId,
     required String remoteUserName,
   }) async {
     if (state.isInCall) return;
+    final isPilgrimCaller =
+        ref.read(authProvider).role?.toLowerCase() == 'pilgrim';
+    final displayName =
+        isPilgrimCaller ? 'call_support_display_name'.tr() : remoteUserName;
     state = CallState(
       status: CallStatus.calling,
       remoteUserId: remoteUserId,
-      remoteUserName: remoteUserName,
+      remoteUserName: displayName,
+      isGroupRingingOut: false,
+      displayPeerAsSupportBranding: isPilgrimCaller,
     );
 
     try {
@@ -148,7 +235,7 @@ class CallNotifier extends Notifier<CallState> {
       AppLogger.i(
         '[CallProvider] → Emitting call-offer to $remoteUserId on channel $channelName',
       );
-      SocketService.emit('call-offer', {
+      CallSignaling.emitWhenConnected('call-offer', {
         'to': remoteUserId,
         'channelName': channelName,
       });
@@ -233,10 +320,27 @@ class CallNotifier extends Notifier<CallState> {
 
     final fromId = _pendingFromId;
     final channelName = _pendingChannelName!;
-    state = state.copyWith(status: CallStatus.connected, durationSeconds: 0);
+    state = state.copyWith(
+      status: CallStatus.connected,
+      durationSeconds: 0,
+      clearIncomingDisplayName: true,
+    );
 
     try {
       await [Permission.microphone].request();
+      // Signal the server immediately — do not wait for Agora. The backend
+      // ring-timeout (30s) clears when it receives call-answer / REST answer;
+      // if joinChannel runs first, a slow SDK can miss the window and the
+      // caller gets "Call Not Answered" even after the callee tapped Accept.
+      if (fromId != null && fromId.isNotEmpty) {
+        CallSignaling.emitWhenConnected('call-answer', {'to': fromId});
+        CallSignaling.notifyAnswerHttp(fromId, SocketService.connectedUserId);
+      } else {
+        AppLogger.e(
+          '[CallProvider] Cannot signal call-answer: missing caller id (fromId=$fromId)',
+        );
+      }
+
       AppLogger.i('[CallProvider] Accepting call on channel: $channelName');
       await _setupEngine();
       await _engine!.joinChannel(
@@ -248,19 +352,20 @@ class CallNotifier extends Notifier<CallState> {
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
         ),
       );
-      if (fromId != null && fromId.isNotEmpty) {
-        _emitWhenConnected('call-answer', {'to': fromId});
-        // HTTP fallback — critical for killed/background state where socket
-        // is not yet connected, so socket-only signaling can be delayed/lost.
-        _notifyCallAnswerViaHttp(fromId);
-      } else {
-        AppLogger.e(
-          '[CallProvider] Cannot signal call-answer: missing caller id (fromId=$fromId)',
-        );
-      }
       _pendingChannelName = null;
       _pendingFromId = null;
       _startTimer();
+      // Android: mark call connected so native prefs use isAccepted=true; otherwise
+      // endCall() routes to DECLINE and never stops CallkitNotificationService FGS.
+      final callKitId = await CallKitService.instance.peekCallKitNotificationId();
+      if (callKitId != null && callKitId.isNotEmpty) {
+        try {
+          await FlutterCallkitIncoming.setCallConnected(callKitId);
+        } catch (e) {
+          AppLogger.w('[CallProvider] setCallConnected failed: $e');
+        }
+      }
+      await CallKitService.instance.dismissIncomingCallNotification();
     } catch (e) {
       _cleanup();
       state = CallState(
@@ -277,10 +382,11 @@ class CallNotifier extends Notifier<CallState> {
   void declineCall() {
     final remoteId = state.remoteUserId;
     if (remoteId != null) {
-      _emitWhenConnected('call-declined', {'to': remoteId});
-      // HTTP fallback — critical for killed/background state where socket
-      // is not yet connected, so the socket emit above is a silent no-op.
-      _notifyCallDeclineViaHttp(remoteId);
+      CallSignaling.emitWhenConnected('call-declined', {'to': remoteId});
+      CallSignaling.notifyDeclineHttp(
+        remoteId,
+        SocketService.connectedUserId,
+      );
     }
     // Dismiss native call screen
     CallKitService.instance.endCurrentCall();
@@ -294,17 +400,50 @@ class CallNotifier extends Notifier<CallState> {
     _scheduleReset();
   }
 
-  /// Decline a call when we only have the caller id (killed-state fallback).
-  void declineCallFromCallerId(String callerId) {
-    if (callerId.isNotEmpty) {
-      _emitWhenConnected('call-declined', {'to': callerId});
-      _notifyCallDeclineViaHttp(callerId);
+  /// Incoming ring timed out (CallKit) — server records **missed**, not declined.
+  void declineCallAsNoAnswer() {
+    final remoteId = state.remoteUserId;
+    if (remoteId != null) {
+      CallSignaling.emitWhenConnected('call-declined', {
+        'to': remoteId,
+        'noAnswer': true,
+      });
+      CallSignaling.notifyDeclineHttp(
+        remoteId,
+        SocketService.connectedUserId,
+        noAnswer: true,
+      );
     }
     CallKitService.instance.endCurrentCall();
     _cleanup();
     state = CallState(
       status: CallStatus.ended,
-      endReason: 'declined',
+      endReason: 'missed',
+      remoteUserId: state.remoteUserId,
+      remoteUserName: state.remoteUserName,
+    );
+    _scheduleReset();
+  }
+
+  /// Decline a call when we only have the caller id (killed-state fallback).
+  /// [noAnswer] — native ring timeout / no pickup (counts as missed, not declined).
+  void declineCallFromCallerId(String callerId, {bool noAnswer = false}) {
+    if (callerId.isNotEmpty) {
+      CallSignaling.emitWhenConnected('call-declined', {
+        'to': callerId,
+        if (noAnswer) 'noAnswer': true,
+      });
+      CallSignaling.notifyDeclineHttp(
+        callerId,
+        SocketService.connectedUserId,
+        noAnswer: noAnswer,
+      );
+    }
+    CallKitService.instance.endCurrentCall();
+    _cleanup();
+    state = CallState(
+      status: CallStatus.ended,
+      endReason: noAnswer ? 'missed' : 'declined',
       remoteUserId: callerId,
       remoteUserName: state.remoteUserName,
     );
@@ -315,7 +454,7 @@ class CallNotifier extends Notifier<CallState> {
   void endCall() {
     _stopRingPoll();
     if (state.remoteUserId != null) {
-      SocketService.emit('call-end', {'to': state.remoteUserId});
+      CallSignaling.emitWhenConnected('call-end', {'to': state.remoteUserId!});
     }
     // Dismiss native call screen
     CallKitService.instance.endCurrentCall();
@@ -329,6 +468,47 @@ class CallNotifier extends Notifier<CallState> {
     _scheduleReset();
   }
 
+  /// Caller cancelled while still ringing — notify callee only via `call-cancel`.
+  /// Never emit `call-end` here: the server treats `call-end` during `ringing`
+  /// as a missed call and mis-notifies the recipient.
+  void cancelOutgoingRing() {
+    _stopRingPoll();
+    if (state.isGroupRingingOut) {
+      CallSignaling.emitWhenConnected('group-call-cancel', <String, dynamic>{});
+    } else {
+      final remoteId = state.remoteUserId;
+      if (remoteId != null && remoteId.isNotEmpty) {
+        CallSignaling.emitWhenConnected('call-cancel', {'to': remoteId});
+      }
+    }
+    CallKitService.instance.endCurrentCall();
+    _cleanup();
+    state = CallState(
+      status: CallStatus.ended,
+      endReason: 'cancelled',
+      remoteUserId: state.remoteUserId,
+      remoteUserName: state.remoteUserName,
+    );
+    _scheduleReset();
+  }
+
+  /// Dismiss local ringing UI after the peer or server already signalled
+  /// (FCM `call_cancel` / `call_declined`). Does not emit `call-end`.
+  void stopLocalCallSession({required String endReason}) {
+    _stopRingPoll();
+    CallKitService.instance.endCurrentCall();
+    final prevName = state.remoteUserName;
+    final prevId = state.remoteUserId;
+    _cleanup();
+    state = CallState(
+      status: CallStatus.ended,
+      endReason: endReason,
+      remoteUserId: prevId,
+      remoteUserName: prevName,
+    );
+    _scheduleReset();
+  }
+
   /// Accept a call that arrived via FCM (background/terminated state).
   /// Called when the user taps "Accept" on the native call screen and the
   /// app was not running (so no socket call-offer was received).
@@ -338,6 +518,11 @@ class CallNotifier extends Notifier<CallState> {
     required String channelName,
   }) async {
     if (state.isInCall) return;
+
+    final prefsEarly = await SharedPreferences.getInstance();
+    final isPilgrimCallee = prefsEarly.getString('user_role') == 'pilgrim';
+    final calleeDisplayName =
+        isPilgrimCallee ? 'call_support_display_name'.tr() : callerName;
 
     AppLogger.i(
       '[CallProvider] Accepting FCM call from $callerName on $channelName',
@@ -363,7 +548,7 @@ class CallNotifier extends Notifier<CallState> {
           status: CallStatus.ended,
           endReason: 'cancelled',
           remoteUserId: callerId,
-          remoteUserName: callerName,
+          remoteUserName: calleeDisplayName,
         );
         _scheduleReset();
         return;
@@ -381,7 +566,9 @@ class CallNotifier extends Notifier<CallState> {
     state = CallState(
       status: CallStatus.ringing,
       remoteUserId: callerId,
-      remoteUserName: callerName,
+      remoteUserName: calleeDisplayName,
+      incomingDisplayName: isPilgrimCallee ? calleeDisplayName : null,
+      displayPeerAsSupportBranding: isPilgrimCallee,
     );
 
     await acceptCall();
@@ -415,12 +602,12 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   Future<void> checkPendingDeclinedCall() async {
-    final callerId = consumePendingDeclinedCallerId();
-    if (callerId != null && callerId.isNotEmpty) {
+    final pending = consumePendingDeclined();
+    if (pending != null && pending.callerId.isNotEmpty) {
       AppLogger.i(
-        '[CallProvider] Found pending declined call for caller=$callerId',
+        '[CallProvider] Found pending declined call for caller=${pending.callerId} noAnswer=${pending.noAnswer}',
       );
-      declineCallFromCallerId(callerId);
+      declineCallFromCallerId(pending.callerId, noAnswer: pending.noAnswer);
     }
   }
 
@@ -453,7 +640,10 @@ class CallNotifier extends Notifier<CallState> {
       AppLogger.w(
         '[CallProvider] Already in call (status=${state.status}) – sending busy',
       );
-      SocketService.emit('call-busy', {'to': payload['from']});
+      final busyTo = payload['from']?.toString();
+      if (busyTo != null && busyTo.isNotEmpty) {
+        CallSignaling.emitWhenConnected('call-busy', {'to': busyTo});
+      }
       return;
     }
 
@@ -486,6 +676,16 @@ class CallNotifier extends Notifier<CallState> {
     final callerInfo = payload['callerInfo'] as Map?;
     final callerName = callerInfo?['name'] as String? ?? 'Unknown';
     final callerRole = callerInfo?['role'] as String?;
+    final isPilgrim = ref.read(authProvider).role == 'pilgrim';
+    final String inAppDisplayName;
+    final String? supportLabel;
+    if (isPilgrim) {
+      supportLabel = 'call_support_display_name'.tr();
+      inAppDisplayName = supportLabel;
+    } else {
+      supportLabel = null;
+      inAppDisplayName = callerName;
+    }
 
     AppLogger.i(
       '[CallProvider] ✓ Incoming call from $callerName ($_pendingFromId) on channel $channelName',
@@ -502,14 +702,28 @@ class CallNotifier extends Notifier<CallState> {
     state = CallState(
       status: CallStatus.ringing,
       remoteUserId: _pendingFromId,
-      remoteUserName: callerName,
+      remoteUserName: inAppDisplayName,
+      incomingDisplayName: supportLabel,
+      displayPeerAsSupportBranding: isPilgrim,
     );
   }
 
   void _onAnswer(dynamic data) {
     _stopRingPoll(); // call was answered — stop polling
     _startTimer();
-    state = state.copyWith(status: CallStatus.connected, durationSeconds: 0);
+    Map<String, dynamic>? map;
+    if (data is Map) {
+      map = Map<String, dynamic>.from(data);
+    }
+    final answererId = map?['from']?.toString();
+    state = state.copyWith(
+      status: CallStatus.connected,
+      durationSeconds: 0,
+      isGroupRingingOut: false,
+      remoteUserId: (answererId != null && answererId.isNotEmpty)
+          ? answererId
+          : state.remoteUserId,
+    );
   }
 
   void _onRemoteDecline(dynamic _) {
@@ -528,6 +742,7 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   void _onRemoteEnd(dynamic _) {
+    _stopRingPoll();
     CallKitService.instance.endCurrentCall();
     final prevName = state.remoteUserName;
     final prevId = state.remoteUserId;
@@ -542,6 +757,7 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   void _onRemoteCancel(dynamic _) {
+    _stopRingPoll();
     CallKitService.instance.endCurrentCall();
     final prevName = state.remoteUserName;
     final prevId = state.remoteUserId;
@@ -573,60 +789,6 @@ class CallNotifier extends Notifier<CallState> {
   // PRIVATE HELPERS
   // ════════════════════════════════════════════════════════════════════════════
 
-  void _emitWhenConnected(String event, Map<String, dynamic> payload) {
-    if (SocketService.isConnected) {
-      SocketService.emit(event, payload);
-      return;
-    }
-
-    AppLogger.w('[CallProvider] Socket not connected, queueing "$event" emit');
-    void sendOnce() {
-      SocketService.emit(event, payload);
-      SocketService.offConnected(sendOnce);
-      AppLogger.i('[CallProvider] Queued "$event" emit sent after reconnect');
-    }
-
-    SocketService.onConnected(sendOnce);
-  }
-
-  /// HTTP fallback: notify the moderator (caller) that the call was answered.
-  /// Used when the app cold-starts from killed state and the socket is not
-  /// connected yet.  Fire-and-forget — errors are logged but don't block the
-  /// call flow.
-  void _notifyCallAnswerViaHttp(String callerId) {
-    final selfId = SocketService.connectedUserId;
-    ApiService.dio
-        .post(
-          '/call-history/answer',
-          data: {'callerId': callerId, 'answererId': selfId ?? ''},
-        )
-        .then(
-          (_) =>
-              AppLogger.i('[CallProvider] HTTP call-answer sent to $callerId'),
-        )
-        .catchError(
-          (e) => AppLogger.e('[CallProvider] HTTP call-answer failed: $e'),
-        );
-  }
-
-  /// HTTP fallback: notify the moderator (caller) that the call was declined.
-  void _notifyCallDeclineViaHttp(String callerId) {
-    final selfId = SocketService.connectedUserId;
-    ApiService.dio
-        .post(
-          '/call-history/decline',
-          data: {'callerId': callerId, 'declinerId': selfId ?? ''},
-        )
-        .then(
-          (_) => AppLogger.i(
-            '[CallProvider] HTTP call-declined sent to $callerId',
-          ),
-        )
-        .catchError(
-          (e) => AppLogger.e('[CallProvider] HTTP call-declined failed: $e'),
-        );
-  }
-
   Future<void> _setupEngine() async {
     if (_engine != null) return; // Reuse existing engine
     
@@ -648,7 +810,8 @@ class CallNotifier extends Notifier<CallState> {
           );
           // These must run AFTER joining the channel (not during setup),
           // otherwise the SDK returns ERR_NOT_READY (-3).
-          _engine?.setEnableSpeakerphone(true);
+          // Must match [CallState.isSpeakerOn] or UI shows earpiece while audio is on speaker.
+          _engine?.setEnableSpeakerphone(state.isSpeakerOn);
           _engine?.muteLocalAudioStream(false);
           _engine?.muteAllRemoteAudioStreams(false);
           _engine?.adjustRecordingSignalVolume(400);

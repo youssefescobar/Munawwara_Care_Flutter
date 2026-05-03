@@ -7,13 +7,14 @@ import 'dart:ui' as ui;
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
-import '../../../main.dart' show isNavigatingToCall;
+import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
 import '../../../core/services/notification_service.dart';
 import '../../notifications/providers/notification_provider.dart';
@@ -231,16 +232,16 @@ class _ModeratorDashboardScreenState
         // Listen for new group messages globally
         SocketService.on('new_message', (data) {
           if (!mounted) return;
-          print('[ModeratorDashboard] Socket event: new_message | Data: $data');
+          AppLogger.d('[ModeratorDashboard] Socket event: new_message | Data: $data');
           try {
             // socket.io can deliver data as Map<dynamic,dynamic> — cast safely
             final map = Map<String, dynamic>.from(data as Map);
-            print(
+            AppLogger.d(
               '[ModeratorDashboard] is_urgent value in map: ${map['is_urgent']} (type: ${map['is_urgent'].runtimeType})',
             );
             final groupId = map['group_id']?.toString();
             if (groupId == null) {
-              print('[ModeratorDashboard] Error: group_id is null in payload');
+              AppLogger.w('[ModeratorDashboard] Error: group_id is null in payload');
               return;
             }
 
@@ -255,19 +256,19 @@ class _ModeratorDashboardScreenState
                 : senderRaw?.toString();
 
             if (senderId == currentUserId) {
-              print('[ModeratorDashboard] Message from self, skipping badge');
+              AppLogger.d('[ModeratorDashboard] Message from self, skipping badge');
               return;
             }
 
             // If the user is actively reading this chat, clear count
             if (ref.read(messageProvider).activeGroupId == groupId) {
               ref.read(moderatorProvider.notifier).clearUnreadCount(groupId);
-              print('[ModeratorDashboard] User reading chat, skipping badge');
+              AppLogger.d('[ModeratorDashboard] User reading chat, skipping badge');
               return;
             }
 
             // Instantly increment unread count for UI badge
-            print(
+            AppLogger.d(
               '[ModeratorDashboard] Incrementing badge for group: $groupId',
             );
             ref.read(moderatorProvider.notifier).incrementUnreadCount(groupId);
@@ -323,13 +324,12 @@ class _ModeratorDashboardScreenState
         moderatorState.error == null &&
         !hasGroups;
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (_currentTab != 0) {
+    return PopScope(
+      canPop: _currentTab == 0,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (!didPop && _currentTab != 0) {
           setState(() => _currentTab = 0);
-          return false;
         }
-        return true;
       },
       child: Scaffold(
         backgroundColor: isDark
@@ -1733,29 +1733,6 @@ class _StatusBadge extends StatelessWidget {
           fontSize: 12.sp,
           color: Colors.white,
         ),
-      ),
-    );
-  }
-}
-
-class _UnreadBadge extends StatelessWidget {
-  const _UnreadBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 12.w,
-      height: 12.w,
-      decoration: BoxDecoration(
-        color: Colors.red,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withValues(alpha: 0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
     );
   }

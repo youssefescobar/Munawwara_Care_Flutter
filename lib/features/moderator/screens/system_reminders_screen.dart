@@ -483,7 +483,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     SizedBox(height: 12.h),
                     DropdownButtonFormField<String>(
                       key: const ValueKey('system_reminder_specific_group'),
-                      value: _selectedGroupIdForPilgrim != null &&
+                      initialValue: _selectedGroupIdForPilgrim != null &&
                               allGroups.any((g) => g.id == _selectedGroupIdForPilgrim)
                           ? _selectedGroupIdForPilgrim
                           : null,
@@ -547,7 +547,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             key: ValueKey(
                               'system_reminder_specific_pilgrim_$_selectedGroupIdForPilgrim',
                             ),
-                            value: validPilgrimId,
+                            initialValue: validPilgrimId,
                             decoration: AppDropdownTheme.formFieldDecoration(
                               isDark: isDark,
                               labelText: 'reminder_select_pilgrim'.tr(),

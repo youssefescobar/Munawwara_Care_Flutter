@@ -122,8 +122,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   AppLogger.i('   Data: ${message.data}');
 
   // ── Incoming call → show native call screen (like WhatsApp) ─────────────
+  final dataTypeEarly = message.data['type']?.toString() ?? '';
   final handled = await CallKitService.handleFcmMessage(message);
   if (handled) {
+    // Dismissing a call must not block this isolate on the CallKit listener —
+    // that path is only for `incoming_call` ringing.
+    if (dataTypeEarly == 'call_cancel') {
+      return;
+    }
     // ── CRITICAL: Keep this isolate alive while the call is ringing ─────────
     // The background isolate lives only as long as this function is awaited.
     // If we return immediately, the isolate is killed and no CallKit event
@@ -159,12 +165,19 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         }
         AppLogger.w('❌ [BG isolate] Decline — callerId=$callerId');
         await _sendDeclineHttp(callerId);
-        await CallKitService.clearPendingIncomingCall();
+        try {
+          await CallKitService.instance.endCurrentCall();
+        } catch (e) {
+          AppLogger.w('📞 [BG isolate] endCurrentCall after decline: $e');
+        }
         await sub.cancel();
         if (!completer.isCompleted) completer.complete();
       } else if (isAccept) {
         // Accept handled by main isolate on cold-start; just unblock.
         AppLogger.i('✅ [BG isolate] Accept — releasing isolate');
+        try {
+          await CallKitService.hideIncomingTrayFromPersistedUuidOnly();
+        } catch (_) {}
         await sub.cancel();
         if (!completer.isCompleted) completer.complete();
       }

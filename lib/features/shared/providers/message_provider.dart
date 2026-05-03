@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../models/message_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ class MessageNotifier extends Notifier<MessageState> {
         markAllRead(msg.groupId);
       }
     } catch (e) {
-      print('[MessageNotifier] Error appending message: $e');
+      AppLogger.w('[MessageNotifier] Error appending message: $e');
     }
   }
 

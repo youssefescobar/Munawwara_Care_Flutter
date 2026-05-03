@@ -266,9 +266,6 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen>
     // Positive angle = Kaaba is clockwise from the phone's current facing direction.
     final qiblaScreenAngle = (qiblaAbsoluteBearing - heading + 360) % 360;
     final aligned = _isAligned();
-    final delta = (_qiblahDirection != null)
-        ? ((_qiblahDirection!.direction - _qiblahDirection!.offset + 180) % 360 - 180).abs().round()
-        : 0;
 
     final arrowColor = aligned
         ? const Color(0xFF2ECC71)

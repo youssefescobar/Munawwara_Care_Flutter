@@ -1064,7 +1064,6 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
   bool _isLoading = false;
   List<_HotelOption> _hotels = [];
   List<_BusOption> _buses = [];
-  final Map<String, int> _roomOccupancy = {};
 
   String? _selectedHotelId;
   String? _selectedRoomId;
@@ -1077,12 +1076,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
     _selectedVisaStatus = widget.pilgrim.visaStatus ?? 'unknown';
     if (widget.pilgrim.currentGroupId != null) {
       _loadResources();
-      _calculateOccupancy();
     }
-  }
-
-  void _calculateOccupancy() {
-    // Backend now handles global occupancy calculation and filtering
   }
 
   Future<void> _loadResources() async {
@@ -1221,7 +1215,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
         mainAxisSize: MainAxisSize.min,
         children: [
                   DropdownButtonFormField<String?>(
-                    value: _selectedHotelId,
+                    initialValue: _selectedHotelId,
                     isExpanded: true,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: isDark,
@@ -1260,7 +1254,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   ),
                   SizedBox(height: 12.h),
                   DropdownButtonFormField<String?>(
-                    value: _selectedRoomId,
+                    initialValue: _selectedRoomId,
                     isExpanded: true,
                     disabledHint: Text('manage_select_hotel_first'.tr()),
                     decoration: AppDropdownTheme.formFieldDecoration(
@@ -1303,7 +1297,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   ),
                   SizedBox(height: 12.h),
                   DropdownButtonFormField<String?>(
-                    value: _selectedBusId,
+                    initialValue: _selectedBusId,
                     isExpanded: true,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: isDark,
@@ -1339,7 +1333,7 @@ class _EditLogisticsContentState extends ConsumerState<_EditLogisticsContent> {
                   ),
                   SizedBox(height: 12.h),
                   DropdownButtonFormField<String>(
-                    value: _selectedVisaStatus,
+                    initialValue: _selectedVisaStatus,
                     isExpanded: true,
                     decoration: AppDropdownTheme.formFieldDecoration(
                       isDark: isDark,

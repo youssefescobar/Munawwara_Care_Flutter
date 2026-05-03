@@ -78,7 +78,10 @@ class _ModeratorGroupMapScreenState
       if (target != null && target.hasLocation) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _mapController.move(LatLng(target.lat!, target.lng!), 17);
+            _mapController.move(
+              LatLng(target.lat!, target.lng!),
+              AppMapTiles.clampMapZoom(17),
+            );
           }
         });
       }
@@ -86,29 +89,58 @@ class _ModeratorGroupMapScreenState
 
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted || !mounted) return;
+
+    bool usableLast(Position p) {
+      final age = DateTime.now().difference(p.timestamp);
+      if (age > const Duration(hours: 8)) return false;
+      final acc = p.accuracy;
+      if (acc.isInfinite || acc < 0) return false;
+      return acc <= 8000;
+    }
+
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null && usableLast(last) && mounted) {
+        setState(() => _myLocation = LatLng(last.latitude, last.longitude));
+        if (widget.focusPilgrimId == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _myLocation != null) {
+              _mapController.move(
+                _myLocation!,
+                AppMapTiles.clampMapZoom(15),
+              );
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 12),
         ),
       );
       if (!mounted) return;
       setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
-      // Only auto-center on me if we're not focusing a specific pilgrim
-      // Wrap in postFrameCallback so the map is guaranteed to be rendered
       if (widget.focusPilgrimId == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _myLocation != null) {
-            _mapController.move(_myLocation!, 15);
+            _mapController.move(
+              _myLocation!,
+              AppMapTiles.clampMapZoom(15),
+            );
           }
         });
       }
     } catch (_) {}
+
     _locationSub =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 30,
+            accuracy: LocationAccuracy.medium,
+            distanceFilter: 25,
           ),
         ).listen((pos) {
           if (mounted) {
@@ -119,7 +151,7 @@ class _ModeratorGroupMapScreenState
 
   void _centerOnMe() {
     final target = _myLocation ?? const LatLng(21.3891, 39.8579);
-    _mapController.move(target, 15);
+    _mapController.move(target, AppMapTiles.clampMapZoom(15));
   }
 
   void _centerOnGroup() {
@@ -132,7 +164,10 @@ class _ModeratorGroupMapScreenState
         located.map((p) => p.lat!).reduce((a, b) => a + b) / located.length;
     final lngAvg =
         located.map((p) => p.lng!).reduce((a, b) => a + b) / located.length;
-    _mapController.move(LatLng(latAvg, lngAvg), 14);
+    _mapController.move(
+      LatLng(latAvg, lngAvg),
+      AppMapTiles.clampMapZoom(14),
+    );
   }
 
   Future<void> _broadcastSOS() async {
@@ -228,7 +263,9 @@ class _ModeratorGroupMapScreenState
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _myLocation ?? const LatLng(21.3891, 39.8579),
-              initialZoom: 14,
+              initialZoom: AppMapTiles.clampMapZoom(14),
+              minZoom: AppMapTiles.mapMinZoom,
+              maxZoom: AppMapTiles.mapMaxZoom,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all,
               ),

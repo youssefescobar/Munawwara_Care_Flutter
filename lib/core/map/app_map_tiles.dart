@@ -11,10 +11,16 @@ import 'package:url_launcher/url_launcher.dart';
 class AppMapTiles {
   AppMapTiles._();
 
+  /// Shared zoom limits for every in-app [FlutterMap] (gesture + programmatic).
+  static const double mapMinZoom = 15;
+  static const double mapMaxZoom = 17;
+
+  /// Use with [MapController.move] so zoom stays within [mapMinZoom]–[mapMaxZoom].
+  static double clampMapZoom(double zoom) => zoom.clamp(mapMinZoom, mapMaxZoom);
+
   static const userAgentPackageName = 'com.munawwaracare.app';
 
-  static const _osmUrl =
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  static const _osmUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   static String? get _accessToken {
     final t = dotenv.env['MAPBOX_ACCESS_TOKEN']?.trim();

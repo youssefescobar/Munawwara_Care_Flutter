@@ -38,6 +38,12 @@ class IncomingCallService : Service() {
         const val ACTION_DECLINE = "com.munawwaracare.andriod.ACTION_DECLINE_CALL"
         const val ACTION_ACCEPT = "com.munawwaracare.andriod.ACTION_ACCEPT_CALL"
         const val ACTION_END = "com.munawwaracare.andriod.ACTION_END_CALL"
+        /**
+         * Remove duplicate tray entry; CallKit already shows incoming/ongoing UI.
+         * Must match `${applicationId}.ACTION_DISMISS_FG_NOTIFICATION` from CallkitIncomingBroadcastReceiver.
+         */
+        const val ACTION_DISMISS_FG_NOTIFICATION =
+            "com.munawwaracare.andriod.ACTION_DISMISS_FG_NOTIFICATION"
 
         const val EXTRA_CALLER_ID = "callerId"
         const val EXTRA_CALLER_NAME = "callerName"
@@ -68,9 +74,12 @@ class IncomingCallService : Service() {
 
         when (action) {
             ACTION_INCOMING -> handleIncoming(intent)
-            ACTION_DECLINE -> handleDecline()
+            ACTION_DECLINE -> handleDecline(
+                intent?.getBooleanExtra("noAnswer", false) == true,
+            )
             ACTION_ACCEPT -> handleAccept()
             ACTION_END -> handleEnd()
+            ACTION_DISMISS_FG_NOTIFICATION -> dismissForegroundNotificationOnly()
         }
         return START_NOT_STICKY
     }
@@ -134,7 +143,7 @@ class IncomingCallService : Service() {
                         Log.i(TAG, "📞 Core-Telecom onDisconnect: ${disconnectCause.reason}")
                         val cid = currentCallerId
                         if (!cid.isNullOrBlank()) {
-                            sendDeclineHttp(cid)
+                            sendDeclineHttp(cid, noAnswer = false)
                         }
                         resetCallState()
                     },
@@ -159,8 +168,8 @@ class IncomingCallService : Service() {
         }
     }
 
-    private fun handleDecline() {
-        Log.i(TAG, "📞 handleDecline called")
+    private fun handleDecline(noAnswer: Boolean = false) {
+        Log.i(TAG, "📞 handleDecline called noAnswer=$noAnswer")
         val cid = currentCallerId
         if (!cid.isNullOrBlank()) {
             // Use the call's scope if available, otherwise create a temporary one
@@ -168,7 +177,7 @@ class IncomingCallService : Service() {
 
             // 1. HTTP POST to backend — this is the critical part
             scope.launch {
-                sendDeclineHttp(cid)
+                sendDeclineHttp(cid, noAnswer = noAnswer)
             }
             // 2. Disconnect from Core-Telecom
             scope.launch {
@@ -213,6 +222,19 @@ class IncomingCallService : Service() {
     }
 
     /**
+     * CallKit already shows the incoming / ongoing call notification.
+     * This removes our duplicate FGS notification without cancelling Core-Telecom work.
+     */
+    private fun dismissForegroundNotificationOnly() {
+        try {
+            Log.i(TAG, "📞 Dismiss duplicate FGS notification (CallKit owns UI)")
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            Log.w(TAG, "📞 dismissForegroundNotificationOnly: ${e.message}")
+        }
+    }
+
+    /**
      * Reset call state WITHOUT stopping the service.
      * This allows the service to handle subsequent incoming calls.
      */
@@ -222,13 +244,16 @@ class IncomingCallService : Service() {
         callJob = null
         callControlScope = null
         currentCallerId = null
-        // Remove foreground notification but DON'T stop the service
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            Log.w(TAG, "📞 resetCallState stopForeground: ${e.message}")
+        }
     }
 
-    private fun sendDeclineHttp(callerId: String) {
+    private fun sendDeclineHttp(callerId: String, noAnswer: Boolean = false) {
         val baseUrl = resolveBaseUrl()
-        Log.i(TAG, "📞 Sending decline HTTP for callerId=$callerId to $baseUrl")
+        Log.i(TAG, "📞 Sending decline HTTP for callerId=$callerId noAnswer=$noAnswer to $baseUrl")
 
         repeat(3) { attempt ->
             try {
@@ -240,7 +265,9 @@ class IncomingCallService : Service() {
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
 
-                val body = """{"callerId":"$callerId"}"""
+                val body =
+                    if (noAnswer) """{"callerId":"$callerId","noAnswer":true}"""
+                    else """{"callerId":"$callerId"}"""
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body) }
 
                 val code = conn.responseCode
@@ -272,10 +299,11 @@ class IncomingCallService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Active Call",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Shows when a call is being managed"
+                description = "Required for call management; CallKit shows the visible call UI"
                 setShowBadge(false)
+                setSound(null, null)
             }
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(channel)
@@ -283,11 +311,13 @@ class IncomingCallService : Service() {
     }
 
     private fun buildForegroundNotification(callerName: String): Notification {
+        // Short-lived: dismissed on accept/connected/end. CallKit shows the real call UI.
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Incoming Call")
-            .setContentText("Call from $callerName")
+            .setContentTitle(callerName.ifBlank { "Call" })
+            .setContentText("Connecting…")
             .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setSilent(true)
             .setOngoing(true)
             .build()
     }
