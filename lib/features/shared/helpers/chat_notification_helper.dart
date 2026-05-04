@@ -39,7 +39,9 @@ class ChatNotificationHelper {
         HapticFeedback.lightImpact();
       }
 
-      final senderName = msg.sender?.fullName ?? 'notification_title'.tr();
+      final senderName = msg.isFromModerator
+          ? 'call_support_display_name'.tr()
+          : (msg.sender?.fullName ?? 'notification_title'.tr());
 
       if (msg.type == 'meetpoint') {
         // Meetpoint message → special popup with Navigate button
