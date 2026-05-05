@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../core/map/app_map_tiles.dart';
+import '../../../core/services/location_permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../shared/providers/suggested_area_provider.dart';
@@ -205,12 +206,8 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
 
     Position? lastKnown;
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
+      final ok = await requestLocationForBackgroundTracking();
+      if (!ok) {
         if (mounted) {
           StandardSnackBar.showError(context, 'Could not get current location');
         }

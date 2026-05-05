@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/env/env_check.dart';
 import 'core/services/api_service.dart';
 import 'core/services/notification_service.dart';
+import 'features/moderator/services/sos_alert_coordinator.dart';
 import 'core/router/app_router.dart' show AppRouter;
 import 'features/auth/providers/auth_provider.dart';
 import 'features/calling/calling_scope.dart';
@@ -152,6 +154,15 @@ void main() async {
         if ((notifType == 'new_message' || notifType == 'meetpoint') &&
             !isUrgentTts) {
           AppLogger.i('FCM onMessage: suppressed system notif (in-app popup)');
+          return;
+        }
+        // SOS: one tray notification from FCM when backgrounded; in foreground
+        // show the in-app dialog only — do not stack a second local notification.
+        if (notifType == 'sos_alert') {
+          AppLogger.i('FCM onMessage: SOS — in-app dialog (no duplicate local notif)');
+          await SosAlertCoordinator.showOnceFromMap(
+            Map<String, dynamic>.from(msg.data),
+          );
           return;
         }
         // Reminder (moderator default = data type "normal"): still show popup + optional TTS
@@ -338,7 +349,7 @@ class MyApp extends ConsumerWidget {
                 onTap: () {
                   FocusManager.instance.primaryFocus?.unfocus();
                 },
-                child: child!,
+                child: _HotReloadSosAlertSuppressor(child: child!),
               ),
             );
           },
@@ -346,4 +357,29 @@ class MyApp extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Briefly suppresses moderator SOS in-app dialogs after hot reload so
+/// duplicate socket/FCM deliveries or cleared dedupe state do not flash a false alert.
+class _HotReloadSosAlertSuppressor extends StatefulWidget {
+  const _HotReloadSosAlertSuppressor({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_HotReloadSosAlertSuppressor> createState() =>
+      _HotReloadSosAlertSuppressorState();
+}
+
+class _HotReloadSosAlertSuppressorState extends State<_HotReloadSosAlertSuppressor> {
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (!kReleaseMode) {
+      SosAlertCoordinator.suppressInAppSosAlertsFor(const Duration(seconds: 3));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

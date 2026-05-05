@@ -187,11 +187,10 @@ class CallNotifier extends Notifier<CallState> {
     } catch (e) {
       _stopRingPoll();
       _cleanup();
-      state = CallState(
+      state = state.copyWith(
         status: CallStatus.ended,
         endReason: 'error',
-        remoteUserId: state.remoteUserId,
-        remoteUserName: state.remoteUserName,
+        isGroupRingingOut: false,
       );
       _scheduleReset();
     }
@@ -245,11 +244,10 @@ class CallNotifier extends Notifier<CallState> {
     } catch (e) {
       _stopRingPoll();
       _cleanup();
-      state = CallState(
+      state = state.copyWith(
         status: CallStatus.ended,
         endReason: 'error',
-        remoteUserId: state.remoteUserId,
-        remoteUserName: state.remoteUserName,
+        isGroupRingingOut: false,
       );
       _scheduleReset();
     }
@@ -284,11 +282,10 @@ class CallNotifier extends Notifier<CallState> {
           );
           _stopRingPoll();
           _cleanup();
-          state = CallState(
+          state = state.copyWith(
             status: CallStatus.ended,
             endReason: status == 'none' ? 'declined' : status,
-            remoteUserId: state.remoteUserId,
-            remoteUserName: state.remoteUserName,
+            isGroupRingingOut: false,
           );
           _scheduleReset();
         }
@@ -368,11 +365,10 @@ class CallNotifier extends Notifier<CallState> {
       await CallKitService.instance.dismissIncomingCallNotification();
     } catch (e) {
       _cleanup();
-      state = CallState(
+      state = state.copyWith(
         status: CallStatus.ended,
         endReason: 'error',
-        remoteUserId: state.remoteUserId,
-        remoteUserName: state.remoteUserName,
+        isGroupRingingOut: false,
       );
       _scheduleReset();
     }
@@ -391,11 +387,10 @@ class CallNotifier extends Notifier<CallState> {
     // Dismiss native call screen
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: 'declined',
-      remoteUserId: state.remoteUserId,
-      remoteUserName: state.remoteUserName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -416,11 +411,10 @@ class CallNotifier extends Notifier<CallState> {
     }
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: 'missed',
-      remoteUserId: state.remoteUserId,
-      remoteUserName: state.remoteUserName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -441,11 +435,11 @@ class CallNotifier extends Notifier<CallState> {
     }
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: noAnswer ? 'missed' : 'declined',
       remoteUserId: callerId,
-      remoteUserName: state.remoteUserName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -459,11 +453,10 @@ class CallNotifier extends Notifier<CallState> {
     // Dismiss native call screen
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: 'ended',
-      remoteUserId: state.remoteUserId,
-      remoteUserName: state.remoteUserName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -483,11 +476,10 @@ class CallNotifier extends Notifier<CallState> {
     }
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: 'cancelled',
-      remoteUserId: state.remoteUserId,
-      remoteUserName: state.remoteUserName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -497,14 +489,11 @@ class CallNotifier extends Notifier<CallState> {
   void stopLocalCallSession({required String endReason}) {
     _stopRingPoll();
     CallKitService.instance.endCurrentCall();
-    final prevName = state.remoteUserName;
-    final prevId = state.remoteUserId;
     _cleanup();
-    state = CallState(
+    state = state.copyWith(
       status: CallStatus.ended,
       endReason: endReason,
-      remoteUserId: prevId,
-      remoteUserName: prevName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -549,6 +538,7 @@ class CallNotifier extends Notifier<CallState> {
           endReason: 'cancelled',
           remoteUserId: callerId,
           remoteUserName: calleeDisplayName,
+          displayPeerAsSupportBranding: isPilgrimCallee,
         );
         _scheduleReset();
         return;
@@ -729,14 +719,12 @@ class CallNotifier extends Notifier<CallState> {
   void _onRemoteDecline(dynamic _) {
     _stopRingPoll();
     CallKitService.instance.endCurrentCall();
-    final prevName = state.remoteUserName;
-    final prevId = state.remoteUserId;
+    final snapshot = state;
     _cleanup();
-    state = CallState(
+    state = snapshot.copyWith(
       status: CallStatus.ended,
       endReason: 'declined',
-      remoteUserId: prevId,
-      remoteUserName: prevName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -744,14 +732,12 @@ class CallNotifier extends Notifier<CallState> {
   void _onRemoteEnd(dynamic _) {
     _stopRingPoll();
     CallKitService.instance.endCurrentCall();
-    final prevName = state.remoteUserName;
-    final prevId = state.remoteUserId;
+    final snapshot = state;
     _cleanup();
-    state = CallState(
+    state = snapshot.copyWith(
       status: CallStatus.ended,
       endReason: 'ended',
-      remoteUserId: prevId,
-      remoteUserName: prevName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
@@ -759,28 +745,24 @@ class CallNotifier extends Notifier<CallState> {
   void _onRemoteCancel(dynamic _) {
     _stopRingPoll();
     CallKitService.instance.endCurrentCall();
-    final prevName = state.remoteUserName;
-    final prevId = state.remoteUserId;
+    final snapshot = state;
     _cleanup();
-    state = CallState(
+    state = snapshot.copyWith(
       status: CallStatus.ended,
       endReason: 'cancelled',
-      remoteUserId: prevId,
-      remoteUserName: prevName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }
 
   void _onRemoteBusy(dynamic _) {
     CallKitService.instance.endCurrentCall();
-    final prevName = state.remoteUserName;
-    final prevId = state.remoteUserId;
+    final snapshot = state;
     _cleanup();
-    state = CallState(
+    state = snapshot.copyWith(
       status: CallStatus.ended,
       endReason: 'busy',
-      remoteUserId: prevId,
-      remoteUserName: prevName,
+      isGroupRingingOut: false,
     );
     _scheduleReset();
   }

@@ -16,7 +16,6 @@ import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
-import '../../../core/services/notification_service.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/screens/alerts_tab.dart';
 import '../providers/moderator_provider.dart';
@@ -30,6 +29,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'system_reminders_screen.dart';
 import '../widgets/moderator_groups_speed_dial.dart';
 import '../widgets/pilgrim_profile_sheet.dart';
+import '../services/sos_alert_coordinator.dart';
 import '../../shared/providers/message_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,89 +83,18 @@ class _ModeratorDashboardScreenState
 
   Future<void> _onSosAlertArrived(dynamic data) async {
     if (!mounted) return;
-    // Refresh the alerts list immediately
     ref.read(notificationProvider.notifier).fetch();
-    // Auto-navigate to Alerts tab so the moderator sees it
-    setState(() => _currentTab = 4);
 
-    String? socketStringId(dynamic v) {
-      if (v == null) return null;
-      if (v is String) return v;
-      if (v is Map) {
-        final id = v['_id'] ?? v['id'];
-        return id?.toString();
-      }
-      return v.toString();
-    }
-
-    final map = data is Map
-        ? Map<String, dynamic>.from(data)
-        : <String, dynamic>{};
+    final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
     final name = map['pilgrim_name'] as String? ?? 'A pilgrim';
-    final pilgrimId = socketStringId(map['pilgrim_id']);
-    final groupId = socketStringId(map['group_id']);
-    final sosIdStr = map['sos_id']?.toString();
 
-    // Show a system notification
-    NotificationService.instance.showUrgentNotification(
-      title: '🚨 SOS Alert!',
-      body: '$name needs immediate help!',
-      data: {'type': 'urgent'},
-    );
+    // In-app dialog (deduped). Do not show a second local notification — FCM
+    // already surfaces one tray notification when applicable.
+    SosAlertCoordinator.showOnceFromMap(map);
 
-    // Speak the alert aloud
     await _alertTts.setVolume(1.0);
     await _alertTts.setSpeechRate(0.42);
     await _alertTts.speak('SOS Alert! $name needs immediate help!');
-
-    // Look up pilgrim from state to pass to profile sheet
-    PilgrimInGroup? targetPilgrim;
-    if (groupId != null && pilgrimId != null) {
-      final groups = ref.read(moderatorProvider).groups;
-      for (final g in groups) {
-        if (g.id == groupId) {
-          try {
-            targetPilgrim = g.pilgrims.firstWhere((p) => p.id == pilgrimId);
-          } catch (_) {}
-          break;
-        }
-      }
-    }
-
-    final currentUserId = ref.read(authProvider).userId ?? '';
-
-    // Show a persistent red SnackBar
-    if (!mounted) return;
-    StandardSnackBar.show(
-      context,
-      message: '🚨 SOS — $name',
-      type: SnackBarType.error,
-      duration: const Duration(seconds: 8),
-      actionLabel: 'View',
-      onAction: () {
-        final gid = groupId;
-        final pid = pilgrimId;
-        if (gid != null && pid != null) {
-          final handling = <String, dynamic>{
-            'groupId': gid,
-            'pilgrimId': pid,
-          };
-          final sid = sosIdStr;
-          if (sid != null) handling['sos_id'] = sid;
-          SocketService.emit('sos_handling', handling);
-        }
-        if (targetPilgrim != null && groupId != null) {
-          showPilgrimProfileSheet(
-            context,
-            targetPilgrim,
-            groupId,
-            currentUserId,
-          );
-        } else {
-          setState(() => _currentTab = 4);
-        }
-      },
-    );
   }
 
   @override

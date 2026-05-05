@@ -15,6 +15,7 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import '../../features/pilgrim/screens/group_inbox_screen.dart';
 import '../../features/moderator/screens/group_messages_screen.dart';
+import '../../features/moderator/services/sos_alert_coordinator.dart';
 import '../../features/notifications/screens/alerts_tab.dart';
 import '../theme/app_colors.dart';
 
@@ -611,6 +612,21 @@ class NotificationService {
         (notificationType == 'urgent' && messageType == 'reminder_tts');
     if (isReminderTap) {
       _navigateToAlertsInbox();
+      return;
+    }
+
+    if (notificationType == 'sos_alert') {
+      final nav = AppRouter.navigatorKey.currentState;
+      final ctx = AppRouter.navigatorKey.currentContext;
+      if (nav == null || ctx == null) {
+        AppLogger.w('📱 Navigator not ready — storing pending SOS deep-link');
+        _pendingNotificationData = Map<String, dynamic>.from(data);
+        _pendingNotificationData!['notification_type'] = 'sos_alert';
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SosAlertCoordinator.showOnceFromMap(data);
+      });
       return;
     }
 

@@ -8,10 +8,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/map/app_map_tiles.dart';
+import '../../../core/services/location_permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../providers/moderator_provider.dart';
@@ -87,8 +87,8 @@ class _ModeratorGroupMapScreenState
       }
     }
 
-    final status = await Permission.locationWhenInUse.request();
-    if (!status.isGranted || !mounted) return;
+    final ok = await requestLocationForBackgroundTracking();
+    if (!ok || !mounted) return;
 
     bool usableLast(Position p) {
       final age = DateTime.now().difference(p.timestamp);

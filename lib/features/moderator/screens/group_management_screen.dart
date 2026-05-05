@@ -14,7 +14,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/widgets/custom_dialog.dart';
 import '../../../core/widgets/standard_snackbar.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -24,6 +23,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/location_permission_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/map/app_map_tiles.dart';
 import '../../../core/theme/app_colors.dart';
@@ -217,8 +217,8 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
   // ── Location ──────────────────────────────────────────────────────────────
 
   Future<void> _initLocation() async {
-    final status = await Permission.locationWhenInUse.request();
-    if (!status.isGranted || !mounted) return;
+    final ok = await requestLocationForBackgroundTracking();
+    if (!ok || !mounted) return;
 
     try {
       final last = await Geolocator.getLastKnownPosition();

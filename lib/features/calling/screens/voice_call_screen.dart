@@ -191,7 +191,13 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                           ),
                         ),
                         SizedBox(height: 10.h),
-                        _StatusChip(call: call, palette: c),
+                        _StatusChip(
+                          call: call,
+                          palette: c,
+                          endedMessage: call.status == CallStatus.ended
+                              ? _endReasonLabel(call.endReason)
+                              : null,
+                        ),
                         const Spacer(flex: 3),
                         if (call.status == CallStatus.connected) ...[
                           Container(
@@ -287,22 +293,6 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                                 ],
                               );
                             },
-                          ),
-                        ],
-                        if (call.status == CallStatus.ended) ...[
-                          Icon(Symbols.info, color: c.textMuted, size: 28.sp),
-                          SizedBox(height: 10.h),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 32.w),
-                            child: Text(
-                              _endReasonLabel(call.endReason),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: c.textSecondary,
-                                fontSize: 14.sp,
-                                fontFamily: 'Lexend',
-                              ),
-                            ),
                           ),
                         ],
                         SizedBox(height: 48.h),
@@ -482,17 +472,50 @@ class _AvatarRing extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.call, required this.palette});
+  const _StatusChip({
+    required this.call,
+    required this.palette,
+    this.endedMessage,
+  });
 
   final CallState call;
   final _CallPalette palette;
+  /// When the call has just ended, show this in the same slot as the timer
+  /// so the Munawwara logo block does not jump vertically.
+  final String? endedMessage;
 
   @override
   Widget build(BuildContext context) {
+    if (call.status == CallStatus.ended) {
+      final text = endedMessage ?? '';
+      if (text.isEmpty) {
+        return SizedBox(height: 44.h);
+      }
+      return Container(
+        constraints: BoxConstraints(minHeight: 44.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          color: palette.chipFill,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: palette.chipBorder),
+        ),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontFamily: 'Lexend',
+            fontWeight: FontWeight.w600,
+            color: palette.textSecondary,
+            height: 1.3,
+          ),
+        ),
+      );
+    }
+
     final label = switch (call.status) {
       CallStatus.calling => 'call_calling'.tr(),
       CallStatus.connected => call.formattedDuration,
-      CallStatus.ended => '',
       _ => '',
     };
     if (label.isEmpty) return const SizedBox.shrink();
