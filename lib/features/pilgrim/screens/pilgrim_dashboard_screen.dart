@@ -99,6 +99,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
   // Location
   StreamSubscription<Position>? _locationSub;
+  StreamSubscription<ServiceStatus>? _serviceStatusSub;
+  bool _isGpsEnabled = true;
+  bool _hasLocPermission = true;
   final Battery _battery = Battery();
   final MapController _mapController = MapController();
   LatLng? _myLatLng;
@@ -141,6 +144,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
   Future<void> _checkLocationPermission() async {
     final hasLoc = await hasLocationAlwaysPermission();
+    if (mounted && _hasLocPermission != hasLoc) {
+      setState(() => _hasLocPermission = hasLoc);
+    }
     if (!hasLoc && mounted) {
       context.go('/location-onboarding');
     }
@@ -162,6 +168,8 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+
+    unawaited(_initLocationHealth());
 
     // GPS + permission: start immediately (do not wait for map tab or dashboard).
     unawaited(_initLocation());
@@ -466,6 +474,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     _sosPostSessionCooldownUiTimer?.cancel();
     _sosVoiceFollowup = false;
     _weatherRefreshTimer?.cancel();
+    _serviceStatusSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _locationSub?.cancel();
     _sfxPlayer.dispose();
@@ -638,6 +647,18 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _mapController.move(target, AppMapTiles.clampMapZoom(15));
+    });
+  }
+
+  Future<void> _initLocationHealth() async {
+    _isGpsEnabled = await Geolocator.isLocationServiceEnabled();
+    _hasLocPermission = await hasLocationAlwaysPermission();
+    if (mounted) setState(() {});
+
+    _serviceStatusSub = Geolocator.getServiceStatusStream().listen((status) {
+      if (mounted) {
+        setState(() => _isGpsEnabled = (status == ServiceStatus.enabled));
+      }
     });
   }
 
@@ -1125,6 +1146,16 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         sosCooldownSecondsRemaining: sosCooldownSec,
         onSosCompletedExit: _exitSosCompletedToIdle,
         navBeacons: pilgrimState.navBeacons,
+        isGpsEnabled: _isGpsEnabled,
+        hasLocPermission: _hasLocPermission,
+        onLocationInactiveTap: () async {
+          if (!_hasLocPermission) {
+            await requestLocationPermissionsFlow();
+            await _checkLocationPermission();
+          } else if (!_isGpsEnabled) {
+            await Geolocator.openLocationSettings();
+          }
+        },
         myLocation: _myLatLng,
         onNavigateToModerator: _navigateToModerator,
         notificationCount: notifCount,
@@ -1330,6 +1361,9 @@ class _HomeTab extends StatelessWidget {
   final VoidCallback onSettingsTap;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
+  final bool isGpsEnabled;
+  final bool hasLocPermission;
+  final VoidCallback onLocationInactiveTap;
   /// From [authProvider] / prefs when pilgrim profile is not hydrated yet.
   final String? authFullName;
 
@@ -1360,6 +1394,9 @@ class _HomeTab extends StatelessWidget {
     required this.onSettingsTap,
     required this.onGroupCardTap,
     required this.onHotspotsTap,
+    required this.isGpsEnabled,
+    required this.hasLocPermission,
+    required this.onLocationInactiveTap,
   });
 
   String _greetingDisplayName(PilgrimProfile? profile) {
@@ -1518,71 +1555,41 @@ class _HomeTab extends StatelessWidget {
                           height: 1.1,
                         ),
                       ),
-                      SizedBox(height: 20.h),
-
-                      // Sharing Status indicator (Full width badge style)
-                      Builder(
-                        builder: (context) {
-                          final sharingOn = pilgrimState.isSharingLocation;
-                          final hasFix = myLocation != null;
-                          final IconData statusIcon = !sharingOn
-                              ? Symbols.location_off
-                              : (!hasFix
-                                  ? Icons.gps_not_fixed_rounded
-                                  : Icons.navigation_rounded);
-                          final Color iconColor = !sharingOn
-                              ? headerMuted
-                              : (!hasFix
-                                  ? Colors.orange.shade700
-                                  : AppColors.primary);
-                          final String statusLabel = !sharingOn
-                              ? 'card_paused'.tr()
-                              : (!hasFix
-                                  ? 'home_location_sharing_waiting'.tr()
-                                  : 'card_active'.tr());
-                          final Color statusColor = !sharingOn
-                              ? headerMuted
-                              : (!hasFix
-                                  ? Colors.orange.shade700
-                                  : AppColors.primary);
-                          return Container(
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                            decoration: BoxDecoration(
-                              color: iconContainerBg,
-                              borderRadius: BorderRadius.circular(16.r),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  statusIcon,
-                                  color: iconColor,
-                                  size: 18.w,
-                                ),
-                                SizedBox(width: 10.w),
-                                Text(
-                                  'home_location_sharing'.tr(),
-                                  style: TextStyle(
-                                    fontFamily: 'Lexend',
-                                    fontSize: 13.sp,
-                                    color: headerMuted,
+                      if (!isGpsEnabled || !hasLocPermission)
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Container(
+                            margin: EdgeInsets.only(top: 20.h),
+                            child: Material(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(12.r),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12.r),
+                                onTap: onLocationInactiveTap,
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Symbols.location_off, size: 16.w, color: Colors.red.shade700, fill: 1),
+                                      SizedBox(width: 8.w),
+                                      Text(
+                                        'Inactive',
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontSize: 13.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                SizedBox(width: 6.w),
-                                Text(
-                                  statusLabel,
-                                  style: TextStyle(
-                                    fontFamily: 'Lexend',
-                                    fontSize: 13.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: statusColor,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                      if (isGpsEnabled && hasLocPermission) SizedBox(height: 20.h),
                     ],
                   ),
                 ),
