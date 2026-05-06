@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 import '../../../core/utils/app_logger.dart';
 import '../models/message_model.dart';
 
@@ -51,6 +53,8 @@ class MessageState {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MessageNotifier extends Notifier<MessageState> {
+  static const _maxCachedMessages = 100;
+
   @override
   MessageState build() => const MessageState();
 
@@ -59,20 +63,84 @@ class MessageNotifier extends Notifier<MessageState> {
   /// Full URL to stream a voice/image upload from the server
   String buildUploadUrl(String filename) => '$_uploadBase/uploads/$filename';
 
+  Map<String, dynamic> _trimMessagesBody(Map<String, dynamic> body) {
+    final copy = Map<String, dynamic>.from(body);
+    final list = copy['data'];
+    if (list is List && list.length > _maxCachedMessages) {
+      copy['data'] = list.sublist(list.length - _maxCachedMessages);
+    }
+    return copy;
+  }
+
+  Future<void> _hydrateMessagesFromCache(String groupId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    final blob = AppDataCache.jsonMap(
+      await AppDataCache.readData(
+        uid,
+        AppDataCache.messagesFile(groupId),
+      ),
+    );
+    if (blob == null) return;
+    final listRaw = blob['data'];
+    if (listRaw is! List<dynamic>) return;
+    try {
+      final parsed = <GroupMessage>[];
+      for (final item in listRaw) {
+        final jm = AppDataCache.jsonMap(item);
+        if (jm == null) continue;
+        try {
+          parsed.add(GroupMessage.fromJson(jm));
+        } catch (_) {}
+      }
+      parsed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      if (parsed.isEmpty) return;
+      state = state.copyWith(messages: parsed);
+    } catch (_) {}
+  }
+
+  Future<void> _writeMessagesCache(
+    String groupId,
+    Map<String, dynamic> body,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    await AppDataCache.write(
+      uid,
+      AppDataCache.messagesFile(groupId),
+      _trimMessagesBody(body),
+    );
+  }
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   Future<void> loadMessages(String groupId) async {
+    await _hydrateMessagesFromCache(groupId);
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await ApiService.dio.get('/messages/group/$groupId');
-      final raw = (res.data['data'] as List<dynamic>)
+      final body = Map<String, dynamic>.from(res.data as Map);
+      await _writeMessagesCache(groupId, body);
+      final raw = (body['data'] as List<dynamic>)
           .map((j) => GroupMessage.fromJson(j as Map<String, dynamic>))
           .toList();
       // oldest first (chronological / chat order)
       raw.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       state = state.copyWith(messages: raw, isLoading: false);
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      if (state.messages.isEmpty) {
+        await _hydrateMessagesFromCache(groupId);
+      }
+      if (state.messages.isNotEmpty) {
+        state = state.copyWith(isLoading: false, error: null);
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: ApiService.parseError(e),
+        );
+      }
     }
   }
 

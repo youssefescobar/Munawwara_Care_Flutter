@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 import '../models/notification_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,13 +46,46 @@ class NotificationNotifier extends Notifier<NotificationState> {
   @override
   NotificationState build() => const NotificationState();
 
+  Future<void> _hydrateFromCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    final data = AppDataCache.jsonMap(
+      await AppDataCache.readData(uid, AppDataCache.notificationsFile),
+    );
+    if (data == null || data['success'] != true) return;
+    try {
+      final rawList = data['notifications'];
+      if (rawList is! List<dynamic>) return;
+      final list = <AppNotification>[];
+      for (final e in rawList) {
+        final em = AppDataCache.jsonMap(e);
+        if (em == null) continue;
+        try {
+          list.add(AppNotification.fromJson(em));
+        } catch (_) {}
+      }
+      final unread = data['unread_count'] as int? ?? 0;
+      state = state.copyWith(notifications: list, unreadCount: unread);
+    } catch (_) {}
+  }
+
+  Future<void> _persistNotifications(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    await AppDataCache.write(uid, AppDataCache.notificationsFile, data);
+  }
+
   // ── Fetch all notifications ───────────────────────────────────────────────
   Future<void> fetch() async {
+    await _hydrateFromCache();
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await ApiService.dio.get('/notifications');
       final data = res.data as Map<String, dynamic>;
       if (data['success'] == true) {
+        await _persistNotifications(data);
         final list = (data['notifications'] as List)
             .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -74,7 +109,17 @@ class NotificationNotifier extends Notifier<NotificationState> {
         state = state.copyWith(isLoading: false, error: 'Failed to load');
       }
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      if (state.notifications.isEmpty) {
+        await _hydrateFromCache();
+      }
+      if (state.notifications.isNotEmpty) {
+        state = state.copyWith(isLoading: false, error: null);
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: ApiService.parseError(e),
+        );
+      }
     }
   }
 
@@ -95,6 +140,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
       final res = await ApiService.dio.get('/notifications');
       final data = res.data as Map<String, dynamic>;
       if (data['success'] == true) {
+        await _persistNotifications(data);
         final list = (data['notifications'] as List)
             .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
             .toList();

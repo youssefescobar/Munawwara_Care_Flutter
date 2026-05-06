@@ -1,8 +1,10 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, SocketException;
 
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_data_cache.dart';
 
 class ApiService {
   static const _prodBaseUrl =
@@ -106,12 +108,46 @@ class ApiService {
   }
 
   static Future<void> clearAuthToken() async {
-    dio.options.headers.remove('Authorization');
     final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    await AppDataCache.clearForUser(uid);
+    dio.options.headers.remove('Authorization');
     await prefs.remove('auth_token');
     await prefs.remove('user_role');
     await prefs.remove('user_id');
     await prefs.remove('user_full_name');
+  }
+
+  /// True when the failure is likely due to no network (not 401/404 auth).
+  static bool isOfflineFailure(DioException e) {
+    final code = e.response?.statusCode;
+    if (code == 401 || code == 404) return false;
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.connectionError ||
+        e.error is SocketException) {
+      return true;
+    }
+    // Airplane mode / DNS failures often use [unknown] with no response.
+    if (e.response == null && e.type == DioExceptionType.unknown) {
+      return true;
+    }
+    if (e.response == null && e.type != DioExceptionType.cancel) {
+      final msg = '${e.message} $e ${e.error}'.toLowerCase();
+      if (msg.contains('failed host lookup') ||
+          msg.contains('network is unreachable') ||
+          msg.contains('connection refused') ||
+          msg.contains('socketexception') ||
+          msg.contains('software caused connection abort') ||
+          msg.contains('no address associated') ||
+          msg.contains('errno = 7') ||
+          msg.contains('errno = 8') ||
+          msg.contains('errno = 101')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Restore session token from SharedPreferences on app start.

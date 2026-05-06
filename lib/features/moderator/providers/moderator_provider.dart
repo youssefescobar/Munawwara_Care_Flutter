@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 
 // ── Pilgrim-in-group model ────────────────────────────────────────────────────
 class PilgrimInGroup {
@@ -255,6 +257,7 @@ class ModeratorState {
   final bool showSosOnly;
   final String searchQuery;
   final bool isBroadcastingSOS;
+  final bool usingOfflineSnapshot;
 
   const ModeratorState({
     this.isLoading = false,
@@ -264,6 +267,7 @@ class ModeratorState {
     this.showSosOnly = false,
     this.searchQuery = '',
     this.isBroadcastingSOS = false,
+    this.usingOfflineSnapshot = false,
   });
 
   ModeratorState copyWith({
@@ -275,6 +279,8 @@ class ModeratorState {
     bool? showSosOnly,
     String? searchQuery,
     bool? isBroadcastingSOS,
+    bool? usingOfflineSnapshot,
+    bool clearOfflineSnapshot = false,
   }) => ModeratorState(
     isLoading: isLoading ?? this.isLoading,
     error: clearError ? null : (error ?? this.error),
@@ -283,6 +289,9 @@ class ModeratorState {
     showSosOnly: showSosOnly ?? this.showSosOnly,
     searchQuery: searchQuery ?? this.searchQuery,
     isBroadcastingSOS: isBroadcastingSOS ?? this.isBroadcastingSOS,
+    usingOfflineSnapshot: clearOfflineSnapshot
+        ? false
+        : (usingOfflineSnapshot ?? this.usingOfflineSnapshot),
   );
 
   ModeratorGroup? get currentGroup => groups.isEmpty
@@ -310,12 +319,48 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
   @override
   ModeratorState build() => const ModeratorState();
 
+  Future<String?> _userId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
+  Future<void> hydrateFromCache() async {
+    final uid = await _userId();
+    if (uid == null) return;
+    final m = AppDataCache.jsonMap(
+      await AppDataCache.readData(uid, AppDataCache.moderatorDashboardFile),
+    );
+    if (m == null) return;
+    final list = m['data'] as List<dynamic>? ?? [];
+    final groups = <ModeratorGroup>[];
+    for (final item in list) {
+      final gm = AppDataCache.jsonMap(item);
+      if (gm == null) continue;
+      try {
+        groups.add(ModeratorGroup.fromJson(gm));
+      } catch (_) {}
+    }
+    if (groups.isEmpty) return;
+    state = state.copyWith(
+      groups: groups,
+      usingOfflineSnapshot: true,
+    );
+  }
+
   // Load all groups + their pilgrims
   Future<void> loadDashboard({bool silently = false}) async {
     if (!silently) state = state.copyWith(isLoading: true, clearError: true);
     try {
       final resp = await ApiService.dio.get('/groups/dashboard');
-      final data = resp.data['data'] as List<dynamic>? ?? [];
+      final respBody = resp.data;
+      final body = respBody is Map
+          ? Map<String, dynamic>.from(respBody)
+          : <String, dynamic>{'data': respBody is List ? respBody : []};
+      final uid = await _userId();
+      if (uid != null) {
+        await AppDataCache.write(uid, AppDataCache.moderatorDashboardFile, body);
+      }
+      final data = body['data'] as List<dynamic>? ?? [];
       final groups = data
           .map((g) => ModeratorGroup.fromJson(g as Map<String, dynamic>))
           .toList();
@@ -323,9 +368,31 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
         isLoading: false,
         groups: groups,
         clearError: true,
+        clearOfflineSnapshot: true,
       );
     } on DioException catch (e) {
-      if (!silently) state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      final code = e.response?.statusCode;
+      if (code == 401) {
+        if (!silently) {
+          state = state.copyWith(
+            isLoading: false,
+            error: ApiService.parseError(e),
+          );
+        }
+        return;
+      }
+      final uid = await _userId();
+      if (uid != null) await hydrateFromCache();
+      final hasData = state.groups.isNotEmpty;
+      if (!silently) {
+        state = state.copyWith(
+          isLoading: false,
+          error: hasData ? null : ApiService.parseError(e),
+          usingOfflineSnapshot: hasData,
+        );
+      } else if (hasData) {
+        state = state.copyWith(usingOfflineSnapshot: true);
+      }
     } catch (e) {
       if (!silently) state = state.copyWith(isLoading: false, error: e.toString());
     }

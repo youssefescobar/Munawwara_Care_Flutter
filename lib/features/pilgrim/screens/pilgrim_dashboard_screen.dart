@@ -166,6 +166,8 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       AppLogger.d('[PilgrimDashboard] Starting loadDashboard...');
       try {
+        await ref.read(authProvider.notifier).hydrateFromCache();
+        await ref.read(pilgrimProvider.notifier).hydrateFromCache();
         await ref.read(pilgrimProvider.notifier).loadDashboard();
         final groupId = ref.read(pilgrimProvider).groupInfo?.groupId;
         AppLogger.d('[PilgrimDashboard] Dashboard loaded. GroupId: $groupId');
@@ -1099,6 +1101,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     final tabs = [
       _HomeTab(
         pilgrimState: pilgrimState,
+        authFullName: ref.watch(authProvider).fullName,
         isDark: isDark,
         weatherAlert: _weatherAlert,
         sosPulseController: _sosPulseController,
@@ -1216,7 +1219,47 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         backgroundColor: isDark
             ? AppColors.backgroundDark
             : const Color(0xfff1f5f3),
-        body: IndexedStack(index: _currentTab, children: tabs),
+        body: Column(
+          children: [
+            if (pilgrimState.usingOfflineSnapshot)
+              Material(
+                color: AppColors.primary.withValues(alpha: 0.14),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 8.h,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Symbols.cloud_off,
+                          size: 18.w,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            'offline_showing_saved_data'.tr(),
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(child: IndexedStack(index: _currentTab, children: tabs)),
+          ],
+        ),
         bottomNavigationBar: _BottomNav(
           currentIndex: _currentTab,
           onTap: (i) {
@@ -1286,9 +1329,12 @@ class _HomeTab extends StatelessWidget {
   final VoidCallback onSettingsTap;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
+  /// From [authProvider] / prefs when pilgrim profile is not hydrated yet.
+  final String? authFullName;
 
   const _HomeTab({
     required this.pilgrimState,
+    required this.authFullName,
     required this.isDark,
     required this.weatherAlert,
     required this.sosPulseController,
@@ -1314,6 +1360,16 @@ class _HomeTab extends StatelessWidget {
     required this.onGroupCardTap,
     required this.onHotspotsTap,
   });
+
+  String _greetingDisplayName(PilgrimProfile? profile) {
+    final p = profile?.shortName.trim();
+    if (p != null && p.isNotEmpty) return p;
+    final a = authFullName?.trim();
+    if (a == null || a.isEmpty) return '';
+    final parts = a.split(RegExp(r'\s+'));
+    if (parts.length >= 2) return '${parts[0]} ${parts[1]}';
+    return a;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1452,7 +1508,7 @@ class _HomeTab extends StatelessWidget {
                       Text(
                         pilgrimState.isLoading
                             ? '...'
-                            : (profile?.shortName ?? ''),
+                            : _greetingDisplayName(profile),
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontSize: 32.sp,

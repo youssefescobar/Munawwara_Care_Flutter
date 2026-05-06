@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 import '../models/suggested_area_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,20 +75,72 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   @override
   SuggestedAreaState build() => const SuggestedAreaState();
 
+  Future<void> _hydrateFromCache(String groupId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    final data = AppDataCache.jsonMap(
+      await AppDataCache.readData(
+        uid,
+        AppDataCache.suggestedAreasFile(groupId),
+      ),
+    );
+    if (data == null) return;
+    try {
+      final List<dynamic> list =
+          (data['areas'] ?? data['data'] ?? []) as List<dynamic>;
+      final raw = list
+          .map((j) => SuggestedArea.fromJson(j as Map<String, dynamic>))
+          .toList();
+      if (raw.isEmpty) return;
+      state = state.copyWith(areas: raw);
+    } catch (_) {}
+  }
+
+  Future<void> _persist(String groupId, Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString('user_id');
+    if (uid == null) return;
+    await AppDataCache.write(
+      uid,
+      AppDataCache.suggestedAreasFile(groupId),
+      data,
+    );
+  }
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   Future<void> load(String groupId) async {
+    await _hydrateFromCache(groupId);
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await ApiService.dio.get('/groups/$groupId/suggested-areas');
-      final data = res.data is Map ? res.data : {};
-      final List<dynamic> list = (data['areas'] ?? data['data'] ?? []) as List<dynamic>;
+      final data = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
+      final prefs = await SharedPreferences.getInstance();
+      final uid = prefs.getString('user_id');
+      if (uid != null) {
+        await _persist(groupId, data);
+      }
+      final List<dynamic> list =
+          (data['areas'] ?? data['data'] ?? []) as List<dynamic>;
       final raw = list
           .map((j) => SuggestedArea.fromJson(j as Map<String, dynamic>))
           .toList();
       state = state.copyWith(areas: raw, isLoading: false);
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      if (state.areas.isEmpty) {
+        await _hydrateFromCache(groupId);
+      }
+      if (state.areas.isNotEmpty) {
+        state = state.copyWith(isLoading: false, error: null);
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: ApiService.parseError(e),
+        );
+      }
     } catch (_) {
       state = state.copyWith(isLoading: false, error: 'Something went wrong');
     }
@@ -105,18 +159,18 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
     int? reminderMinutes,
   }) async {
     try {
+      final body = <String, dynamic>{
+        'name': name,
+        'description': description,
+        'latitude': latitude,
+        'longitude': longitude,
+        'area_type': areaType,
+        'meetpoint_time': ?meetpointTime?.toUtc().toIso8601String(),
+        'reminder_minutes': ?reminderMinutes,
+      };
       await ApiService.dio.post(
         '/groups/$groupId/suggested-areas',
-        data: {
-          'name': name,
-          'description': description,
-          'latitude': latitude,
-          'longitude': longitude,
-          'area_type': areaType,
-          if (meetpointTime != null)
-            'meetpoint_time': meetpointTime.toUtc().toIso8601String(),
-          'reminder_minutes': ?reminderMinutes,
-        },
+        data: body,
       );
       // Don't update state here - let the socket event handle it
       // to avoid duplicates and ensure consistency across all clients
@@ -155,17 +209,17 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
     int? reminderMinutes,
   }) async {
     try {
+      final body = <String, dynamic>{
+        'name': ?name,
+        'description': ?description,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'meetpoint_time': ?meetpointTime?.toUtc().toIso8601String(),
+        'reminder_minutes': ?reminderMinutes,
+      };
       await ApiService.dio.put(
         '/groups/$groupId/suggested-areas/$areaId',
-        data: {
-          'name': ?name,
-          'description': ?description,
-          'latitude': ?latitude,
-          'longitude': ?longitude,
-          if (meetpointTime != null)
-            'meetpoint_time': meetpointTime.toUtc().toIso8601String(),
-          'reminder_minutes': ?reminderMinutes,
-        },
+        data: body,
       );
       // The backend no longer emits `area_updated`; refresh from source of truth.
       await load(groupId);

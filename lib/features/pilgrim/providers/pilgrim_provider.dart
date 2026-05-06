@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 
 // ── Pilgrim Profile Model ─────────────────────────────────────────────────────
 
@@ -174,6 +176,8 @@ class PilgrimState {
   final String? activeSosId;
   // key = moderatorId, value = active beacon info
   final Map<String, ModeratorBeacon> navBeacons;
+  /// True when dashboard data comes from disk (offline or pre-hydrate).
+  final bool usingOfflineSnapshot;
 
   const PilgrimState({
     this.isLoading = false,
@@ -186,6 +190,7 @@ class PilgrimState {
     this.sosActive = false,
     this.activeSosId,
     this.navBeacons = const {},
+    this.usingOfflineSnapshot = false,
   });
 
   PilgrimState copyWith({
@@ -202,6 +207,8 @@ class PilgrimState {
     bool clearError = false,
     bool clearGroup = false,
     bool clearSosId = false,
+    bool? usingOfflineSnapshot,
+    bool clearOfflineSnapshot = false,
   }) => PilgrimState(
     isLoading: isLoading ?? this.isLoading,
     isSosLoading: isSosLoading ?? this.isSosLoading,
@@ -213,6 +220,9 @@ class PilgrimState {
     sosActive: sosActive ?? this.sosActive,
     activeSosId: clearSosId ? null : (activeSosId ?? this.activeSosId),
     navBeacons: navBeacons ?? this.navBeacons,
+    usingOfflineSnapshot: clearOfflineSnapshot
+        ? false
+        : (usingOfflineSnapshot ?? this.usingOfflineSnapshot),
   );
 }
 
@@ -225,6 +235,73 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
   @override
   PilgrimState build() {
     return const PilgrimState();
+  }
+
+  Future<String?> _userId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
+  /// Load last-known dashboard from disk (call before network refresh).
+  Future<void> hydrateFromCache() async {
+    final uid = await _userId();
+    if (uid == null) return;
+
+    PilgrimProfile? profile;
+    final pMap = AppDataCache.jsonMap(
+      await AppDataCache.readData(uid, AppDataCache.pilgrimProfileFile),
+    );
+    if (pMap != null) {
+      try {
+        profile = PilgrimProfile.fromJson(pMap);
+      } catch (_) {}
+    }
+
+    GroupInfo? groupInfo;
+    bool clearGroup = false;
+    final gMap = AppDataCache.jsonMap(
+      await AppDataCache.readData(uid, AppDataCache.pilgrimMyGroupFile),
+    );
+    if (gMap != null) {
+      final gid = gMap['group_id']?.toString() ?? '';
+      if (gid.isNotEmpty) {
+        try {
+          groupInfo = GroupInfo.fromJson(gMap);
+        } catch (_) {}
+      } else {
+        clearGroup = true;
+      }
+    }
+
+    if (profile == null && groupInfo == null && !clearGroup) return;
+
+    state = state.copyWith(
+      profile: profile ?? state.profile,
+      groupInfo: clearGroup ? null : (groupInfo ?? state.groupInfo),
+      clearGroup: clearGroup,
+      navBeacons: clearGroup ? const {} : null,
+      usingOfflineSnapshot: true,
+    );
+  }
+
+  Future<void> _writePilgrimCache(
+    String uid,
+    Map<String, dynamic>? profileData,
+    Map<String, dynamic>? groupData,
+  ) async {
+    if (profileData != null) {
+      await AppDataCache.write(uid, AppDataCache.pilgrimProfileFile, profileData);
+    }
+    if (groupData != null &&
+        (groupData['group_id']?.toString() ?? '').isNotEmpty) {
+      await AppDataCache.write(uid, AppDataCache.pilgrimMyGroupFile, groupData);
+    } else {
+      await AppDataCache.write(
+        uid,
+        AppDataCache.pilgrimMyGroupFile,
+        <String, dynamic>{'group_id': ''},
+      );
+    }
   }
 
   Future<void> loadDashboard({bool force = false}) async {
@@ -253,6 +330,11 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
       final profileData = results[0].data as Map<String, dynamic>?;
       final groupData = results[1].data as Map<String, dynamic>?;
 
+      final uid = await _userId();
+      if (uid != null && profileData != null) {
+        await _writePilgrimCache(uid, profileData, groupData);
+      }
+
       state = state.copyWith(
         isLoading: false,
         profile: profileData != null
@@ -265,9 +347,25 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
         navBeacons: !(groupData != null && groupData.containsKey('group_id'))
             ? const {}
             : null,
+        clearOfflineSnapshot: true,
       );
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: ApiService.parseError(e));
+      final code = e.response?.statusCode;
+      if (code == 401) {
+        state = state.copyWith(
+          isLoading: false,
+          error: ApiService.parseError(e),
+        );
+        return;
+      }
+      final uid = await _userId();
+      if (uid != null) await hydrateFromCache();
+      final hasData = state.profile != null || state.groupInfo != null;
+      state = state.copyWith(
+        isLoading: false,
+        error: hasData ? null : ApiService.parseError(e),
+        usingOfflineSnapshot: hasData,
+      );
     }
   }
 

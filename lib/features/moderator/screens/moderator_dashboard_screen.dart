@@ -122,6 +122,8 @@ class _ModeratorDashboardScreenState
       if (route != null) {
         AppRouter.moderatorRouteObserver.subscribe(this, route);
       }
+      await ref.read(authProvider.notifier).hydrateFromCache();
+      await ref.read(moderatorProvider.notifier).hydrateFromCache();
       await ref.read(moderatorProvider.notifier).loadDashboard();
       // Connect socket with this moderator's identity
       final auth = ref.read(authProvider);
@@ -310,17 +312,60 @@ class _ModeratorDashboardScreenState
             : const Color(0xFFF0F0F8),
         body: Stack(
           children: [
-            IndexedStack(
-              index: _currentTab,
+            Column(
               children: [
-                _GroupsHomeTab(
-                  searchController: _searchController,
-                  onNotificationTap: () => setState(() => _currentTab = 4),
-                ), // 0: Groups
-                const PilgrimProvisioningScreen(), // 1: Provisioning
-                const SystemRemindersScreen(), // 2: Reminders
-                const ModeratorProfileScreen(), // 3: Profile
-                const AlertsTab(), // 4: Alerts
+                if (moderatorState.usingOfflineSnapshot)
+                  Material(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 8.h,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Symbols.cloud_off,
+                              size: 18.w,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                'offline_showing_saved_data'.tr(),
+                                style: TextStyle(
+                                  fontFamily: 'Lexend',
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : AppColors.textDark,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTab,
+                    children: [
+                      _GroupsHomeTab(
+                        searchController: _searchController,
+                        onNotificationTap: () =>
+                            setState(() => _currentTab = 4),
+                      ), // 0: Groups
+                      const PilgrimProvisioningScreen(), // 1: Provisioning
+                      const SystemRemindersScreen(), // 2: Reminders
+                      const ModeratorProfileScreen(), // 3: Profile
+                      const AlertsTab(), // 4: Alerts
+                    ],
+                  ),
+                ),
               ],
             ),
             if (showEmptyGroupsArrow)

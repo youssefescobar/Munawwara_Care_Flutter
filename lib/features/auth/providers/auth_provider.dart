@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_data_cache.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/utils/app_logger.dart';
 
@@ -210,6 +211,11 @@ class AuthNotifier extends Notifier<AuthState> {
           await prefs.setString('user_role', resolvedRole);
         }
 
+        final cacheId = resolvedId ?? userId;
+        if (cacheId != null && cacheId.isNotEmpty) {
+          await AppDataCache.write(cacheId, AppDataCache.authMeFile, data);
+        }
+
         await _registerFcmToken();
       } on DioException catch (e) {
         final code = e.response?.statusCode;
@@ -243,6 +249,7 @@ class AuthNotifier extends Notifier<AuthState> {
           userId: userId,
           fullName: fullName,
         );
+        await _mergeAuthMeFromCache(userId);
         await _registerFcmToken();
       }
 
@@ -251,6 +258,38 @@ class AuthNotifier extends Notifier<AuthState> {
       AppLogger.e('AuthNotifier restoreSession error: $e\n$st');
       state = const AuthState(isRestoringSession: false);
     }
+  }
+
+  Future<void> _mergeAuthMeFromCache(String? userId) async {
+    if (userId == null || userId.isEmpty) return;
+    final raw = await AppDataCache.readData(userId, AppDataCache.authMeFile);
+    if (raw is! Map) return;
+    final data = Map<String, dynamic>.from(raw);
+    state = state.copyWith(
+      fullName: (data['full_name'] ?? state.fullName)?.toString(),
+      email: data['email'] as String? ?? state.email,
+      emailVerified: data['email_verified'] as bool? ?? state.emailVerified,
+      phoneNumber: data['phone_number'] as String? ?? state.phoneNumber,
+      age: (data['age'] as num?)?.toInt() ?? state.age,
+      gender: data['gender'] as String? ?? state.gender,
+      medicalHistory: data['medical_history'] as String? ?? state.medicalHistory,
+      hotelName: data['hotel_name'] as String? ?? state.hotelName,
+      roomNumber: data['room_number'] as String? ?? state.roomNumber,
+      busInfo: data['bus_info'] as String? ?? state.busInfo,
+      visaNumber: data['visa']?['visa_number']?.toString() ?? state.visaNumber,
+      visaStatus: data['visa']?['status']?.toString() ?? state.visaStatus,
+      nationalId: data['national_id']?.toString() ?? state.nationalId,
+      language: data['language']?.toString() ?? state.language,
+      ethnicity: data['ethnicity']?.toString() ?? state.ethnicity,
+    );
+  }
+
+  /// Merge `/auth/me` fields from disk when token exists (e.g. offline cold start).
+  Future<void> hydrateFromCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString('auth_token') == null) return;
+    final uid = state.userId ?? prefs.getString('user_id');
+    await _mergeAuthMeFromCache(uid);
   }
 
   /// Clear local auth without calling the server (user record already gone or 401 handled).
@@ -449,6 +488,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Returns `false` when the session is invalid (401/404), after [logout] runs if needed.
   Future<bool> fetchProfile() async {
     if (!state.isAuthenticated) return false;
+    await hydrateFromCache();
     try {
       final response = await ApiService.dio.get('/auth/me');
       final data = response.data as Map<String, dynamic>;
@@ -476,6 +516,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final uid = data['_id']?.toString() ?? data['id']?.toString();
       if (uid != null && uid.isNotEmpty) {
         await prefs.setString('user_id', uid);
+        await AppDataCache.write(uid, AppDataCache.authMeFile, data);
       }
       final r = data['role']?.toString() ?? data['user_type']?.toString();
       if (r != null && r.isNotEmpty) {
@@ -492,6 +533,9 @@ class AuthNotifier extends Notifier<AuthState> {
         }
         return false;
       }
+      final prefs = await SharedPreferences.getInstance();
+      final uid = state.userId ?? prefs.getString('user_id');
+      await _mergeAuthMeFromCache(uid);
       return true;
     }
   }
