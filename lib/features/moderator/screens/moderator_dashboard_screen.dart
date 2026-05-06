@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -34,6 +34,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'system_reminders_screen.dart';
 import '../widgets/moderator_groups_speed_dial.dart';
 import '../widgets/pilgrim_profile_sheet.dart';
+import '../services/moderator_global_nav_beacon_controller.dart';
 import '../services/sos_alert_coordinator.dart';
 import '../../shared/providers/message_provider.dart';
 
@@ -57,6 +58,7 @@ class _ModeratorDashboardScreenState
       0; // 0=Groups, 1=Provisioning, 2=Reminders, 3=Profile, 4=Alerts
   final _searchController = TextEditingController();
   final _alertTts = FlutterTts();
+  ModeratorGlobalNavBeaconController? _globalNavBeacon;
 
   // ── RouteAware: re-join group rooms when returning from sub-screens ────────
   @override
@@ -65,6 +67,9 @@ class _ModeratorDashboardScreenState
     // returning focus to this screen. Re-join all rooms in case a sub-screen
     // (e.g. GroupManagementScreen) cleared our socket room memberships.
     _joinAllGroupRooms();
+    unawaited(
+      _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
+    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -78,7 +83,9 @@ class _ModeratorDashboardScreenState
 
   /// Named reconnect callback so offConnected can remove it.
   void _onSocketConnected() {
-    if (mounted) _joinAllGroupRooms();
+    if (!mounted) return;
+    _joinAllGroupRooms();
+    unawaited(_globalNavBeacon?.emitSnapshotIfNeeded() ?? Future.value());
   }
 
   void _refreshRealtimeState() {
@@ -106,7 +113,14 @@ class _ModeratorDashboardScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted && !kIsWeb) {
-      unawaited(_checkLocationPermission());
+      unawaited(() async {
+        await _checkLocationPermission();
+        if (mounted) {
+          unawaited(
+            _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
+          );
+        }
+      }());
     }
   }
 
@@ -136,7 +150,10 @@ class _ModeratorDashboardScreenState
       // Connect socket with this moderator's identity
       final auth = ref.read(authProvider);
       if (auth.userId != null) {
+        _globalNavBeacon = ModeratorGlobalNavBeaconController(ref);
         final socketUrl = ApiService.socketOrigin;
+        // Register before connect so a fast handshake never misses join + beacon.
+        SocketService.onConnected(_onSocketConnected);
         SocketService.connect(
           serverUrl: socketUrl,
           userId: auth.userId!,
@@ -160,14 +177,12 @@ class _ModeratorDashboardScreenState
         }
         // Fetch unread notification count for badge
         ref.read(notificationProvider.notifier).fetchUnreadCount();
-        // Join all group rooms — must happen AFTER socket handshake (register-user).
-        // If the socket is already connected, join right away; otherwise wait for the
-        // first connected event, then keep re-joining on every reconnect.
         if (SocketService.isConnected) {
-          _joinAllGroupRooms();
+          _onSocketConnected();
         }
-        // Re-join on every (re)connect including the first connection
-        SocketService.onConnected(_onSocketConnected);
+        unawaited(
+          _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
+        );
         // Listen for real-time SOS alerts
         SocketService.on('sos-alert-received', _onSosAlertArrived);
         // Listen for SOS cancellations
@@ -275,6 +290,8 @@ class _ModeratorDashboardScreenState
     SocketService.off('removed-from-group');
     SocketService.off('new_message');
     SocketService.offConnected(_onSocketConnected);
+    _globalNavBeacon?.dispose();
+    _globalNavBeacon = null;
     super.dispose();
   }
 
@@ -313,6 +330,16 @@ class _ModeratorDashboardScreenState
         ),
       );
     }
+
+    ref.listen<ModeratorState>(moderatorProvider, (prev, next) {
+      final pa = [...?prev?.groups.map((g) => g.id)]..sort();
+      final na = next.groups.map((g) => g.id).toList()..sort();
+      if (!listEquals(pa, na)) {
+        unawaited(
+          _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
+        );
+      }
+    });
 
     // Fallback: if an incoming call was accepted and we're connected,
     // navigate to VoiceCallScreen from here.

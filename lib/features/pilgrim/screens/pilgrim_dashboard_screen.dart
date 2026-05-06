@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -3012,6 +3013,25 @@ class _PilgrimMapTab extends StatelessWidget {
     final fabBottom = 14.h;
     final fabStride = 44.w + 10.h;
 
+    LatLng offsetIfTooCloseToMe(LatLng p) {
+      final me = myLocation;
+      if (me == null) return p;
+      final dM = Geolocator.distanceBetween(
+        me.latitude,
+        me.longitude,
+        p.latitude,
+        p.longitude,
+      );
+      // If the beacon sits on top of the pilgrim marker, nudge it a few meters
+      // so both remain visible/tappable even at max zoom.
+      if (dM > 8) return p;
+      const meters = 10.0;
+      final latRad = me.latitude * math.pi / 180.0;
+      final dLat = meters / 111320.0;
+      final dLng = meters / (111320.0 * math.cos(latRad).abs().clamp(0.2, 1.0));
+      return LatLng(p.latitude + dLat, p.longitude + dLng);
+    }
+
     void centerOnMe() {
       final target = myLocation ?? AppMapTiles.fallbackMapCenter;
       mapController.move(target, AppMapTiles.clampMapZoom(15));
@@ -3048,7 +3068,7 @@ class _PilgrimMapTab extends StatelessWidget {
                   ),
                 for (final b in beacons)
                   Marker(
-                    point: LatLng(b.lat, b.lng),
+                    point: offsetIfTooCloseToMe(LatLng(b.lat, b.lng)),
                     width: 92.w,
                     height: 90.h,
                     child: Column(
