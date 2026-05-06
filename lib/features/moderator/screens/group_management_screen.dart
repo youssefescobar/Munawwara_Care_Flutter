@@ -25,6 +25,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../../../core/services/socket_service.dart';
+import '../../../core/map/app_map_marker_cluster.dart';
 import '../../../core/map/app_map_tiles.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_popup_menu.dart';
@@ -1529,6 +1530,46 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
             ),
             children: [
               ...AppMapTiles.baseLayers(isDark: isDark),
+              AppMapMarkerCluster.layer(
+                markers: [
+                  ...PilgrimMarkerLayout.pointsForMarkers(locatedPilgrims)
+                      .map((item) {
+                    final selected = _focusedPilgrimId == item.pilgrim.id;
+                    final sz = PilgrimMapMarker.mapMarkerSize(
+                      context,
+                      isSelected: selected,
+                    );
+                    return Marker(
+                      point: item.point,
+                      width: sz.width,
+                      height: sz.height,
+                      alignment: Alignment.topCenter,
+                      child: GestureDetector(
+                        onTap: () => _focusPilgrim(item.pilgrim),
+                        child: Padding(
+                          padding: PilgrimMapMarker.mapMarkerPadding(),
+                          child: PilgrimMapMarker(
+                            pilgrim: item.pilgrim,
+                            isSelected: selected,
+                            isSOS: item.pilgrim.hasSOS,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  for (var area in areaState.areas)
+                    Marker(
+                      point: LatLng(area.latitude, area.longitude),
+                      width: 100.w,
+                      height: 82.h,
+                      alignment: Alignment.topCenter,
+                      child: GestureDetector(
+                        onTap: () => _showAreaList(group, areaState),
+                        child: AreaMapMarker(area: area),
+                      ),
+                    ),
+                ],
+              ),
               if (_myLocation != null)
                 MarkerLayer(
                   markers: [
@@ -1553,49 +1594,6 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                     ),
                   ],
                 ),
-              MarkerLayer(
-                markers: PilgrimMarkerLayout.pointsForMarkers(locatedPilgrims)
-                    .map((item) {
-                  final selected = _focusedPilgrimId == item.pilgrim.id;
-                  final sz = PilgrimMapMarker.mapMarkerSize(
-                    context,
-                    isSelected: selected,
-                  );
-                  return Marker(
-                    point: item.point,
-                    width: sz.width,
-                    height: sz.height,
-                    alignment: Alignment.topCenter,
-                    child: GestureDetector(
-                      onTap: () => _focusPilgrim(item.pilgrim),
-                      child: Padding(
-                        padding: PilgrimMapMarker.mapMarkerPadding(),
-                        child: PilgrimMapMarker(
-                          pilgrim: item.pilgrim,
-                          isSelected: selected,
-                          isSOS: item.pilgrim.hasSOS,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              // Suggested area & meetpoint markers
-              MarkerLayer(
-                markers: [
-                  for (var area in areaState.areas)
-                    Marker(
-                      point: LatLng(area.latitude, area.longitude),
-                      width: 100.w,
-                      height: 82.h,
-                      alignment: Alignment.topCenter,
-                      child: GestureDetector(
-                        onTap: () => _showAreaList(group, areaState),
-                        child: AreaMapMarker(area: area),
-                      ),
-                    ),
-                ],
-              ),
             ],
           ),
 

@@ -20,6 +20,7 @@ import '../../shared/helpers/chat_notification_helper.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../../../core/services/socket_service.dart';
+import '../../../core/map/app_map_marker_cluster.dart';
 import '../../../core/map/app_map_tiles.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_logger.dart';
@@ -199,6 +200,10 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       // Connect socket with this pilgrim's identity
       final auth = ref.read(authProvider);
       if (auth.userId != null) {
+        // Re-join group room on every (re)connect. Register BEFORE connect so we
+        // can't miss a fast connect on hot restart.
+        SocketService.onConnected(_onSocketConnected);
+
         final socketUrl = ApiService.socketOrigin;
         SocketService.connect(
           serverUrl: socketUrl,
@@ -210,6 +215,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         AppLogger.d(
           '[PilgrimDashboard] Socket status: ${SocketService.isConnected ? 'Connected' : 'Connecting...'}',
         );
+
+        // If we're already connected, join immediately (and trigger beacon sync).
+        _onSocketConnected();
 
         // Check if there's a pending call accepted from native call screen.
         // Must run AFTER the socket handshake so the call-answer emit goes through.
@@ -225,16 +233,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
           SocketService.onConnected(checkOnce);
         }
-        // Join group socket room so we receive group-scoped events
-        final gId = ref.read(pilgrimProvider).groupInfo?.groupId;
-        if (gId != null) {
-          AppLogger.d('[PilgrimDashboard] Emitting join_group for $gId');
-          SocketService.emit('join_group', gId);
-        } else {
-          AppLogger.w('[PilgrimDashboard] Cannot join room, groupId is null');
-        }
-        // Re-join group room on every reconnect (so beacon state is re-synced)
-        SocketService.onConnected(_onSocketConnected);
+        // Group join is handled by _onSocketConnected (initial + every reconnect)
         // Listen for moderator navigation beacon
         SocketService.on('mod_nav_beacon', (data) {
           if (!mounted) return;
@@ -3034,23 +3033,90 @@ class _PilgrimMapTab extends StatelessWidget {
           ),
           children: [
             ...AppMapTiles.baseLayers(isDark: isDark),
-            // Suggested areas & meetpoints
-            if (areas.isNotEmpty)
-              MarkerLayer(
-                markers: [
-                  for (var area in areas)
-                    Marker(
-                      point: LatLng(area.latitude, area.longitude),
-                      width: 120.w,
-                      height: 82.h,
-                      child: GestureDetector(
-                        onTap: () => _showAreaInfo(context, area),
-                        child: _PilgrimAreaMarker(area: area),
-                      ),
+            // Areas, meetpoints & moderator beacons — clustered when overlapping
+            AppMapMarkerCluster.layer(
+              markers: [
+                for (var area in areas)
+                  Marker(
+                    point: LatLng(area.latitude, area.longitude),
+                    width: 120.w,
+                    height: 82.h,
+                    child: GestureDetector(
+                      onTap: () => _showAreaInfo(context, area),
+                      child: _PilgrimAreaMarker(area: area),
                     ),
-                ],
-              ),
-            // My location
+                  ),
+                for (final b in beacons)
+                  Marker(
+                    point: LatLng(b.lat, b.lng),
+                    width: 92.w,
+                    height: 90.h,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 46.w,
+                          height: 46.w,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.surfaceDark
+                                : Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.14),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(3.w),
+                            child: ModeratorAvatar(
+                              size: 40.w,
+                              initials: b.name.isNotEmpty ? b.name[0] : '?',
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 2.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.surfaceDark
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(8.r),
+                            border: Border.all(
+                              color: Colors.black.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          child: Text(
+                            b.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10.sp,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            // My location (always on top, never clustered)
             if (myLocation != null)
               MarkerLayer(
                 markers: [
@@ -3104,78 +3170,6 @@ class _PilgrimMapTab extends StatelessWidget {
                       ],
                     ),
                   ),
-                ],
-              ),
-            // Moderator beacons (only when enabled)
-            if (beacons.isNotEmpty)
-              MarkerLayer(
-                markers: [
-                  for (final b in beacons)
-                    Marker(
-                      point: LatLng(b.lat, b.lng),
-                      width: 92.w,
-                      height: 90.h,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 46.w,
-                            height: 46.w,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.surfaceDark
-                                  : Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.14),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.all(3.w),
-                              child: ModeratorAvatar(
-                                size: 40.w,
-                                initials: b.name.isNotEmpty ? b.name[0] : '?',
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 6.w,
-                              vertical: 2.h,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.surfaceDark
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(
-                                color: Colors.black.withValues(alpha: 0.06),
-                              ),
-                            ),
-                            child: Text(
-                              b.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'Lexend',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 10.sp,
-                                color: isDark ? Colors.white : AppColors.textDark,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
           ],

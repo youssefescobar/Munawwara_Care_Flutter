@@ -9,6 +9,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/map/app_map_marker_cluster.dart';
 import '../../../core/map/app_map_tiles.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -419,18 +420,25 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
         ),
         children: [
           ...AppMapTiles.baseLayers(isDark: isDark),
-          MarkerLayer(
+          AppMapMarkerCluster.layer(
+            markerChildBehavior: false,
             markers: [
-              ...ref.watch(suggestedAreaProvider).areas.map((a) => Marker(
-                    point: LatLng(a.latitude, a.longitude),
-                    width: 48.w,
-                    height: 48.w,
-                    child: Opacity(
-                      opacity: 0.6,
-                      child: AreaMapMarker(area: a),
+              ...ref.watch(suggestedAreaProvider).areas.map(
+                    (a) => Marker(
+                      point: LatLng(a.latitude, a.longitude),
+                      width: 48.w,
+                      height: 48.w,
+                      child: Opacity(
+                        opacity: 0.6,
+                        child: AreaMapMarker(area: a),
+                      ),
                     ),
-                  )),
-              if (_pickedPoint != null && !_isFullScreenMap)
+                  ),
+            ],
+          ),
+          if (_pickedPoint != null && !_isFullScreenMap)
+            MarkerLayer(
+              markers: [
                 Marker(
                   point: _pickedPoint!,
                   width: 60.w,
@@ -450,8 +458,8 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
                     ],
                   ),
                 ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

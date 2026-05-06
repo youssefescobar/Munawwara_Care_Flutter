@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/map/app_map_marker_cluster.dart';
 import '../../../core/map/app_map_tiles.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -275,33 +276,9 @@ class _ModeratorGroupMapScreenState
             ),
             children: [
               ...AppMapTiles.baseLayers(isDark: isDark),
-              // My location
-              if (_myLocation != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _myLocation!,
-                      width: 20.w,
-                      height: 20.w,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.5),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              // Pilgrim markers
-              MarkerLayer(
+              // Pilgrim markers (clustered when overlapping)
+              AppMapMarkerCluster.layer(
+                markerChildBehavior: false,
                 markers: PilgrimMarkerLayout.pointsForMarkers(locatedPilgrims)
                     .map((item) {
                   final selected =
@@ -326,6 +303,31 @@ class _ModeratorGroupMapScreenState
                   );
                 }).toList(),
               ),
+              // My location (drawn above clusters)
+              if (_myLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _myLocation!,
+                      width: 20.w,
+                      height: 20.w,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.5),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
 
