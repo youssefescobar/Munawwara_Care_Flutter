@@ -44,6 +44,22 @@ class SosAlertCoordinator {
     await c?.read(moderatorSosEngagementProvider.notifier).refresh();
   }
 
+  /// Notifies the pilgrim app so the SOS **auto-call** timer is cancelled
+  /// (moderator is viewing / engaging, not ignoring the request).
+  static void emitModeratorHandling({
+    required String pilgrimId,
+    required String groupId,
+    String? sosId,
+  }) {
+    if (pilgrimId.isEmpty || groupId.isEmpty) return;
+    final handling = <String, dynamic>{
+      'groupId': groupId,
+      'pilgrimId': pilgrimId,
+    };
+    if (sosId != null && sosId.isNotEmpty) handling['sos_id'] = sosId;
+    SocketService.emit('sos_handling', handling);
+  }
+
   /// Unified entry for socket payload, FCM `data`, or pending deep-link map.
   static Future<void> showOnceFromMap(Map<String, dynamic> raw) async {
     final until = _suppressDialogsUntil;
@@ -101,6 +117,16 @@ class SosAlertCoordinator {
 
     final groupLabel = payload.groupName.isEmpty ? '—' : payload.groupName;
 
+    final pid = payload.pilgrimId;
+    final gid = payload.groupId;
+    if (pid != null && pid.isNotEmpty && gid != null && gid.isNotEmpty) {
+      emitModeratorHandling(
+        pilgrimId: pid,
+        groupId: gid,
+        sosId: payload.sosId,
+      );
+    }
+
     await showDialog<void>(
       context: ctx,
       barrierDismissible: false,
@@ -153,13 +179,11 @@ class SosAlertCoordinator {
     final gid = payload.groupId;
     final pid = payload.pilgrimId;
     if (gid != null && gid.isNotEmpty && pid != null && pid.isNotEmpty) {
-      final handling = <String, dynamic>{
-        'groupId': gid,
-        'pilgrimId': pid,
-      };
-      final sid = payload.sosId;
-      if (sid != null && sid.isNotEmpty) handling['sos_id'] = sid;
-      SocketService.emit('sos_handling', handling);
+      emitModeratorHandling(
+        pilgrimId: pid,
+        groupId: gid,
+        sosId: payload.sosId,
+      );
     }
 
     await c.read(moderatorProvider.notifier).loadDashboard(silently: true);

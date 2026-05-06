@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/open_maps_navigation.dart';
 import '../../moderator/providers/moderator_sos_engagement_provider.dart';
 import '../../moderator/services/moderator_sos_engagement_store.dart';
+import '../../moderator/services/sos_alert_coordinator.dart';
 import '../models/notification_model.dart';
 import '../providers/notification_provider.dart';
 import '../../moderator/providers/moderator_provider.dart';
@@ -376,6 +377,20 @@ class _NotificationTile extends ConsumerWidget {
                                   null) ...[
                                 GestureDetector(
                                   onTap: () async {
+                                    final d = n.data!;
+                                    final pId =
+                                        d['pilgrim_id']?.toString() ?? '';
+                                    final gId =
+                                        d['group_id']?.toString() ?? '';
+                                    final sidStr =
+                                        d['sos_id']?.toString();
+                                    if (pId.isNotEmpty && gId.isNotEmpty) {
+                                      SosAlertCoordinator.emitModeratorHandling(
+                                        pilgrimId: pId,
+                                        groupId: gId,
+                                        sosId: sidStr,
+                                      );
+                                    }
                                     final ll =
                                         _sosAlertNotificationLatLng(n.data)!;
                                     final ok =
@@ -434,10 +449,22 @@ class _NotificationTile extends ConsumerWidget {
                               ],
                               GestureDetector(
                                 onTap: () {
+                                  final d = n.data!;
                                   final pId =
-                                      n.data!['pilgrim_id'] as String;
+                                      d['pilgrim_id'] as String;
                                   final gId =
-                                      n.data!['group_id'] as String?;
+                                      d['group_id'] as String?;
+                                  final sidStr =
+                                      d['sos_id']?.toString();
+                                  if (gId != null &&
+                                      gId.isNotEmpty &&
+                                      pId.isNotEmpty) {
+                                    SosAlertCoordinator.emitModeratorHandling(
+                                      pilgrimId: pId,
+                                      groupId: gId,
+                                      sosId: sidStr,
+                                    );
+                                  }
                                   final modState =
                                       ref.read(moderatorProvider);
                                   PilgrimInGroup? pilgrim;

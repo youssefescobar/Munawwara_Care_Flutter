@@ -432,10 +432,28 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           if (!mounted) return;
           try {
             final map = Map<String, dynamic>.from(data as Map);
-            final sid = map['sos_id']?.toString();
-            final active = ref.read(pilgrimProvider).activeSosId;
             if (!ref.read(pilgrimProvider).sosActive) return;
-            if (sid != null && active != null && sid != active) return;
+
+            final myGroup = ref.read(pilgrimProvider).groupInfo?.groupId;
+            final evtGroup = map['group_id']?.toString();
+            if (myGroup != null &&
+                evtGroup != null &&
+                evtGroup != myGroup) {
+              return;
+            }
+
+            final sid = map['sos_id']?.toString().trim();
+            final active = ref.read(pilgrimProvider).activeSosId?.trim();
+            // Ignore only when both IDs are present and clearly differ
+            // (fixes missed cancels when one side omits or formats ids).
+            if (sid != null &&
+                sid.isNotEmpty &&
+                active != null &&
+                active.isNotEmpty &&
+                sid != active) {
+              return;
+            }
+
             _stopSosHelpTimers();
             setState(() => _sosHelpStatusKey = 'sos_status_reviewing');
           } catch (e) {
@@ -2385,91 +2403,119 @@ class _SosHelpSessionPanel extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: 400.w),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(22.w, 24.h, 22.w, 20.h),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(22.r),
-          border: Border.all(color: border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.mark_email_read_outlined,
-              color: AppColors.primary,
-              size: 40.w,
-            ),
-            SizedBox(height: 14.h),
-            Text(
-              'sos_help_title'.tr(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w800,
-                color: titleColor,
-                height: 1.25,
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              'sos_help_subtitle'.tr(namedArgs: {'name': brand}),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w500,
-                color: muted,
-                height: 1.45,
-              ),
-            ),
-            SizedBox(height: 18.h),
-            Text(
-              statusText,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-                height: 1.35,
-              ),
-            ),
-            SizedBox(height: 22.h),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onCancelRequest,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: muted,
-                  side: BorderSide(
-                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: EdgeInsets.fromLTRB(22.w, 24.h, 22.w, 20.h),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(22.r),
+              border: Border.all(color: border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: isDark ? 0.25 : 0.06,
                   ),
-                  padding: EdgeInsets.symmetric(vertical: 14.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14.r),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.mark_email_read_outlined,
+                  color: AppColors.primary,
+                  size: 40.w,
+                ),
+                SizedBox(height: 14.h),
+                Text(
+                  'sos_help_title'.tr(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w800,
+                    color: titleColor,
+                    height: 1.25,
                   ),
                 ),
-                child: Text(
-                  'sos_cancel_request'.tr(),
+                SizedBox(height: 8.h),
+                Text(
+                  'sos_help_subtitle'.tr(namedArgs: {'name': brand}),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: muted,
+                    height: 1.45,
+                  ),
+                ),
+                SizedBox(height: 18.h),
+                Text(
+                  statusText,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    height: 1.35,
                   ),
                 ),
+                SizedBox(height: 22.h),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: onCancelRequest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: muted,
+                      side: BorderSide(
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 14.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14.r),
+                      ),
+                    ),
+                    child: Text(
+                      'sos_cancel_request'.tr(),
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 4.h,
+            right: 4.w,
+            child: IconButton(
+              onPressed: onCancelRequest,
+              tooltip: 'popup_dismiss'.tr(),
+              style: IconButton.styleFrom(
+                foregroundColor: muted,
+                minimumSize: Size(30.w, 30.h),
+                padding: EdgeInsets.all(4.w),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: Icon(
+                Symbols.close,
+                size: 18.sp,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

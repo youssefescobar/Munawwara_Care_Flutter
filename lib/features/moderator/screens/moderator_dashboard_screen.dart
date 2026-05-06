@@ -1581,14 +1581,23 @@ class _SosBannerCard extends ConsumerWidget {
               runSpacing: 8.h,
               alignment: WrapAlignment.end,
               children: [
-                if (hasNav)
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final ok = await OpenMapsNavigation.confirmAndLaunch(
-                        context,
-                        row.lat!,
-                        row.lng!,
+              if (hasNav)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final p = row.pilgrim;
+                    final g = row.group;
+                    if (p != null && g != null) {
+                      SosAlertCoordinator.emitModeratorHandling(
+                        pilgrimId: p.id,
+                        groupId: g.id,
+                        sosId: row.record?.sosId,
                       );
+                    }
+                    final ok = await OpenMapsNavigation.confirmAndLaunch(
+                      context,
+                      row.lat!,
+                      row.lng!,
+                    );
                       if (!ok || !context.mounted) return;
                       final sk = row.storageKey;
                       if (sk != null) {
@@ -1613,20 +1622,25 @@ class _SosBannerCard extends ConsumerWidget {
                       style: const TextStyle(fontFamily: 'Lexend'),
                     ),
                   ),
-                FilledButton(
-                  onPressed: () {
-                    final g = row.group;
-                    final p = row.pilgrim;
-                    if (g == null || p == null) {
-                      StandardSnackBar.showWarning(
-                        context,
-                        'sos_mod_pilgrim_not_loaded'.tr(),
-                      );
-                      return;
-                    }
-                    final uid = ref.read(authProvider).userId ?? '';
-                    showPilgrimProfileSheet(context, p, g.id, uid);
-                  },
+              FilledButton(
+                onPressed: () {
+                  final g = row.group;
+                  final p = row.pilgrim;
+                  if (g == null || p == null) {
+                    StandardSnackBar.showWarning(
+                      context,
+                      'sos_mod_pilgrim_not_loaded'.tr(),
+                    );
+                    return;
+                  }
+                  SosAlertCoordinator.emitModeratorHandling(
+                    pilgrimId: p.id,
+                    groupId: g.id,
+                    sosId: row.record?.sosId,
+                  );
+                  final uid = ref.read(authProvider).userId ?? '';
+                  showPilgrimProfileSheet(context, p, g.id, uid);
+                },
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFDC2626),
                     foregroundColor: Colors.white,
