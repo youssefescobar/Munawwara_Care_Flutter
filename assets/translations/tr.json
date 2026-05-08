@@ -242,6 +242,7 @@
   "inbox_filter_voice": "Ses",
   "inbox_filter_tts": "TTS",
   "inbox_filter_private": "Inbox",
+  "inbox_filter_only_you": "Sadece sen",
   "inbox_empty": "Henüz mesaj yok",
   "inbox_today": "Bugün",
   "inbox_yesterday": "Dün",

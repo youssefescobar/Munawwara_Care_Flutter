@@ -278,6 +278,7 @@
   "inbox_filter_voice": "Voice",
   "inbox_filter_tts": "TTS",
   "inbox_filter_private": "Inbox",
+  "inbox_filter_only_you": "Only you",
   "inbox_empty": "No messages yet",
   "inbox_today": "Today",
   "inbox_yesterday": "Yesterday",

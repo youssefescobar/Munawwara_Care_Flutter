@@ -242,6 +242,7 @@
   "inbox_filter_voice": "Suara",
   "inbox_filter_tts": "TTS",
   "inbox_filter_private": "Inbox",
+  "inbox_filter_only_you": "Hanya kamu",
   "inbox_empty": "Belum ada pesan",
   "inbox_today": "Hari ini",
   "inbox_yesterday": "Kemarin",

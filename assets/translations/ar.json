@@ -269,6 +269,7 @@
   "inbox_filter_voice": "صوت",
   "inbox_filter_tts": "TTS",
   "inbox_filter_private": "الوارد",
+  "inbox_filter_only_you": "خاص بك",
   "inbox_empty": "لا توجد رسائل بعد",
   "inbox_today": "اليوم",
   "inbox_yesterday": "أمس",

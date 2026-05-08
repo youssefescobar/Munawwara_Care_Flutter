@@ -46,6 +46,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   String? _playingId;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  final _sfxPlayer = AudioPlayer();
 
   // TTS
   final _tts = FlutterTts();
@@ -53,24 +54,23 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   bool _ttsSpeaking = false;
 
   // UI
-  String _filter = 'all'; // all | urgent | voice | tts
+  String _filter = 'all'; // all | private
   final _scrollController = ScrollController();
   final Set<String> _newMessageIds = {};
   Timer? _highlightClearTimer;
   int _preLoadUnread = 0; // unread count captured before _load() runs
   bool _initialLoadDone = false; // true once the first load has completed
 
+  bool _hasUnreadAll = false;
+  bool _hasUnreadPrivate = false;
+  bool _pulseAll = false;
+  bool _pulsePrivate = false;
+  Timer? _pulseAllTimer;
+  Timer? _pulsePrivateTimer;
+
   // Translation — keyed by message id, value is translated text (null = not yet translated)
   final Map<String, String?> _translations = {};
   final Set<String> _translating = {}; // ids currently fetching
-
-  final _filters = const [
-    ('all', 'inbox_filter_all'),
-    ('urgent', 'inbox_filter_urgent'),
-    ('voice', 'inbox_filter_voice'),
-    ('tts', 'inbox_filter_tts'),
-    ('private', 'inbox_filter_private'),
-  ];
 
   @override
   void initState() {
@@ -127,10 +127,34 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   void dispose() {
     widget.scrollNotifier?.removeListener(_onExternalScroll);
     _player.dispose();
+    _sfxPlayer.dispose();
     _tts.stop();
     _scrollController.dispose();
     _highlightClearTimer?.cancel();
+    _pulseAllTimer?.cancel();
+    _pulsePrivateTimer?.cancel();
     super.dispose();
+  }
+
+  void _triggerTabPulse(String tab) {
+    const pulseWindow = Duration(seconds: 6);
+    if (tab == 'private') {
+      _hasUnreadPrivate = true;
+      _pulsePrivate = true;
+      _pulsePrivateTimer?.cancel();
+      _pulsePrivateTimer = Timer(pulseWindow, () {
+        if (!mounted) return;
+        setState(() => _pulsePrivate = false);
+      });
+    } else {
+      _hasUnreadAll = true;
+      _pulseAll = true;
+      _pulseAllTimer?.cancel();
+      _pulseAllTimer = Timer(pulseWindow, () {
+        if (!mounted) return;
+        setState(() => _pulseAll = false);
+      });
+    }
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -163,9 +187,6 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   List<GroupMessage> get _filtered {
     final all = ref.read(messageProvider).messages;
     return switch (_filter) {
-      'urgent' => all.where((m) => m.isUrgent).toList(),
-      'voice' => all.where((m) => m.type == 'voice').toList(),
-      'tts' => all.where((m) => m.type == 'tts').toList(),
       'private' => all.where((m) => m.recipientId != null).toList(),
       _ => all,
     };
@@ -221,6 +242,18 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
     await _tts.speak(text);
   }
 
+  Future<void> _playReceiveSfx(GroupMessage msg) async {
+    try {
+      if (msg.isUrgent) {
+        await _sfxPlayer.play(AssetSource('static/urgent_tts.wav'));
+      } else {
+        await _sfxPlayer.play(AssetSource('static/in_app.mp3'));
+      }
+    } catch (_) {
+      // ignore – SFX should never break chat UX
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -258,10 +291,8 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
       if (!next.isLoading &&
           (prev?.messages.length ?? 0) < next.messages.length) {
         final prevIds = prev?.messages.map((m) => m.id).toSet() ?? {};
-        final arrivedIds = next.messages
-            .where((m) => !prevIds.contains(m.id))
-            .map((m) => m.id)
-            .toSet();
+        final arrived = next.messages.where((m) => !prevIds.contains(m.id));
+        final arrivedIds = arrived.map((m) => m.id).toSet();
         if (arrivedIds.isNotEmpty) {
           setState(() => _newMessageIds.addAll(arrivedIds));
           _highlightClearTimer?.cancel();
@@ -269,6 +300,17 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
             if (mounted) setState(() => _newMessageIds.clear());
           });
           _scrollToBottom(); // smooth animate — no flicker
+          // Play receive sound for any new message while this screen is open.
+          for (final m in arrived) {
+            unawaited(_playReceiveSfx(m));
+          }
+          // Pulse the relevant tab only if user is not currently on it.
+          for (final m in arrived) {
+            final targetTab = (m.recipientId != null) ? 'private' : 'all';
+            if (_filter != targetTab) {
+              setState(() => _triggerTabPulse(targetTab));
+            }
+          }
         }
       }
     });
@@ -322,52 +364,111 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   // ── Filter chips ──────────────────────────────────────────────────────────
 
   Widget _buildFilterRow(bool isDark) {
-    return Container(
-      height: 46.h,
-      color: GroupChatTheme.filterStripBackground(isDark),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
-        itemCount: _filters.length,
-        separatorBuilder: (_, _) => SizedBox(width: 6.w),
-        itemBuilder: (_, i) {
-          final (key, label) = _filters[i];
-          final selected = _filter == key;
-          return GestureDetector(
-            onTap: () => setState(() => _filter = key),
+    final bg = GroupChatTheme.filterStripBackground(isDark);
+    final surface = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
+    final border = isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
+
+    Widget buildBox({
+      required String key,
+      required String labelKey,
+      required bool selected,
+      required bool hasDot,
+      required bool isPulsing,
+      required VoidCallback onTap,
+    }) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            scale: isPulsing ? 1.03 : 1.0,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
+              duration: const Duration(milliseconds: 200),
+              padding: EdgeInsets.symmetric(vertical: 10.h),
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primary
-                    : (isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.white),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: selected
-                      ? AppColors.primary
-                      : (isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : const Color(0xFFE2E8F0)),
-                ),
+                color: selected ? AppColors.primary : surface,
+                borderRadius: BorderRadius.circular(14.r),
+                border: Border.all(color: selected ? AppColors.primary : border),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                label.tr(),
-                style: TextStyle(
-                  fontFamily: 'Lexend',
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w600,
-                  color: selected
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : AppColors.textMutedLight),
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Text(
+                    labelKey.tr(),
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? Colors.white
+                          : (isDark ? Colors.white70 : AppColors.textDark),
+                    ),
+                  ),
+                  if (hasDot)
+                    Positioned(
+                      right: 10.w,
+                      top: 8.h,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 200),
+                        opacity: selected ? 0.0 : 1.0,
+                        child: Container(
+                          width: 8.w,
+                          height: 8.w,
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      color: bg,
+      padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
+      child: Row(
+        children: [
+          buildBox(
+            key: 'all',
+            labelKey: 'inbox_filter_all',
+            selected: _filter == 'all',
+            hasDot: _hasUnreadAll,
+            isPulsing: _pulseAll,
+            onTap: () {
+              setState(() {
+                _filter = 'all';
+                _hasUnreadAll = false;
+                _pulseAll = false;
+              });
+              _pulseAllTimer?.cancel();
+              _pulseAllTimer = null;
+            },
+          ),
+          SizedBox(width: 10.w),
+          buildBox(
+            key: 'private',
+            labelKey: 'inbox_filter_only_you',
+            selected: _filter == 'private',
+            hasDot: _hasUnreadPrivate,
+            isPulsing: _pulsePrivate,
+            onTap: () {
+              setState(() {
+                _filter = 'private';
+                _hasUnreadPrivate = false;
+                _pulsePrivate = false;
+              });
+              _pulsePrivateTimer?.cancel();
+              _pulsePrivateTimer = null;
+            },
+          ),
+        ],
       ),
     );
   }
