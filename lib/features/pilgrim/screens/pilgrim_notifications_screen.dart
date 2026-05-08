@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../notifications/screens/alerts_tab.dart';
+import '../../notifications/screens/alerts_tab_v2.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pilgrim Notifications Screen — wraps AlertsTab in a Scaffold with back nav

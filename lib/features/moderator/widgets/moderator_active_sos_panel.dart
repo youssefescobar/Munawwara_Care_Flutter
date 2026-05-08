@@ -425,7 +425,7 @@ class ModeratorSosBannerCard extends ConsumerWidget {
                     await ref
                         .read(moderatorProvider.notifier)
                         .loadDashboard(silently: true);
-                    await ref.read(notificationProvider.notifier).fetch();
+                    await ref.read(notificationProvider.notifier).refetch();
                     if (!context.mounted) return;
                     onSosResolved?.call();
                     StandardSnackBar.showSuccess(

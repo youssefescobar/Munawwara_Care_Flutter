@@ -20,4 +20,9 @@ class ModeratorResolvedSosNotifier
     await ModeratorResolvedSosStore.prepend(record);
     await refresh();
   }
+
+  Future<void> clearAll() async {
+    await ModeratorResolvedSosStore.clearAll();
+    await refresh();
+  }
 }

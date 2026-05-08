@@ -78,7 +78,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
   }
 
   // ── Fetch all notifications ───────────────────────────────────────────────
-  Future<void> fetch() async {
+  Future<void> fetch({bool markAllAsRead = false}) async {
     await _hydrateFromCache();
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -95,8 +95,8 @@ class NotificationNotifier extends Notifier<NotificationState> {
           unreadCount: unread,
           isLoading: false,
         );
-        // Auto-mark all as read once fetched
-        if (unread > 0) {
+        // Only mark read when the user is explicitly viewing Alerts.
+        if (markAllAsRead && unread > 0) {
           await _markAllReadRemote();
           state = state.copyWith(
             unreadCount: 0,

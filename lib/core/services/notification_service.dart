@@ -16,7 +16,7 @@ import 'package:flutter_callkit_incoming/entities/entities.dart';
 import '../../features/pilgrim/screens/group_inbox_screen.dart';
 import '../../features/moderator/screens/group_messages_screen.dart';
 import '../../features/moderator/services/sos_alert_coordinator.dart';
-import '../../features/notifications/screens/alerts_tab.dart';
+import '../../features/notifications/screens/alerts_tab_v2.dart';
 import '../theme/app_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────

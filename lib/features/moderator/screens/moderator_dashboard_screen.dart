@@ -22,7 +22,7 @@ import '../../calling/screens/voice_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
 import '../../notifications/providers/notification_provider.dart';
-import '../../notifications/screens/alerts_tab.dart';
+import '../../notifications/screens/alerts_tab_v2.dart';
 import '../providers/moderator_provider.dart';
 import 'pilgrim_provisioning_screen.dart';
 import 'create_group_screen.dart';
@@ -93,9 +93,39 @@ class _ModeratorDashboardScreenState
     ref.read(moderatorProvider.notifier).loadDashboard(silently: true);
   }
 
+  Future<void> _onSosAlertCancelled(dynamic data) async {
+    if (!mounted) return;
+    _alertTts.stop();
+
+    String? pilgrimId;
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      pilgrimId = (map['pilgrim_id'] ?? map['pilgrimId'])?.toString();
+    }
+
+    final pid = pilgrimId?.trim();
+    if (pid != null && pid.isNotEmpty) {
+      ref.read(moderatorProvider.notifier).markPilgrimSOS(pid, active: false);
+      // Important: await removal BEFORE refresh to avoid a race where the
+      // Active SOS tab re-reads the old prefs snapshot.
+      await ModeratorSosEngagementStore.removeAllEntriesForPilgrim(pid);
+      await ref.read(moderatorSosEngagementProvider.notifier).refresh();
+    }
+
+    // Dismiss any open SOS dialog (pilgrim cancelled — no need for it)
+    final nav = AppRouter.navigatorKey.currentState;
+    if (nav != null && nav.canPop()) {
+      nav.pop();
+    }
+
+    // Refresh list + unread badge without auto-marking as read.
+    unawaited(ref.read(notificationProvider.notifier).refetch());
+  }
+
   Future<void> _onSosAlertArrived(dynamic data) async {
     if (!mounted) return;
-    ref.read(notificationProvider.notifier).fetch();
+    // Update badge/list without auto-clearing unread count.
+    ref.read(notificationProvider.notifier).refetch();
 
     final map = data is Map
         ? Map<String, dynamic>.from(data)
@@ -191,36 +221,9 @@ class _ModeratorDashboardScreenState
         );
         // Listen for real-time SOS alerts
         SocketService.on('sos-alert-received', _onSosAlertArrived);
-        // Listen for SOS cancellations
-        SocketService.on('sos-alert-cancelled', (data) {
-          if (!mounted) return;
-          _alertTts.stop();
-
-          if (data is Map) {
-            final pilgrimId = data['pilgrim_id'] as String?;
-            if (pilgrimId != null) {
-              ref
-                  .read(moderatorProvider.notifier)
-                  .markPilgrimSOS(pilgrimId, active: false);
-              unawaited(
-                ModeratorSosEngagementStore.removeAllEntriesForPilgrim(
-                  pilgrimId,
-                ),
-              );
-              unawaited(
-                ref.read(moderatorSosEngagementProvider.notifier).refresh(),
-              );
-            }
-          }
-
-          // Dismiss any open SOS dialog (pilgrim cancelled — no need for it)
-          final nav = AppRouter.navigatorKey.currentState;
-          if (nav != null && nav.canPop()) {
-            nav.pop();
-          }
-
-          ref.read(notificationProvider.notifier).fetch();
-        });
+        // Backend may emit either name depending on transport/version.
+        SocketService.on('sos-alert-cancelled', _onSosAlertCancelled);
+        SocketService.on('sos_cancel', _onSosAlertCancelled);
         // Listen for missed calls — refresh notification/list + groups
         SocketService.on('missed-call-received', (_) {
           _refreshRealtimeState();
@@ -310,6 +313,7 @@ class _ModeratorDashboardScreenState
     AppRouter.moderatorRouteObserver.unsubscribe(this);
     SocketService.off('sos-alert-received');
     SocketService.off('sos-alert-cancelled');
+    SocketService.off('sos_cancel');
     SocketService.off('missed-call-received');
     SocketService.off('notification_refresh');
     SocketService.off('group_updated');

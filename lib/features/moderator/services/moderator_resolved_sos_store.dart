@@ -94,4 +94,9 @@ class ModeratorResolvedSosStore {
     ].take(_maxItems).toList();
     await _saveAll(next);
   }
+
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+  }
 }

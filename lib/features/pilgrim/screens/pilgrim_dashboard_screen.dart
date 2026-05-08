@@ -919,26 +919,40 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx, false),
-            child: Text(
-              'sos_cancel_confirm_keep'.tr(),
-              style: const TextStyle(
-                fontFamily: 'Lexend',
-                color: AppColors.textMutedLight,
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogCtx, false),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(
+                    'sos_cancel_confirm_keep'.tr(),
+                    style: const TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogCtx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(
-              'sos_cancel_confirm_yes'.tr(),
-              style: const TextStyle(fontFamily: 'Lexend'),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: () => Navigator.pop(dialogCtx, true),
+                  child: Text(
+                    'sos_cancel_confirm_yes'.tr(),
+                    style: const TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

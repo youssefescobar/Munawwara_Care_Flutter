@@ -30,4 +30,11 @@ class CallHistoryApi {
   static Future<void> markMissedCallsRead() async {
     await ApiService.dio.put('/call-history/mark-read');
   }
+
+  /// Clears the user's call history (server-side).
+  ///
+  /// Backend endpoint is expected to exist; if not, caller should handle errors.
+  static Future<void> clearCallHistory() async {
+    await ApiService.dio.delete('/call-history');
+  }
 }
