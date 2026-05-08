@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import 'callkit_service.dart';
+import 'speech_service.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/router/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -252,15 +253,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         message.data['body']?.toString() ??
         message.data['content']?.toString() ??
         '';
+    final audioUrl = message.data['audio_url']?.toString();
     final isReminder = msgType == 'reminder_tts';
     final prefix = isReminder ? 'Incoming reminder.' : 'Urgent message.';
+    final lang = message.data['lang']?.toString() ?? 'en';
     if (text.isEmpty &&
         isReminder &&
         (message.notification?.body ?? '').isNotEmpty) {
       text = message.notification!.body!;
     }
     AppLogger.i(
-      '🔊 ${isReminder ? "Reminder" : "Urgent"} TTS [background]: "$text"',
+      '🔊 ${isReminder ? 'Reminder' : 'Urgent'} TTS [background]: "$text" '
+      '(audioUrl=${audioUrl != null ? 'present' : 'null'}, lang=$lang)',
     );
 
     // 1. Show notification — the urgent channel plays urgent_tts.wav as sound
@@ -281,10 +285,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     }
 
     if (text.isNotEmpty) {
-      // 2. Wait for the alert sound to finish before TTS begins
+      // 2. Wait for the alert sound to finish before TTS begins.
       await Future.delayed(const Duration(milliseconds: 2200));
-      // 3. Speak with prefix (helper logs engine/language support)
-      await _speakWithTts('$prefix $text');
+
+      // 3. Play cloud audio (with local TTS fallback) and repeat 3× for
+      //    urgent broadcast messages. Reminders only play once.
+      if (isReminder) {
+        await SpeechService.playRobust(
+          audioUrl: audioUrl,
+          backupText: '$prefix $text',
+          lang: lang,
+          isUrgent: true,
+        );
+      } else {
+        await SpeechService.playUrgentLoop(
+          audioUrl: audioUrl,
+          backupText: '$prefix $text',
+          lang: lang,
+        );
+      }
     }
     return; // notification already shown above, skip the call below
   }
@@ -569,9 +588,19 @@ class NotificationService {
 
   // ── TTS (public, usable from foreground context) ───────────────────────────
 
-  /// Speak [text] aloud. Logs TTS engine/language availability so you can
-  /// see in the console whether the device supports TTS.
-  static Future<void> speakTts(String text) => _speakWithTts(text);
+  /// Play [text] aloud using the hybrid SpeechService.
+  /// Optionally supply [audioUrl] (GCS MP3) to attempt cloud playback first;
+  /// falls back to local flutter_tts on timeout or failure.
+  static Future<void> speakTts(
+    String text, {
+    String? audioUrl,
+    String lang = 'en',
+  }) =>
+      SpeechService.playRobust(
+        audioUrl: audioUrl,
+        backupText: text,
+        lang: lang,
+      );
 
   // ── Notification Tap Handler ──────────────────────────────────────────────
 

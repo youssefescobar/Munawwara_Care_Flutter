@@ -42,6 +42,7 @@ abstract final class GroupChatTheme {
 /// Shared “play aloud” / TTS control (info blue) for pilgrim inbox and moderator group chat.
 class TtsPlayAloudButton extends StatelessWidget {
   final bool isSpeaking;
+  final bool isLoading;
   final VoidCallback onPressed;
   final String idleLabel;
   final String playingLabel;
@@ -52,18 +53,38 @@ class TtsPlayAloudButton extends StatelessWidget {
     required this.onPressed,
     required this.idleLabel,
     required this.playingLabel,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget leadingIcon;
+    String label;
+
+    if (isLoading) {
+      leadingIcon = SizedBox(
+        width: 18.w,
+        height: 18.w,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppColors.info,
+        ),
+      );
+      label = idleLabel; // keep label stable during load
+    } else if (isSpeaking) {
+      leadingIcon = Icon(Symbols.stop, size: 20.w);
+      label = playingLabel;
+    } else {
+      leadingIcon = Icon(Symbols.volume_up, size: 20.w);
+      label = idleLabel;
+    }
+
     return FilledButton.tonalIcon(
-      onPressed: onPressed,
-      icon: Icon(
-        isSpeaking ? Symbols.stop : Symbols.volume_up,
-        size: 20.w,
-      ),
+      // Disable taps while buffering to prevent double-trigger
+      onPressed: isLoading ? null : onPressed,
+      icon: leadingIcon,
       label: Text(
-        isSpeaking ? playingLabel : idleLabel,
+        label,
         style: TextStyle(
           fontFamily: 'Lexend',
           fontWeight: FontWeight.w600,
@@ -75,6 +96,8 @@ class TtsPlayAloudButton extends StatelessWidget {
             ? AppColors.info
             : AppColors.info.withValues(alpha: 0.14),
         foregroundColor: isSpeaking ? Colors.white : AppColors.info,
+        disabledBackgroundColor: AppColors.info.withValues(alpha: 0.10),
+        disabledForegroundColor: AppColors.info.withValues(alpha: 0.60),
         padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 12.h),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.r),

@@ -70,6 +70,9 @@ dependencies:
   flutter_qiblah: ^3.2.0
   flutter_compass_v2: any
   flutter_map_marker_cluster: ^1.4.0
+  just_audio: ^0.10.5
+  audio_session: ^0.2.3
+  wakelock_plus: ^1.5.2
 dependency_overrides:
   # Local copy of flutter_callkit_incoming with native Android HTTP decline fix.
   # The BroadcastReceiver now posts to /call-history/decline when the pilgrim

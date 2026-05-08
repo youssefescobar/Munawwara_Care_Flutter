@@ -5,13 +5,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/callkit_service.dart';
+import '../../../core/services/speech_service.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../shared/models/message_model.dart';
 import '../../shared/providers/message_provider.dart';
@@ -49,9 +49,9 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   final _sfxPlayer = AudioPlayer();
 
   // TTS
-  final _tts = FlutterTts();
   String? _ttsPlayingId;
   bool _ttsSpeaking = false;
+  bool _ttsLoading = false;
 
   // UI
   String _filter = 'all'; // all | private
@@ -92,24 +92,6 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
       }
     });
 
-    // TTS
-    _tts.setCompletionHandler(() {
-      if (mounted) {
-        setState(() {
-          _ttsSpeaking = false;
-          _ttsPlayingId = null;
-        });
-      }
-    });
-    _tts.setErrorHandler((_) {
-      if (mounted) {
-        setState(() {
-          _ttsSpeaking = false;
-          _ttsPlayingId = null;
-        });
-      }
-    });
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
     });
@@ -128,7 +110,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
     widget.scrollNotifier?.removeListener(_onExternalScroll);
     _player.dispose();
     _sfxPlayer.dispose();
-    _tts.stop();
+    SpeechService.stop();
     _scrollController.dispose();
     _highlightClearTimer?.cancel();
     _pulseAllTimer?.cancel();
@@ -201,10 +183,11 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
       return;
     }
     if (_ttsPlayingId != null) {
-      await _tts.stop();
+      await SpeechService.stop();
       setState(() {
         _ttsSpeaking = false;
         _ttsPlayingId = null;
+        _ttsLoading = false;
       });
     }
     setState(() {
@@ -219,27 +202,59 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
 
   Future<void> _toggleTts(GroupMessage msg) async {
     final text = msg.originalText ?? msg.content ?? '';
-    if (_ttsPlayingId == msg.id && _ttsSpeaking) {
-      await _tts.stop();
-      setState(() {
-        _ttsSpeaking = false;
-        _ttsPlayingId = null;
-      });
+    final isCurrentlySpeaking = _ttsPlayingId == msg.id && (_ttsSpeaking || _ttsLoading);
+    
+    if (isCurrentlySpeaking) {
+      await SpeechService.stop();
+      if (mounted) {
+        setState(() {
+          _ttsSpeaking = false;
+          _ttsPlayingId = null;
+          _ttsLoading = false;
+        });
+      }
       return;
     }
+    
     if (_playingId != null) {
       await _player.stop();
+      if (mounted) {
+        setState(() {
+          _playingId = null;
+          _position = Duration.zero;
+        });
+      }
+    }
+    
+    await SpeechService.stop();
+    if (mounted) {
       setState(() {
-        _playingId = null;
-        _position = Duration.zero;
+        _ttsPlayingId = msg.id;
+        _ttsLoading = true;
       });
     }
-    await _tts.stop();
-    setState(() {
-      _ttsPlayingId = msg.id;
-      _ttsSpeaking = true;
-    });
-    await _tts.speak(text);
+
+    try {
+      // Play robustly (cloud with local fallback)
+      await SpeechService.playRobust(
+        audioUrl: msg.audioUrl,
+        backupText: text,
+      );
+      if (mounted && _ttsPlayingId == msg.id) {
+        setState(() {
+          _ttsLoading = false;
+          _ttsSpeaking = true;
+        });
+      }
+    } catch (_) {
+      if (mounted && _ttsPlayingId == msg.id) {
+        setState(() {
+          _ttsLoading = false;
+          _ttsSpeaking = false;
+          _ttsPlayingId = null;
+        });
+      }
+    }
   }
 
   Future<void> _playReceiveSfx(GroupMessage msg) async {
@@ -800,6 +815,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
 
   Widget _buildTtsBody(GroupMessage msg, bool isDark) {
     final isSpeaking = _ttsPlayingId == msg.id && _ttsSpeaking;
+    final isLoading = _ttsPlayingId == msg.id && _ttsLoading;
     final originalText = msg.originalText ?? msg.content ?? '';
     final translated = _translations[msg.id];
     final displayText = translated ?? originalText;
@@ -823,6 +839,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
         SizedBox(height: 10.h),
         TtsPlayAloudButton(
           isSpeaking: isSpeaking,
+          isLoading: isLoading,
           onPressed: () => _toggleTts(msg),
           idleLabel: 'msg_play_aloud'.tr(),
           playingLabel: 'msg_playing'.tr(),
