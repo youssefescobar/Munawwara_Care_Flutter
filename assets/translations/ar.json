@@ -872,5 +872,7 @@
   "reg_passport_hint": "أدخل رقم الجواز أو الهوية",
   "reg_phone_hint": "55 123 4567",
   "reg_age_hint": "سنوات",
-  "reg_medical_hint": "مثال: مرض السكري، أمراض القلب، الحساسية..."
+  "reg_medical_hint": "مثال: مرض السكري، أمراض القلب، الحساسية...",
+  "clear_call_history": "مسح المكالمات",
+  "clear_resolved_sos": "مسح المُعالَج"
 }

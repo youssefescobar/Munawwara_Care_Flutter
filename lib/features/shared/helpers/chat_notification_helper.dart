@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/in_app_popup.dart';
@@ -13,16 +14,38 @@ import '../providers/message_provider.dart';
 
 class ChatNotificationHelper {
   static final AudioPlayer _sfxPlayer = AudioPlayer();
+  static const _prefsLastPopupMsKey = 'chat_last_in_app_popup_ms_v1';
 
-  static void showIncomingMessage({
+  static Future<void> showIncomingMessage({
     required BuildContext context,
     required WidgetRef ref,
     required Map<String, dynamic> map,
     required VoidCallback onViewChat,
-  }) {
+  }) async {
     if (!context.mounted) return;
 
     try {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final createdAtRaw = map['createdAt']?.toString() ??
+          map['created_at']?.toString() ??
+          map['timestamp']?.toString();
+      int msgMs = nowMs;
+      if (createdAtRaw != null && createdAtRaw.isNotEmpty) {
+        try {
+          msgMs = DateTime.parse(createdAtRaw).toLocal().millisecondsSinceEpoch;
+        } catch (_) {}
+      }
+
+      // Prevent replaying old socket messages on reconnect/hot restart.
+      final prefs = await SharedPreferences.getInstance();
+      final lastMs = prefs.getInt(_prefsLastPopupMsKey) ?? 0;
+      if (msgMs <= lastMs) {
+        AppLogger.d(
+          '[ChatNotificationHelper] Skipping popup (dedup) msgMs=$msgMs lastMs=$lastMs',
+        );
+        return;
+      }
+
       final msg = GroupMessage.fromJson(map);
 
       // Don't show popup for our own messages
@@ -118,6 +141,8 @@ class ChatNotificationHelper {
           onViewChat: onViewChat,
         );
       }
+
+      await prefs.setInt(_prefsLastPopupMsKey, msgMs);
     } catch (e) {
       AppLogger.e('[ChatNotificationHelper] Error showing popup: $e');
     }

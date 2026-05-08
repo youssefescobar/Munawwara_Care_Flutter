@@ -783,5 +783,7 @@
   "provisioning_basic_information": "بنیادی معلومات",
   "provisioning_optional_logistics": "اختیاری لاجسٹکس",
   "provisioning_required": "Required",
-  "provisioning_invalid": "Invalid"
+  "provisioning_invalid": "Invalid",
+  "clear_call_history": "کال ہسٹری صاف کریں",
+  "clear_resolved_sos": "حل شدہ صاف کریں"
 }

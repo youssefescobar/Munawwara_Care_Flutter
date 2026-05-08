@@ -305,15 +305,17 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
             }
 
             // Show in-app popup for the incoming message
-            ChatNotificationHelper.showIncomingMessage(
-              context: context,
-              ref: ref,
-              map: map,
-              onViewChat: () {
-                setState(() => _currentTab = 3);
-                ref.read(messageProvider.notifier).markAllRead(groupId);
-                _chatScrollNotifier.value++;
-              },
+            unawaited(
+              ChatNotificationHelper.showIncomingMessage(
+                context: context,
+                ref: ref,
+                map: map,
+                onViewChat: () {
+                  setState(() => _currentTab = 3);
+                  ref.read(messageProvider.notifier).markAllRead(groupId);
+                  _chatScrollNotifier.value++;
+                },
+              ),
             );
           } catch (e) {
             AppLogger.e('[PilgrimDashboard] new_message handler error: $e');

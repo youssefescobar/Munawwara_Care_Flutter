@@ -783,5 +783,7 @@
   "provisioning_basic_information": "Informations de base",
   "provisioning_optional_logistics": "Logistique optionnelle",
   "provisioning_required": "Required",
-  "provisioning_invalid": "Invalid"
+  "provisioning_invalid": "Invalid",
+  "clear_call_history": "Effacer les appels",
+  "clear_resolved_sos": "Effacer résolus"
 }

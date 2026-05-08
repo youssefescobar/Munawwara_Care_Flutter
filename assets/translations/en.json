@@ -873,5 +873,7 @@
   "reg_passport_hint": "Enter passport or ID number",
   "reg_phone_hint": "55 123 4567",
   "reg_age_hint": "Years",
-  "reg_medical_hint": "e.g. Diabetes, heart conditions, allergies..."
+  "reg_medical_hint": "e.g. Diabetes, heart conditions, allergies...",
+  "clear_call_history": "Clear calls",
+  "clear_resolved_sos": "Clear resolved"
 }

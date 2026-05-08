@@ -783,5 +783,7 @@
   "provisioning_basic_information": "Informasi dasar",
   "provisioning_optional_logistics": "Logistik opsional",
   "provisioning_required": "Required",
-  "provisioning_invalid": "Invalid"
+  "provisioning_invalid": "Invalid",
+  "clear_call_history": "Hapus riwayat panggilan",
+  "clear_resolved_sos": "Hapus yang terselesaikan"
 }
