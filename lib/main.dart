@@ -205,7 +205,11 @@ void main() async {
               );
             }
             if (isUrgentTts) {
-              await NotificationService.speakTts('Incoming reminder. $text');
+              await NotificationService.speakTts(
+                'Incoming reminder. $text',
+                audioUrl: msg.data['audio_url']?.toString(),
+                lang: msg.data['lang']?.toString() ?? 'en',
+              );
             }
           }
           return;
@@ -218,7 +222,11 @@ void main() async {
               '';
           if (text.isNotEmpty) {
             AppLogger.i('🔊 Foreground urgent TTS: "$text"');
-            await NotificationService.speakTts('Urgent message. $text');
+            await NotificationService.speakTts(
+              'Urgent message. $text',
+              audioUrl: msg.data['audio_url']?.toString(),
+              lang: msg.data['lang']?.toString() ?? 'en',
+            );
           }
         }
 

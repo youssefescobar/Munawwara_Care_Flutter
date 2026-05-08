@@ -36,6 +36,7 @@ class GroupMessage {
   final String type; // 'text' | 'voice' | 'tts' | 'meetpoint'
   final String? content;
   final String? mediaUrl; // filename only (voice/image)
+  final String? audioUrl; // GCS URL for TTS messages
   final String? originalText; // TTS source text
   final bool isUrgent;
   final int duration; // seconds (voice)
@@ -52,6 +53,7 @@ class GroupMessage {
     required this.type,
     this.content,
     this.mediaUrl,
+    this.audioUrl,
     this.originalText,
     required this.isUrgent,
     required this.duration,
@@ -85,6 +87,7 @@ class GroupMessage {
         type: j['type']?.toString() ?? 'text',
         content: j['content']?.toString(),
         mediaUrl: j['media_url']?.toString(),
+        audioUrl: j['audio_url']?.toString(),
         originalText: j['original_text']?.toString(),
         isUrgent: j['is_urgent'] == true ||
             j['is_urgent'] == 1 ||
