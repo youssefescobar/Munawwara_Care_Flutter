@@ -1,4 +1,4 @@
-﻿{
+{
   "offline_showing_saved_data": "لا يوجد اتصال — عرض البيانات المحفوظة. اتصل للتحديث.",
   "welcome_back": "مرحباً بعودتك",
   "login_subtitle": "سجّل دخولك إلى رعاية منوّرة،\nرفيقك في رحلة مباركة.",
@@ -579,7 +579,7 @@
   "sos_status_callback_available": "إذا كنت لا تزال بحاجة للمساعدة، يمكنك الاتصال بالمشرف مرة أخرى.",
   "sos_status_resolved_friendly": "تم حلّ المشكلة. قامت Munawwara Care بإغلاق طلبك بنجاح.",
   "sos_status_seen": "شاهد أحد المشرفين طلبك وهو يتابع...",
-  "sos_status_responding": "{name} في طريقه إليك \u2714",
+  "sos_status_responding": "{name} في طريقه إليك ✔",
   "sos_status_connecting": "جارٍ توصيلك بـ {name}…",
   "sos_cancel_request": "إلغاء الطلب",
   "sos_call_back": "اتصال مرة أخرى",
@@ -923,5 +923,8 @@
   "reg_age_hint": "سنوات",
   "reg_medical_hint": "مثال: مرض السكري، أمراض القلب، الحساسية...",
   "clear_call_history": "مسح المكالمات",
-  "clear_resolved_sos": "مسح المُعالَج"
+  "clear_resolved_sos": "مسح المُعالَج",
+  "dialog_delete": "حذف",
+  "dialog_yes": "نعم",
+  "dialog_no": "لا"
 }
