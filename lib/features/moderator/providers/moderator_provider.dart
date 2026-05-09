@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_munawwara/core/utils/app_logger.dart';
@@ -131,15 +132,22 @@ class PilgrimInGroup {
     return BatteryStatus.low;
   }
 
-  /// Human-readable "last seen" text
+  /// Human-readable "last seen" text (localized).
   String get lastSeenText {
-    if (isOnline) return 'Active now';
-    if (lastUpdated == null) return 'Offline';
+    if (isOnline) return 'pilgrim_last_seen_active_now'.tr();
+    if (lastUpdated == null) return 'profile_offline'.tr();
     final diff = DateTime.now().difference(lastUpdated!);
-    if (diff.inMinutes < 1) return 'Updated just now';
-    if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
-    return 'Updated ${diff.inDays}d ago';
+    if (diff.inMinutes < 1) {
+      return 'pilgrim_last_seen_updated_just_now'.tr();
+    }
+    if (diff.inMinutes < 60) {
+      return 'pilgrim_last_seen_updated_minutes'
+          .tr(args: ['${diff.inMinutes}']);
+    }
+    if (diff.inHours < 24) {
+      return 'pilgrim_last_seen_updated_hours'.tr(args: ['${diff.inHours}']);
+    }
+    return 'pilgrim_last_seen_updated_days'.tr(args: ['${diff.inDays}']);
   }
 }
 

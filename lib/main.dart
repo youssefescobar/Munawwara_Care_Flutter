@@ -153,10 +153,17 @@ void main() async {
           NativeCallCoordinator.handleForegroundCallControl(msg.data);
           return;
         }
-        // Skip system tray notification for message/meetpoint types when
-        // the app is in foreground — the in-app popup overlay handles these.
-        if ((notifType == 'new_message' || notifType == 'meetpoint') &&
-            !isUrgentTts) {
+        // Skip tray notification for chat when foreground — socket +
+        // ChatNotificationHelper / inbox SFX already handle UX (avoids double
+        // urgent_tts chime). Include a fallback when notification_type is
+        // missing from the FCM data payload on some devices.
+        const chatMsgTypes = {'text', 'voice', 'image', 'tts', 'meetpoint'};
+        final isChatNotif =
+            notifType == 'new_message' || notifType == 'meetpoint';
+        final urgentChatNoNotifType = notifType.isEmpty &&
+            dataType == 'urgent' &&
+            chatMsgTypes.contains(msgType);
+        if ((isChatNotif || urgentChatNoNotifType) && !isUrgentTts) {
           AppLogger.i('FCM onMessage: suppressed system notif (in-app popup)');
           return;
         }
@@ -174,8 +181,8 @@ void main() async {
         // Reminder (moderator default = data type "normal"): still show popup + optional TTS
         if (isReminderTts) {
           final text =
-              msg.data['body']?.toString() ??
               msg.data['content']?.toString() ??
+              msg.data['body']?.toString() ??
               msg.notification?.body ??
               '';
           if (text.isNotEmpty) {
@@ -209,11 +216,14 @@ void main() async {
               );
             }
             if (isUrgentTts) {
-              // Keep ordering consistent with background: sound -> delay -> TTS.
-              await NotificationService.instance.showNotificationFromMessage(msg);
-              await Future.delayed(const Duration(milliseconds: 2200));
+              // Tray notif would duplicate urgent_tts.wav from socket/helper.
+              await Future.delayed(kUrgentAlertToTtsDelay);
+              final spoken = urgentTtsSpokenBackupText(
+                msg,
+                isReminder: true,
+              );
               await NotificationService.speakTts(
-                'Incoming reminder. $text',
+                spoken,
                 audioUrl: msg.data['audio_url']?.toString(),
                 lang: msg.data['lang']?.toString() ?? 'en',
                 messageKey: messageKey.isEmpty ? null : messageKey,
@@ -225,21 +235,24 @@ void main() async {
         // Other urgent TTS (not reminder)
         if (isUrgentTts) {
           final text =
-              msg.data['body']?.toString() ??
               msg.data['content']?.toString() ??
+              msg.data['body']?.toString() ??
               '';
           if (text.isNotEmpty) {
             AppLogger.i('🔊 Foreground urgent TTS: "$text"');
-            await NotificationService.instance.showNotificationFromMessage(msg);
-            await Future.delayed(const Duration(milliseconds: 2200));
+            await Future.delayed(kUrgentAlertToTtsDelay);
+            final spoken = urgentTtsSpokenBackupText(
+              msg,
+              isReminder: false,
+            );
             await NotificationService.speakTts(
-              'Urgent message. $text',
+              spoken,
               audioUrl: msg.data['audio_url']?.toString(),
               lang: msg.data['lang']?.toString() ?? 'en',
               messageKey: messageKey.isEmpty ? null : messageKey,
             );
           }
-          return; // we already showed a local notification above
+          return;
         }
 
         await NotificationService.instance.showNotificationFromMessage(msg);

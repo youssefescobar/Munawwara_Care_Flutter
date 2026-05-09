@@ -1377,21 +1377,18 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
             final firstModerator = hasModerator
                 ? pilgrimState.groupInfo!.moderators.first
                 : null;
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => GroupDetailsScreen(
-                  moderatorName: firstModerator?.fullName,
-                  moderatorLat: firstModerator?.lat,
-                  moderatorLng: firstModerator?.lng,
-                  hotelName: pilgrimState.groupInfo!.hotelName,
-                  roomNumber: pilgrimState.groupInfo!.roomNumber,
-                  busNumber: pilgrimState.groupInfo!.busNumber,
-                  driverName: pilgrimState.groupInfo!.driverName,
-                  checkIn: pilgrimState.groupInfo!.checkIn,
-                  checkOut: pilgrimState.groupInfo!.checkOut,
-                  daysRemaining: pilgrimState.groupInfo!.daysRemaining,
-                ),
-              ),
+            showGroupDetailsBottomSheet(
+              context,
+              moderatorName: firstModerator?.fullName,
+              moderatorLat: firstModerator?.lat,
+              moderatorLng: firstModerator?.lng,
+              hotelName: pilgrimState.groupInfo!.hotelName,
+              roomNumber: pilgrimState.groupInfo!.roomNumber,
+              busNumber: pilgrimState.groupInfo!.busNumber,
+              driverName: pilgrimState.groupInfo!.driverName,
+              checkIn: pilgrimState.groupInfo!.checkIn,
+              checkOut: pilgrimState.groupInfo!.checkOut,
+              daysRemaining: pilgrimState.groupInfo!.daysRemaining,
             );
           } else {
             // No group — do nothing (limbo state, moderator will assign)

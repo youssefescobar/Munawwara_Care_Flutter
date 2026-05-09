@@ -6,7 +6,71 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-class GroupDetailsScreen extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Group details — bottom sheet (same pattern as weather detail sheet)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void showGroupDetailsBottomSheet(
+  BuildContext context, {
+  String? moderatorName,
+  double? moderatorLat,
+  double? moderatorLng,
+  String? hotelName,
+  String? roomNumber,
+  String? busNumber,
+  String? driverName,
+  String? checkIn,
+  String? checkOut,
+  int? daysRemaining,
+}) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final titleStyle = theme.textTheme.titleLarge?.copyWith(
+    fontFamily: 'Lexend',
+    fontWeight: FontWeight.w800,
+    color: isDark ? Colors.white : AppColors.textDark,
+  );
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+    ),
+    builder: (ctx) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(22.w, 8.h, 22.w, 20.h),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('group_details_title'.tr(), style: titleStyle),
+              SizedBox(height: 18.h),
+              _GroupDetailsBody(
+                moderatorName: moderatorName,
+                moderatorLat: moderatorLat,
+                moderatorLng: moderatorLng,
+                hotelName: hotelName,
+                roomNumber: roomNumber,
+                busNumber: busNumber,
+                driverName: driverName,
+                checkIn: checkIn,
+                checkOut: checkOut,
+                daysRemaining: daysRemaining,
+              ),
+              SizedBox(height: MediaQuery.paddingOf(ctx).bottom + 8.h),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _GroupDetailsBody extends StatelessWidget {
   final String? moderatorName;
   final double? moderatorLat;
   final double? moderatorLng;
@@ -18,8 +82,7 @@ class GroupDetailsScreen extends StatelessWidget {
   final String? checkOut;
   final int? daysRemaining;
 
-  const GroupDetailsScreen({
-    super.key,
+  const _GroupDetailsBody({
     this.moderatorName,
     this.moderatorLat,
     this.moderatorLng,
@@ -69,133 +132,114 @@ class GroupDetailsScreen extends StatelessWidget {
         ? daysRemaining.toString()
         : noRecordsText;
 
-    return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.backgroundDark
-          : const Color(0xfff1f5f3),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: isDark ? Colors.white : AppColors.textDark,
-        title: Text(
-          'group_details_title'.tr(),
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontWeight: FontWeight.w700,
-            fontSize: 18.sp,
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionCard(
+          isDark: isDark,
+          title: 'group_hotel_info'.tr(),
+          icon: Symbols.hotel,
+          tint: const Color(0xFFF3ECE0),
+          iconTint: const Color(0xFFDCECF9),
+          children: [
+            _SectionLine(label: 'group_hotel_name'.tr(), value: hotelText),
+            _SectionLine(label: 'group_room_number'.tr(), value: roomText),
+          ],
         ),
-      ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
-        children: [
-          SizedBox(height: 6.h),
-          _SectionCard(
-            isDark: isDark,
-            title: 'group_hotel_info'.tr(),
-            icon: Symbols.hotel,
-            tint: const Color(0xFFF3ECE0),
-            iconTint: const Color(0xFFDCECF9),
-            children: [
-              _SectionLine(label: 'group_hotel_name'.tr(), value: hotelText),
-              _SectionLine(label: 'group_room_number'.tr(), value: roomText),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          _SectionCard(
-            isDark: isDark,
-            title: 'group_moderator_section'.tr(),
-            icon: Symbols.location_on,
-            tint: const Color(0xFFEAF6ED),
-            iconTint: const Color(0xFFCFEBD7),
-            children: [
+        SizedBox(height: 12.h),
+        _SectionCard(
+          isDark: isDark,
+          title: 'group_moderator_section'.tr(),
+          icon: Symbols.location_on,
+          tint: const Color(0xFFEAF6ED),
+          iconTint: const Color(0xFFCFEBD7),
+          children: [
+            _SectionLine(
+              label: 'group_moderator_name'.tr(),
+              value: moderatorName?.isNotEmpty == true
+                  ? moderatorName!
+                  : noRecordsText,
+            ),
+            if (_hasModeratorLocation) ...[
               _SectionLine(
-                label: 'group_moderator_name'.tr(),
-                value: moderatorName?.isNotEmpty == true
-                    ? moderatorName!
-                    : noRecordsText,
+                label: 'group_current_location'.tr(),
+                value:
+                    '${moderatorLat!.toStringAsFixed(5)}, ${moderatorLng!.toStringAsFixed(5)}',
               ),
-              if (_hasModeratorLocation) ...[
-                _SectionLine(
-                  label: 'group_current_location'.tr(),
-                  value:
-                      '${moderatorLat!.toStringAsFixed(5)}, ${moderatorLng!.toStringAsFixed(5)}',
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: _openModeratorLocation,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 10.h),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7DB8E3), Color(0xFF72AFDA)],
+                    ),
+                    borderRadius: BorderRadius.circular(14.r),
+                  ),
+                  child: Text(
+                    'group_view_on_map'.tr(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
                 ),
-                SizedBox(height: 8.h),
-                GestureDetector(
-                  onTap: _openModeratorLocation,
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 10.h),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF7DB8E3), Color(0xFF72AFDA)],
-                      ),
-                      borderRadius: BorderRadius.circular(14.r),
-                    ),
-                    child: Text(
-                      'group_view_on_map'.tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
+              ),
+            ],
+          ],
+        ),
+        SizedBox(height: 12.h),
+        _SectionCard(
+          isDark: isDark,
+          title: 'group_transport_details'.tr(),
+          icon: Symbols.directions_bus,
+          tint: const Color(0xFFF8F1D9),
+          iconTint: const Color(0xFFF2E4AE),
+          children: [
+            _SectionLine(label: 'group_bus_number'.tr(), value: busText),
+            _SectionLine(label: 'group_driver_name'.tr(), value: driverText),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        _SectionCard(
+          isDark: isDark,
+          title: 'group_stay_duration'.tr(),
+          icon: Symbols.calendar_month,
+          tint: const Color(0xFFE3F0FB),
+          iconTint: const Color(0xFFC5E1F8),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _StayColumn(
+                    title: 'group_checkin'.tr(),
+                    value: checkInText,
+                    alignStart: true,
+                  ),
+                ),
+                Expanded(
+                  child: _StayColumn(
+                    title: 'group_days_remaining'.tr(),
+                    value: daysRemainingText,
+                  ),
+                ),
+                Expanded(
+                  child: _StayColumn(
+                    title: 'group_checkout'.tr(),
+                    value: checkOutText,
+                    alignStart: false,
                   ),
                 ),
               ],
-            ],
-          ),
-          SizedBox(height: 12.h),
-          _SectionCard(
-            isDark: isDark,
-            title: 'group_transport_details'.tr(),
-            icon: Symbols.directions_bus,
-            tint: const Color(0xFFF8F1D9),
-            iconTint: const Color(0xFFF2E4AE),
-            children: [
-              _SectionLine(label: 'group_bus_number'.tr(), value: busText),
-              _SectionLine(label: 'group_driver_name'.tr(), value: driverText),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          _SectionCard(
-            isDark: isDark,
-            title: 'group_stay_duration'.tr(),
-            icon: Symbols.calendar_month,
-            tint: const Color(0xFFE3F0FB),
-            iconTint: const Color(0xFFC5E1F8),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _StayColumn(
-                      title: 'group_checkin'.tr(),
-                      value: checkInText,
-                      alignStart: true,
-                    ),
-                  ),
-                  Expanded(
-                    child: _StayColumn(
-                      title: 'group_days_remaining'.tr(),
-                      value: daysRemainingText,
-                    ),
-                  ),
-                  Expanded(
-                    child: _StayColumn(
-                      title: 'group_checkout'.tr(),
-                      value: checkOutText,
-                      alignStart: false,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

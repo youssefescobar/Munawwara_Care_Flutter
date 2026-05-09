@@ -212,6 +212,7 @@ class _PilgrimProfileSheet extends ConsumerWidget {
                                 recipientId: pilgrim.id,
                                 recipientName: pilgrim.fullName,
                                 currentUserId: currentUserId,
+                                recipientLanguage: pilgrim.language,
                               ),
                             ),
                           );

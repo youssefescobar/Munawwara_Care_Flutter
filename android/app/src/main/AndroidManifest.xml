@@ -77,21 +77,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="mc_default_v2" />
-        <!-- FCM services (plugin also adds these automatically, but we include them explicitly) -->
-        <service
-            android:name="com.google.firebase.messaging.FirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-        <service
-            android:name="com.google.firebase.iid.FirebaseInstanceIdService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
-            </intent-filter>
-        </service>
+        <!-- Do NOT declare com.google.firebase.messaging.FirebaseMessagingService here.
+             firebase_messaging already registers FlutterFirebaseMessagingService for
+             MESSAGING_EVENT; a second service steals messages so Dart background
+             handlers never run (data-only urgent TTS would be silent). -->
         <!-- Receiver for boot and notification actions -->
         <receiver 
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"

@@ -164,6 +164,26 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
     await _player.play(UrlSource(url));
   }
 
+  String _dominantPilgrimLanguageCode() {
+    ModeratorGroup? match;
+    for (final g in ref.read(moderatorProvider).groups) {
+      if (g.id == widget.groupId) {
+        match = g;
+        break;
+      }
+    }
+    final pilgrims = match?.pilgrims ?? const [];
+    if (pilgrims.isEmpty) return 'en';
+    final counts = <String, int>{};
+    for (final p in pilgrims) {
+      final code = p.language.trim().isNotEmpty ? p.language : 'en';
+      counts[code] = (counts[code] ?? 0) + 1;
+    }
+    return counts.entries
+        .reduce((a, b) => a.value >= b.value ? a : b)
+        .key;
+  }
+
   Future<void> _toggleTts(GroupMessage msg) async {
     final text = msg.originalText ?? msg.content ?? '';
     final isCurrentlySpeaking = _ttsPlayingId == msg.id && (_ttsSpeaking || _ttsLoading);
@@ -203,6 +223,7 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
       await SpeechService.playRobust(
         audioUrl: msg.audioUrl,
         backupText: text,
+        lang: _dominantPilgrimLanguageCode(),
       );
       if (mounted && _ttsPlayingId == msg.id) {
         setState(() {

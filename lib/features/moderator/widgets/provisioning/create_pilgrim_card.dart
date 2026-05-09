@@ -39,8 +39,8 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
   final _medicalHistoryCtrl = TextEditingController();
 
   String _selectedLanguage = 'en';
-  String _selectedVisaStatus = 'unknown';
-  String _selectedEthnicity = 'Other';
+  String? _selectedVisaStatus;
+  String? _selectedEthnicity;
   String? _selectedHotelId;
   String? _selectedRoomId;
   String? _selectedBusId;
@@ -121,7 +121,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
       'age': int.tryParse(_ageCtrl.text.trim()),
       'gender': _genderSelection.first,
       'language': _selectedLanguage,
-      'ethnicity': _selectedEthnicity,
+      'ethnicity': _selectedEthnicity ?? 'Other',
       'hotel_id': _selectedHotelId,
       'hotel_name': selectedHotel?.name,
       'room_id': _selectedRoomId,
@@ -130,7 +130,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
       'bus_info': selectedBus == null
           ? null
           : '${selectedBus.busNumber} - ${selectedBus.destination}',
-      'visa': {'status': _selectedVisaStatus},
+      'visa': {'status': _selectedVisaStatus ?? 'unknown'},
     };
 
     widget.onCreate(data);
@@ -154,6 +154,13 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
     final rooms = (selectedHotel?.rooms ?? const <RoomOption>[])
         .where((r) => r.active)
         .toList();
+
+    final hotelInteractive =
+        !widget.isLoadingResources && widget.hotels.isNotEmpty;
+    final roomInteractive =
+        selectedHotel != null && !widget.isLoadingResources && rooms.isNotEmpty;
+    final busInteractive =
+        !widget.isLoadingResources && widget.buses.isNotEmpty;
 
     final g = ProvisioningFormTheme.gapMd(context);
     final gSm = ProvisioningFormTheme.gapSm(context);
@@ -414,13 +421,13 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<String>(
+                            child: DropdownButtonFormField<String?>(
                               isExpanded: true,
                               initialValue: _selectedEthnicity,
                               decoration: ProvisioningFormTheme.fieldDecoration(
                                 context: context,
                                 isDark: widget.isDark,
-                                hintText: 'ethnicity'.tr(),
+                                hintText: 'provisioning_field_ethnicity'.tr(),
                               ),
                               icon: AppDropdownTheme.menuTrailingIcon(),
                               dropdownColor: AppDropdownTheme.menuBackground(
@@ -433,7 +440,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                                   AppDropdownTheme.valueStyle(widget.isDark),
                               items: _ethnicityOptions
                                   .map(
-                                    (e) => DropdownMenuItem(
+                                    (e) => DropdownMenuItem<String?>(
                                       value: e['value'],
                                       child: Text(
                                         (e['labelKey'] ?? '').tr(),
@@ -446,18 +453,18 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                                   )
                                   .toList(),
                               onChanged: (v) =>
-                                  setState(() => _selectedEthnicity = v!),
+                                  setState(() => _selectedEthnicity = v),
                             ),
                           ),
                           SizedBox(width: gSm),
                           Expanded(
-                            child: DropdownButtonFormField<String>(
+                            child: DropdownButtonFormField<String?>(
                               isExpanded: true,
                               initialValue: _selectedVisaStatus,
                               decoration: ProvisioningFormTheme.fieldDecoration(
                                 context: context,
                                 isDark: widget.isDark,
-                                hintText: 'profile_visa_status'.tr(),
+                                hintText: 'provisioning_field_visa'.tr(),
                               ),
                               icon: AppDropdownTheme.menuTrailingIcon(),
                               dropdownColor: AppDropdownTheme.menuBackground(
@@ -476,7 +483,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                                 'expired',
                               ]
                                   .map(
-                                    (s) => DropdownMenuItem(
+                                    (s) => DropdownMenuItem<String?>(
                                       value: s,
                                       child: Text(
                                         'status_$s'.tr(),
@@ -489,7 +496,7 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                                   )
                                   .toList(),
                               onChanged: (v) =>
-                                  setState(() => _selectedVisaStatus = v!),
+                                  setState(() => _selectedVisaStatus = v),
                             ),
                           ),
                         ],
@@ -497,11 +504,12 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                       SizedBox(height: g),
                       DropdownButtonFormField<String?>(
                         isExpanded: true,
-                        initialValue: _selectedHotelId,
+                        initialValue:
+                            hotelInteractive ? _selectedHotelId : null,
                         decoration: ProvisioningFormTheme.fieldDecoration(
                           context: context,
                           isDark: widget.isDark,
-                          hintText: 'group_hotel_name'.tr(),
+                          hintText: 'provisioning_field_hotel'.tr(),
                           prefixIcon: _prefix(Symbols.apartment, textMuted),
                         ),
                         icon: AppDropdownTheme.menuTrailingIcon(),
@@ -510,36 +518,40 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                         borderRadius: AppDropdownTheme.menuBorderRadius(),
                         elevation: AppDropdownTheme.menuElevation(),
                         style: AppDropdownTheme.valueStyle(widget.isDark),
-                        items: [
-                          DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text(
-                              'group_no_hotel'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                          ...widget.hotels.map(
-                            (h) => DropdownMenuItem<String?>(
-                              value: h.id,
-                              child: Text(
-                                h.name,
-                                style: AppDropdownTheme.menuItemStyle(
-                                  widget.isDark,
+                        items: hotelInteractive
+                            ? widget.hotels
+                                .map(
+                                  (h) => DropdownMenuItem<String?>(
+                                    value: h.id,
+                                    child: Text(
+                                      h.name,
+                                      style: AppDropdownTheme.menuItemStyle(
+                                        widget.isDark,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList()
+                            : [
+                                DropdownMenuItem<String?>(
+                                  value: null,
+                                  enabled: false,
+                                  child: Text(
+                                    'provisioning_no_hotels'.tr(),
+                                    style: AppDropdownTheme.menuItemStyle(
+                                      widget.isDark,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        onChanged: widget.isLoadingResources
-                            ? null
-                            : (v) {
+                              ],
+                        onChanged: hotelInteractive
+                            ? (v) {
                                 setState(() {
                                   _selectedHotelId = v;
                                   _selectedRoomId = null;
                                 });
-                              },
+                              }
+                            : null,
                       ),
                       SizedBox(height: g),
                       Row(
@@ -548,12 +560,13 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                           Expanded(
                             child: DropdownButtonFormField<String?>(
                               isExpanded: true,
-                              initialValue: _selectedRoomId,
+                              initialValue:
+                                  roomInteractive ? _selectedRoomId : null,
                               decoration:
                                   ProvisioningFormTheme.fieldDecoration(
                                 context: context,
                                 isDark: widget.isDark,
-                                hintText: 'group_room_number'.tr(),
+                                hintText: 'provisioning_field_room'.tr(),
                                 prefixIcon: _prefix(Symbols.bed, textMuted),
                               ),
                               icon: AppDropdownTheme.menuTrailingIcon(),
@@ -566,61 +579,68 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                               elevation: AppDropdownTheme.menuElevation(),
                               style:
                                   AppDropdownTheme.valueStyle(widget.isDark),
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text(
-                                    'group_no_room'.tr(),
-                                    style:
-                                        AppDropdownTheme.menuItemStyle(
-                                      widget.isDark,
-                                    ),
-                                  ),
-                                ),
-                                ...rooms.map(
-                                  (r) {
-                                    final full =
-                                        r.currentOccupancy >= r.capacity;
-                                    final base =
-                                        AppDropdownTheme.menuItemStyle(
-                                      widget.isDark,
-                                      fontSize: 13,
-                                    );
-                                    return DropdownMenuItem<String?>(
-                                      value: r.id,
-                                      child: Text(
-                                        '${r.roomNumber}'
-                                        '${r.floor != null ? ' (F${r.floor})' : ''}'
-                                        ' - ${r.currentOccupancy}/'
-                                        '${r.capacity}',
-                                        style: full
-                                            ? base.copyWith(
-                                                color:
-                                                    Colors.green.shade400,
-                                              )
-                                            : base,
+                              items: roomInteractive
+                                  ? rooms
+                                      .map(
+                                        (r) {
+                                          final full =
+                                              r.currentOccupancy >= r.capacity;
+                                          final base =
+                                              AppDropdownTheme.menuItemStyle(
+                                            widget.isDark,
+                                            fontSize: 13,
+                                          );
+                                          return DropdownMenuItem<String?>(
+                                            value: r.id,
+                                            child: Text(
+                                              '${r.roomNumber}'
+                                              '${r.floor != null ? ' (F${r.floor})' : ''}'
+                                              ' - ${r.currentOccupancy}/'
+                                              '${r.capacity}',
+                                              style: full
+                                                  ? base.copyWith(
+                                                      color: Colors
+                                                          .green.shade400,
+                                                    )
+                                                  : base,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                      .toList()
+                                  : [
+                                      DropdownMenuItem<String?>(
+                                        value: null,
+                                        enabled: false,
+                                        child: Text(
+                                          selectedHotel == null
+                                              ? 'manage_select_hotel_first'
+                                                  .tr()
+                                              : 'provisioning_no_rooms'.tr(),
+                                          style:
+                                              AppDropdownTheme.menuItemStyle(
+                                            widget.isDark,
+                                          ),
+                                        ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ],
-                              onChanged: selectedHotel == null
-                                  ? null
-                                  : (v) => setState(
-                                        () => _selectedRoomId = v,
-                                      ),
+                                    ],
+                              onChanged: roomInteractive
+                                  ? (v) =>
+                                      setState(() => _selectedRoomId = v)
+                                  : null,
                             ),
                           ),
                           SizedBox(width: gSm),
                           Expanded(
                             child: DropdownButtonFormField<String?>(
                               isExpanded: true,
-                              initialValue: _selectedBusId,
+                              initialValue:
+                                  busInteractive ? _selectedBusId : null,
                               decoration:
                                   ProvisioningFormTheme.fieldDecoration(
                                 context: context,
                                 isDark: widget.isDark,
-                                hintText: 'group_bus_number'.tr(),
+                                hintText: 'provisioning_field_bus'.tr(),
                                 prefixIcon: _prefix(
                                   Symbols.directions_bus,
                                   textMuted,
@@ -636,35 +656,41 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                               elevation: AppDropdownTheme.menuElevation(),
                               style:
                                   AppDropdownTheme.valueStyle(widget.isDark),
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text(
-                                    'group_no_bus'.tr(),
-                                    style:
-                                        AppDropdownTheme.menuItemStyle(
-                                      widget.isDark,
-                                    ),
-                                  ),
-                                ),
-                                ...widget.buses.map(
-                                  (b) => DropdownMenuItem<String?>(
-                                    value: b.id,
-                                    child: Text(
-                                      b.destination.isEmpty
-                                          ? b.busNumber
-                                          : '${b.busNumber} — '
-                                              '${b.destination}',
-                                      style:
-                                          AppDropdownTheme.menuItemStyle(
-                                        widget.isDark,
+                              items: busInteractive
+                                  ? widget.buses
+                                      .map(
+                                        (b) => DropdownMenuItem<String?>(
+                                          value: b.id,
+                                          child: Text(
+                                            b.destination.isEmpty
+                                                ? b.busNumber
+                                                : '${b.busNumber} — '
+                                                    '${b.destination}',
+                                            style:
+                                                AppDropdownTheme.menuItemStyle(
+                                              widget.isDark,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList()
+                                  : [
+                                      DropdownMenuItem<String?>(
+                                        value: null,
+                                        enabled: false,
+                                        child: Text(
+                                          'provisioning_no_buses'.tr(),
+                                          style:
+                                              AppDropdownTheme.menuItemStyle(
+                                            widget.isDark,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _selectedBusId = v),
+                                    ],
+                              onChanged: busInteractive
+                                  ? (v) =>
+                                      setState(() => _selectedBusId = v)
+                                  : null,
                             ),
                           ),
                         ],

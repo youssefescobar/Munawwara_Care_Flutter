@@ -230,10 +230,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
         final accOk = !acc.isInfinite && acc >= 0 && acc <= 8000;
         if (age <= const Duration(hours: 8) && accOk) {
           setState(() => _myLocation = LatLng(last.latitude, last.longitude));
-          _mapController.move(
-            _myLocation!,
-            AppMapTiles.clampMapZoom(15),
-          );
+          _mapController.move(_myLocation!, AppMapTiles.clampMapZoom(15));
         }
       }
     } catch (_) {}
@@ -247,10 +244,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       );
       if (!mounted) return;
       setState(() => _myLocation = LatLng(pos.latitude, pos.longitude));
-      _mapController.move(
-        _myLocation!,
-        AppMapTiles.clampMapZoom(15),
-      );
+      _mapController.move(_myLocation!, AppMapTiles.clampMapZoom(15));
 
       if (_navBeaconEnabled) {
         final auth = ref.read(authProvider);
@@ -303,10 +297,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       return;
     }
     setState(() => _focusedPilgrimId = p.id);
-    _mapController.move(
-      LatLng(p.lat!, p.lng!),
-      AppMapTiles.clampMapZoom(17),
-    );
+    _mapController.move(LatLng(p.lat!, p.lng!), AppMapTiles.clampMapZoom(17));
     _dssController.animateTo(
       0.28,
       duration: const Duration(milliseconds: 300),
@@ -1533,8 +1524,9 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
               ...AppMapTiles.baseLayers(isDark: isDark),
               AppMapMarkerCluster.layer(
                 markers: [
-                  ...PilgrimMarkerLayout.pointsForMarkers(locatedPilgrims)
-                      .map((item) {
+                  ...PilgrimMarkerLayout.pointsForMarkers(locatedPilgrims).map((
+                    item,
+                  ) {
                     final selected = _focusedPilgrimId == item.pilgrim.id;
                     final sz = PilgrimMapMarker.mapMarkerSize(
                       context,
@@ -1729,8 +1721,8 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                         iconColor: _navBeaconEnabled
                             ? AppColors.primary
                             : (isDark
-                                ? Colors.white70
-                                : AppColors.textMutedLight),
+                                  ? Colors.white70
+                                  : AppColors.textMutedLight),
                       ),
                     ),
                     PopupMenuItem(
@@ -2186,9 +2178,9 @@ class _QrShareSheetState extends State<_QrShareSheet> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('group_share_failed'.tr(args: ['$e']))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('group_share_failed'.tr(args: ['$e']))),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSharing = false);
@@ -2697,7 +2689,7 @@ class _ModeratorManageSheet extends ConsumerWidget {
               height: 50.h,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  await _showInviteSheet(context, ref, liveGroup);
+                  await _showInviteSheet(context, liveGroup);
                 },
                 icon: Icon(
                   Symbols.person_add,
@@ -2729,329 +2721,354 @@ class _ModeratorManageSheet extends ConsumerWidget {
 
   Future<void> _showInviteSheet(
     BuildContext context,
-    WidgetRef ref,
     ModeratorGroup g,
   ) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ctrl = TextEditingController();
-    var step = _ModInviteStep.qr;
-    var loading = false;
-    String? fieldError;
-
+    final snackContext = context;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return Container(
-            padding: EdgeInsets.fromLTRB(
-              20.w,
-              20.h,
-              20.w,
-              MediaQuery.of(ctx).viewInsets.bottom + 32.h,
-            ),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surfaceDark : Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40.w,
-                      height: 4.h,
-                      margin: EdgeInsets.only(bottom: 20.h),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2.r),
-                      ),
-                    ),
-                  ),
-                  if (step == _ModInviteStep.qr) ...[
-                    Text(
-                      'group_invite_mod'.tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16.sp,
-                        color: isDark ? Colors.white : AppColors.textDark,
-                      ),
-                    ),
-                    SizedBox(height: 20.h),
-                    Center(
-                      child: Container(
-                        padding: EdgeInsets.all(12.w),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16.r),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: QrImageView(
-                          data: g.groupCode,
-                          version: QrVersions.auto,
-                          size: 180.w,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    Text(
-                      'scan_to_join_mod'.tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 13.sp,
-                        color: isDark
-                            ? AppColors.textMutedLight
-                            : Colors.grey.shade600,
-                      ),
-                    ),
-                    SizedBox(height: 8.h),
-                    TextButton(
-                      onPressed: () => setSheetState(() => step = _ModInviteStep.code),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                      ),
-                      child: Text(
-                        'not_working_enter_code'.tr(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        step = _ModInviteStep.email;
-                        fieldError = null;
-                      }),
-                      child: Text(
-                        'tab_email'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                          color: isDark
-                              ? AppColors.textMutedLight
-                              : Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (step == _ModInviteStep.code) ...[
-                    Text(
-                      'share_this_code'.tr(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 13.sp,
-                        color: isDark
-                            ? AppColors.textMutedLight
-                            : Colors.grey.shade600,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 20.h),
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 24.w,
-                        vertical: 16.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Text(
-                        g.groupCode,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 6,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    TextButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: g.groupCode));
-                        StandardSnackBar.showSuccess(
-                          context,
-                          'create_group_code_copied'.tr(),
-                        );
-                      },
-                      icon: Icon(Symbols.content_copy, size: 18.w),
-                      label: Text('copy_code'.tr()),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        textStyle: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () =>
-                          setSheetState(() => step = _ModInviteStep.qr),
-                      child: Text(
-                        'QR Code'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        step = _ModInviteStep.email;
-                        fieldError = null;
-                      }),
-                      child: Text(
-                        'tab_email'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                          color: isDark
-                              ? AppColors.textMutedLight
-                              : Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (step == _ModInviteStep.email) ...[
-                    Text(
-                      'group_invite_mod_desc'.tr(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 13.sp,
-                        color: isDark
-                            ? AppColors.textMutedLight
-                            : Colors.grey.shade600,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 20.h),
-                    TextField(
-                      controller: ctrl,
-                      keyboardType: TextInputType.emailAddress,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: 'group_invite_email_hint'.tr(),
-                        errorText: fieldError,
-                        filled: true,
-                        fillColor: isDark
-                            ? AppColors.backgroundDark
-                            : Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 20.h),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50.h,
-                      child: ElevatedButton(
-                        onPressed: loading
-                            ? null
-                            : () async {
-                                final raw = ctrl.text.trim();
-                                final emails = raw
-                                    .split(RegExp(r'[,\n; ]+'))
-                                    .map((e) => e.trim())
-                                    .where((e) => e.isNotEmpty)
-                                    .toSet()
-                                    .toList();
-                                final hasInvalid = emails.isEmpty ||
-                                    emails.any((e) => !e.contains('@'));
+      builder: (sheetContext) =>
+          _ModeratorInviteSheet(group: g, snackContext: snackContext),
+    );
+  }
+}
 
-                                if (hasInvalid) {
-                                  setSheetState(
-                                    () => fieldError = 'email_invalid'.tr(),
-                                  );
-                                  return;
-                                }
-                                setSheetState(() {
-                                  loading = true;
-                                  fieldError = null;
-                                });
-                                final (ok, err) = await ref
-                                    .read(moderatorProvider.notifier)
-                                    .inviteModerators(g.id, emails);
-                                if (sheetContext.mounted) {
-                                  if (ok) {
-                                    Navigator.pop(sheetContext);
-                                    StandardSnackBar.showSuccess(
-                                      context,
-                                      'group_invite_success'.tr(),
-                                    );
-                                  } else {
-                                    setSheetState(() {
-                                      loading = false;
-                                      fieldError = err == 'email_invalid'
-                                          ? 'email_invalid'.tr()
-                                          : (err ?? 'error_generic'.tr());
-                                    });
-                                  }
-                                }
-                              },
-                        child: loading
-                            ? SizedBox(
-                                width: 20.w,
-                                height: 20.w,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text('invite_send'.tr()),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        step = _ModInviteStep.qr;
-                        fieldError = null;
-                      }),
-                      child: Text(
-                        'QR Code'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+class _ModeratorInviteSheet extends ConsumerStatefulWidget {
+  final ModeratorGroup group;
+  final BuildContext snackContext;
+
+  const _ModeratorInviteSheet({
+    required this.group,
+    required this.snackContext,
+  });
+
+  @override
+  ConsumerState<_ModeratorInviteSheet> createState() =>
+      _ModeratorInviteSheetState();
+}
+
+class _ModeratorInviteSheetState extends ConsumerState<_ModeratorInviteSheet> {
+  late final TextEditingController _emailCtrl;
+  _ModInviteStep _step = _ModInviteStep.qr;
+  bool _loading = false;
+  String? _fieldError;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20.w,
+        20.h,
+        20.w,
+        MediaQuery.of(context).viewInsets.bottom + 32.h,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40.w,
+                height: 4.h,
+                margin: EdgeInsets.only(bottom: 20.h),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
               ),
             ),
-          );
-        },
+            if (_step == _ModInviteStep.qr) ...[
+              Text(
+                'group_invite_mod'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Lexend',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16.sp,
+                  color: isDark ? Colors.white : AppColors.textDark,
+                ),
+              ),
+              SizedBox(height: 20.h),
+              Center(
+                child: Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: QrImageView(
+                    data: widget.group.groupCode,
+                    version: QrVersions.auto,
+                    size: 180.w,
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'scan_to_join_mod'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Lexend',
+                  fontSize: 13.sp,
+                  color: isDark
+                      ? AppColors.textMutedLight
+                      : Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              TextButton(
+                onPressed: () => setState(() => _step = _ModInviteStep.code),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                child: Text(
+                  'not_working_enter_code'.tr(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _step = _ModInviteStep.email;
+                  _fieldError = null;
+                }),
+                child: Text(
+                  'tab_email'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                    color: isDark
+                        ? AppColors.textMutedLight
+                        : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ],
+            if (_step == _ModInviteStep.code) ...[
+              Text(
+                'share_this_code'.tr(),
+                style: TextStyle(
+                  fontFamily: 'Lexend',
+                  fontSize: 13.sp,
+                  color: isDark
+                      ? AppColors.textMutedLight
+                      : Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20.h),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Text(
+                  widget.group.groupCode,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 28.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 6,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              TextButton.icon(
+                onPressed: () {
+                  Clipboard.setData(
+                    ClipboardData(text: widget.group.groupCode),
+                  );
+                  StandardSnackBar.showSuccess(
+                    widget.snackContext,
+                    'create_group_code_copied'.tr(),
+                  );
+                },
+                icon: Icon(Symbols.content_copy, size: 18.w),
+                label: Text('copy_code'.tr()),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  textStyle: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _step = _ModInviteStep.qr),
+                child: Text(
+                  'QR Code'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _step = _ModInviteStep.email;
+                  _fieldError = null;
+                }),
+                child: Text(
+                  'tab_email'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                    color: isDark
+                        ? AppColors.textMutedLight
+                        : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ],
+            if (_step == _ModInviteStep.email) ...[
+              Text(
+                'group_invite_mod_desc'.tr(),
+                style: TextStyle(
+                  fontFamily: 'Lexend',
+                  fontSize: 13.sp,
+                  color: isDark
+                      ? AppColors.textMutedLight
+                      : Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20.h),
+              TextField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                minLines: 1,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'group_invite_email_hint'.tr(),
+                  errorText: _fieldError,
+                  filled: true,
+                  fillColor: isDark
+                      ? AppColors.backgroundDark
+                      : Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20.h),
+              SizedBox(
+                width: double.infinity,
+                height: 50.h,
+                child: ElevatedButton(
+                  onPressed: _loading
+                      ? null
+                      : () async {
+                          final raw = _emailCtrl.text.trim();
+                          final emails = raw
+                              .split(RegExp(r'[,\n; ]+'))
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toSet()
+                              .toList();
+                          final hasInvalid =
+                              emails.isEmpty ||
+                              emails.any((e) => !e.contains('@'));
+
+                          if (hasInvalid) {
+                            setState(() => _fieldError = 'email_invalid'.tr());
+                            return;
+                          }
+                          setState(() {
+                            _loading = true;
+                            _fieldError = null;
+                          });
+                          final (ok, err) = await ref
+                              .read(moderatorProvider.notifier)
+                              .inviteModerators(widget.group.id, emails);
+                          if (!mounted) return;
+                          if (ok) {
+                            Navigator.pop(context);
+                            StandardSnackBar.showSuccess(
+                              widget.snackContext,
+                              'group_invite_success'.tr(),
+                            );
+                          } else {
+                            setState(() {
+                              _loading = false;
+                              _fieldError = err == 'email_invalid'
+                                  ? 'email_invalid'.tr()
+                                  : (err ?? 'error_generic'.tr());
+                            });
+                          }
+                        },
+                  child: _loading
+                      ? SizedBox(
+                          width: 20.w,
+                          height: 20.w,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text('invite_send'.tr()),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _step = _ModInviteStep.qr;
+                  _fieldError = null;
+                }),
+                child: Text(
+                  'QR Code'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-    ).whenComplete(() => ctrl.dispose());
+    );
   }
 }
 

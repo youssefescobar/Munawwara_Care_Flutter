@@ -14,6 +14,27 @@ String _mongoIdString(dynamic raw) {
   return raw.toString().trim();
 }
 
+/// API / Mongo dates are UTC ISO strings; convert to device local for labels.
+DateTime _parseCreatedAt(dynamic raw) {
+  if (raw == null) return DateTime.now();
+  if (raw is Map) {
+    final d = raw[r'$date'];
+    if (d != null) {
+      if (d is int) {
+        return DateTime.fromMillisecondsSinceEpoch(d, isUtc: true).toLocal();
+      }
+      final fromExt = DateTime.tryParse(d.toString());
+      if (fromExt != null) return fromExt.toLocal();
+    }
+  }
+  if (raw is int) {
+    return DateTime.fromMillisecondsSinceEpoch(raw, isUtc: true).toLocal();
+  }
+  final parsed = DateTime.tryParse(raw.toString());
+  if (parsed != null) return parsed.toLocal();
+  return DateTime.now();
+}
+
 class MessageSender {
   final String id;
   final String fullName;
@@ -104,9 +125,7 @@ class GroupMessage {
             j['is_urgent']?.toString() == 'true',
         duration: (j['duration'] as num?)?.toInt() ?? 0,
         meetpointData: meetpointData,
-        createdAt: j['created_at'] != null
-            ? DateTime.tryParse(j['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
+        createdAt: _parseCreatedAt(j['created_at']),
       );
     } catch (e) {
       AppLogger.w('[GroupMessage] Error parsing fromJson: $e');

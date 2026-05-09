@@ -30,6 +30,8 @@ class IndividualMessagesScreen extends ConsumerStatefulWidget {
   final String recipientId;
   final String recipientName;
   final String currentUserId;
+  /// BCP-47 short code from pilgrim profile (e.g. en, ar, ur) for TTS preview.
+  final String recipientLanguage;
 
   const IndividualMessagesScreen({
     super.key,
@@ -38,6 +40,7 @@ class IndividualMessagesScreen extends ConsumerStatefulWidget {
     required this.recipientId,
     required this.recipientName,
     required this.currentUserId,
+    this.recipientLanguage = 'en',
   });
 
   @override
@@ -192,6 +195,7 @@ class _IndividualMessagesScreenState
       await SpeechService.playRobust(
         audioUrl: msg.audioUrl,
         backupText: text,
+        lang: widget.recipientLanguage,
       );
       if (mounted && _ttsPlayingId == msg.id) {
         setState(() {

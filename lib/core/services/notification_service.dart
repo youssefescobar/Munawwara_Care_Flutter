@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -19,6 +20,9 @@ import '../../features/moderator/screens/group_messages_screen.dart';
 import '../../features/moderator/services/sos_alert_coordinator.dart';
 import '../../features/notifications/screens/alerts_tab_v2.dart';
 import '../theme/app_colors.dart';
+
+/// Wait after the urgent notification sound before starting TTS (extra 2 s).
+const Duration kUrgentAlertToTtsDelay = Duration(milliseconds: 4200);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Background Message Handler
@@ -116,8 +120,26 @@ Future<void> _sendDeclineHttp(String callerId) async {
   }
 }
 
+/// Full translated TTS string from FCM, with English prefix only when needed.
+String urgentTtsSpokenBackupText(
+  RemoteMessage message, {
+  required bool isReminder,
+}) {
+  final lang = message.data['lang']?.toString().toLowerCase() ?? 'en';
+  final content = message.data['content']?.toString() ?? '';
+  final body = message.data['body']?.toString() ?? '';
+  final text = content.isNotEmpty ? content : body;
+  if (text.isEmpty) return '';
+  final prefix = isReminder ? 'Incoming reminder.' : 'Urgent message.';
+  final useEnglishPrefix = lang == 'en' && content.isEmpty;
+  return useEnglishPrefix ? '$prefix $text' : text;
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
   AppLogger.i('📩 Background message received: ${message.messageId}');
   AppLogger.i('   Title: ${message.notification?.title}');
   AppLogger.i('   Body: ${message.notification?.body}');
@@ -249,13 +271,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // ── Urgent TTS / Reminder TTS → show notification then speak ──────────────
   if (dataType == 'urgent' && (msgType == 'tts' || msgType == 'reminder_tts')) {
-    var text =
-        message.data['body']?.toString() ??
-        message.data['content']?.toString() ??
-        '';
-    final audioUrl = message.data['audio_url']?.toString();
     final isReminder = msgType == 'reminder_tts';
-    final prefix = isReminder ? 'Incoming reminder.' : 'Urgent message.';
+    var text = urgentTtsSpokenBackupText(message, isReminder: isReminder);
+    final audioUrl = message.data['audio_url']?.toString();
     final lang = message.data['lang']?.toString() ?? 'en';
     final messageKey =
         message.data['message_id']?.toString() ??
@@ -274,10 +292,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // 1. Show notification — the urgent channel plays urgent_tts.wav as sound
     await NotificationService.instance.showNotificationFromMessage(message);
 
-    // ── Attempt to trigger the in-app popup if the main isolate is alive ──
+    // Reminder TTS only: main isolate may show ReminderPopup. Urgent broadcast
+    // TTS must not use that UI (wrong "reminder" title); tray + TTS suffice.
     final sendPort = IsolateNameServer.lookupPortByName('popup_port');
-    if (sendPort != null) {
-      AppLogger.i('🔔 Main isolate is alive — sending popup trigger');
+    if (sendPort != null && isReminder) {
+      AppLogger.i('🔔 Main isolate is alive — sending reminder popup trigger');
       sendPort.send({
         'type': 'reminder_popup',
         'body': text,
@@ -290,12 +309,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     if (text.isNotEmpty) {
       // 2. Wait for the alert sound to finish before TTS begins.
-      await Future.delayed(const Duration(milliseconds: 2200));
+      await Future.delayed(kUrgentAlertToTtsDelay);
 
       // 3. Play cloud audio (with local TTS fallback) once.
       await SpeechService.playRobust(
         audioUrl: audioUrl,
-        backupText: '$prefix $text',
+        backupText: text,
         lang: lang,
         isUrgent: true,
         messageKey: messageKey.isEmpty ? null : messageKey,

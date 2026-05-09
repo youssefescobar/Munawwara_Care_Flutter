@@ -21,12 +21,16 @@ class SystemRemindersScreen extends ConsumerStatefulWidget {
       _SystemRemindersScreenState();
 }
 
-class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
+class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen>
+    with SingleTickerProviderStateMixin {
   Timer? _refreshTimer;
+  late final TabController _audienceTabController;
 
   @override
   void initState() {
     super.initState();
+    _audienceTabController = TabController(length: 3, vsync: this);
+    _audienceTabController.addListener(_onAudienceTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncPilgrimAudienceWithGroups(ref.read(moderatorProvider).groups);
@@ -35,6 +39,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) ref.read(reminderProvider.notifier).load();
     });
+  }
+
+  void _onAudienceTabChanged() {
+    if (!mounted) return;
+    final i = _audienceTabController.index;
+    if (i == _targetAudienceIndex) return;
+    setState(() => _targetAudienceIndex = i);
   }
 
   int _targetAudienceIndex = 0; // 0 = System Wide, 1 = Specific Groups, 2 = Specific Pilgrim
@@ -68,6 +79,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
 
   @override
   void dispose() {
+    _audienceTabController.removeListener(_onAudienceTabChanged);
+    _audienceTabController.dispose();
     _refreshTimer?.cancel();
     _messageController.dispose();
 
@@ -201,6 +214,9 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         _selectedPilgrimId = null;
         _weeklyDays.clear();
       });
+      if (_audienceTabController.index != 0) {
+        _audienceTabController.index = 0;
+      }
     } else {
       StandardSnackBar.showError(context, 'reminder_create_partial_fail'.tr());
     }
@@ -299,48 +315,36 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           color: textMuted,
                         ),
                       ),
-                      SizedBox(height: 10.h),
-                      SegmentedButton<int>(
-                        segments: [
-                          ButtonSegment<int>(
-                            value: 0,
-                            label: Text('reminder_audience_system_wide'.tr()),
-                            icon: Icon(Symbols.public, size: 18.sp),
+                      SizedBox(height: 6.h),
+                      Material(
+                        color: Colors.transparent,
+                        child: TabBar(
+                          controller: _audienceTabController,
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.start,
+                          padding: EdgeInsetsDirectional.only(start: 2.w),
+                          labelPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                          dividerHeight: 0,
+                          indicatorSize: TabBarIndicatorSize.label,
+                          indicatorWeight: 3,
+                          indicatorColor: AppColors.primary,
+                          labelColor: AppColors.primary,
+                          unselectedLabelColor: textMuted,
+                          labelStyle: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15.sp,
                           ),
-                          ButtonSegment<int>(
-                            value: 1,
-                            label: Text('reminder_audience_groups_tab'.tr()),
-                            icon: Icon(Symbols.groups, size: 18.sp),
-                          ),
-                          ButtonSegment<int>(
-                            value: 2,
-                            label: Text('reminder_audience_pilgrim_tab'.tr()),
-                            icon: Icon(Symbols.person, size: 18.sp),
-                          ),
-                        ],
-                        selected: {_targetAudienceIndex},
-                        onSelectionChanged: (next) {
-                          if (next.isEmpty) return;
-                          setState(() => _targetAudienceIndex = next.first);
-                        },
-                        multiSelectionEnabled: false,
-                        emptySelectionAllowed: false,
-                        showSelectedIcon: false,
-                        style: SegmentedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 6.w,
-                            vertical: 10.h,
-                          ),
-                          side: BorderSide(color: outline),
-                          foregroundColor: textMuted,
-                          selectedForegroundColor: AppColors.primary,
-                          selectedBackgroundColor:
-                              AppColors.primary.withValues(alpha: 0.12),
-                          textStyle: TextStyle(
+                          unselectedLabelStyle: TextStyle(
                             fontFamily: 'Lexend',
                             fontWeight: FontWeight.w600,
-                            fontSize: 11.sp,
+                            fontSize: 15.sp,
                           ),
+                          tabs: [
+                            Tab(text: 'reminder_audience_system_wide'.tr()),
+                            Tab(text: 'reminder_audience_groups_tab'.tr()),
+                            Tab(text: 'reminder_audience_pilgrim_tab'.tr()),
+                          ],
                         ),
                       ),
                       if (_targetAudienceIndex == 1) ...[
@@ -777,45 +781,20 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     ),
                   ),
                   SizedBox(height: 10.h),
-                  Wrap(
-                    spacing: 6.w,
-                    runSpacing: 6.h,
-                    children: List.generate(7, (i) {
-                      final d = i + 1;
-                      final selected = _weeklyDays.contains(d);
-                      return FilterChip(
-                        label: Text(
-                          'reminder_weekday_short_$d'.tr(),
-                          style: TextStyle(
-                            fontFamily: 'Lexend',
-                            fontSize: 11.sp,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
-                            color: selected ? Colors.white : textPrimary,
-                          ),
-                        ),
-                        selected: selected,
-                        onSelected: (v) {
-                          setState(() {
-                            if (v) {
-                              _weeklyDays.add(d);
-                            } else {
-                              _weeklyDays.remove(d);
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primary,
-                        backgroundColor: isDark
-                            ? const Color(0xFF1A2230)
-                            : AppColors.iconBgLight.withValues(alpha: 0.65),
-                        side: BorderSide(
-                          color: outline.withValues(alpha: 0.5),
-                        ),
-                        checkmarkColor: Colors.white,
-                        showCheckmark: false,
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                      );
-                    }),
+                  _WeekdayPickerStrip(
+                    isDark: isDark,
+                    textPrimary: textPrimary,
+                    outline: outline,
+                    selectedDays: _weeklyDays,
+                    onDayTapped: (d) {
+                      setState(() {
+                        if (_weeklyDays.contains(d)) {
+                          _weeklyDays.remove(d);
+                        } else {
+                          _weeklyDays.add(d);
+                        }
+                      });
+                    },
                   ),
                   SizedBox(height: 18.h),
                   Row(
@@ -1149,5 +1128,119 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     );
   }
 
+}
+
+/// Single-line weekday toggles (Mon–Sun). Uses [FittedBox] so all seven fit on
+/// narrow phones without wrapping.
+class _WeekdayPickerStrip extends StatelessWidget {
+  final bool isDark;
+  final Color textPrimary;
+  final Color outline;
+  final Set<int> selectedDays;
+  final ValueChanged<int> onDayTapped;
+
+  const _WeekdayPickerStrip({
+    required this.isDark,
+    required this.textPrimary,
+    required this.outline,
+    required this.selectedDays,
+    required this.onDayTapped,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final baseBg = isDark
+        ? const Color(0xFF1A2230)
+        : AppColors.iconBgLight.withValues(alpha: 0.65);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1A2230).withValues(alpha: 0.55)
+            : AppColors.iconBgLight.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(
+          color: outline.withValues(alpha: 0.45),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: c.maxWidth,
+              child: Row(
+                children: List.generate(7, (i) {
+                  final d = i + 1;
+                  final selected = selectedDays.contains(d);
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(
+                        start: i == 0 ? 0 : 3.w,
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(11.r),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => onDayTapped(d),
+                          borderRadius: BorderRadius.circular(11.r),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOutCubic,
+                            alignment: Alignment.center,
+                            height: 42.h,
+                            decoration: BoxDecoration(
+                              color: selected ? AppColors.primary : baseBg,
+                              borderRadius: BorderRadius.circular(11.r),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary
+                                    : outline.withValues(alpha: 0.55),
+                                width: selected ? 1.5 : 1,
+                              ),
+                              boxShadow: selected
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.22),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Text(
+                              'reminder_weekday_short_$d'.tr(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 12.sp,
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color:
+                                    selected ? Colors.white : textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
