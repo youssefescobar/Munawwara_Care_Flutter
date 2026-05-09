@@ -4,6 +4,16 @@
 
 import '../../../core/utils/app_logger.dart';
 
+String _mongoIdString(dynamic raw) {
+  if (raw == null) return '';
+  if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+  if (raw is Map) {
+    final o = raw[r'$oid'] ?? raw['oid'];
+    if (o != null) return o.toString().trim();
+  }
+  return raw.toString().trim();
+}
+
 class MessageSender {
   final String id;
   final String fullName;
@@ -79,7 +89,7 @@ class GroupMessage {
       }
 
       return GroupMessage(
-        id: j['_id']?.toString() ?? '',
+        id: _mongoIdString(j['_id']),
         groupId: j['group_id']?.toString() ?? '',
         recipientId: j['recipient_id']?.toString(),
         sender: sender,

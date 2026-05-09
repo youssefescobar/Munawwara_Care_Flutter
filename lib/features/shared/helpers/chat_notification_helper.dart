@@ -11,10 +11,37 @@ import '../../../core/widgets/in_app_popup.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/message_model.dart';
 import '../providers/message_provider.dart';
+import 'chat_popup_dedup.dart';
 
 class ChatNotificationHelper {
   static final AudioPlayer _sfxPlayer = AudioPlayer();
-  static const _prefsLastPopupMsKey = 'chat_last_in_app_popup_ms_v1';
+
+  static String _messageIdFromMap(Map<String, dynamic> map) {
+    final raw = map['_id'] ?? map['id'];
+    if (raw == null) return '';
+    if (raw is String) return raw.trim();
+    if (raw is Map) {
+      final oid = raw[r'$oid'] ?? raw['oid'];
+      if (oid != null) return oid.toString().trim();
+    }
+    return raw.toString().trim();
+  }
+
+  static Future<void> _recordDedup(
+    SharedPreferences prefs,
+    int msgMs,
+    String messageId,
+  ) async {
+    await prefs.setInt(ChatPopupDedup.lastPopupMsKey, msgMs);
+    if (messageId.isEmpty) return;
+    final existing = prefs.getStringList(ChatPopupDedup.notifiedIdsKey) ?? [];
+    if (existing.contains(messageId)) return;
+    final next = [...existing, messageId];
+    final trimmed = next.length > ChatPopupDedup.maxNotifiedIds
+        ? next.sublist(next.length - ChatPopupDedup.maxNotifiedIds)
+        : next;
+    await prefs.setStringList(ChatPopupDedup.notifiedIdsKey, trimmed);
+  }
 
   static Future<void> showIncomingMessage({
     required BuildContext context,
@@ -25,11 +52,22 @@ class ChatNotificationHelper {
     if (!context.mounted) return;
 
     try {
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      final createdAtRaw = map['createdAt']?.toString() ??
-          map['created_at']?.toString() ??
+      final prefs = await SharedPreferences.getInstance();
+      final messageId = _messageIdFromMap(map);
+      final notifiedIds =
+          prefs.getStringList(ChatPopupDedup.notifiedIdsKey) ?? [];
+      if (messageId.isNotEmpty && notifiedIds.contains(messageId)) {
+        AppLogger.d(
+          '[ChatNotificationHelper] Skipping popup (id dedup) id=$messageId',
+        );
+        return;
+      }
+
+      final createdAtRaw = map['created_at']?.toString() ??
+          map['createdAt']?.toString() ??
           map['timestamp']?.toString();
-      int msgMs = nowMs;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      var msgMs = nowMs;
       if (createdAtRaw != null && createdAtRaw.isNotEmpty) {
         try {
           msgMs = DateTime.parse(createdAtRaw).toLocal().millisecondsSinceEpoch;
@@ -37,11 +75,11 @@ class ChatNotificationHelper {
       }
 
       // Prevent replaying old socket messages on reconnect/hot restart.
-      final prefs = await SharedPreferences.getInstance();
-      final lastMs = prefs.getInt(_prefsLastPopupMsKey) ?? 0;
+      final lastMs = prefs.getInt(ChatPopupDedup.lastPopupMsKey) ?? 0;
       if (msgMs <= lastMs) {
         AppLogger.d(
-          '[ChatNotificationHelper] Skipping popup (dedup) msgMs=$msgMs lastMs=$lastMs',
+          '[ChatNotificationHelper] Skipping popup (dedup) '
+          'msgMs=$msgMs lastMs=$lastMs',
         );
         return;
       }
@@ -112,6 +150,7 @@ class ChatNotificationHelper {
             duration: const Duration(seconds: 4),
             onViewChat: onViewChat,
           );
+          await _recordDedup(prefs, msgMs, msg.id);
           return;
         }
 
@@ -142,7 +181,7 @@ class ChatNotificationHelper {
         );
       }
 
-      await prefs.setInt(_prefsLastPopupMsKey, msgMs);
+      await _recordDedup(prefs, msgMs, msg.id);
     } catch (e) {
       AppLogger.e('[ChatNotificationHelper] Error showing popup: $e');
     }

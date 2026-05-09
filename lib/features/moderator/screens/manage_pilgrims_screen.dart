@@ -502,21 +502,40 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                       ),
                       child: TextField(
                         onChanged: (v) => setState(() => _search = v),
+                        cursorColor: AppColors.primary,
                         style: TextStyle(
-                            fontFamily: 'Lexend',
-                            fontSize: 14.sp,
-                            color: textPrimary),
+                          fontFamily: 'Lexend',
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                          height: 1.25,
+                          color: textPrimary,
+                        ),
                         decoration: InputDecoration(
+                          filled: false,
+                          isDense: true,
                           hintText: 'manage_pilgrims_search_hint'.tr(),
                           hintStyle: TextStyle(
-                              fontFamily: 'Lexend',
-                              color: textMuted,
-                              fontSize: 13.sp),
-                          prefixIcon:
-                              Icon(Symbols.search, color: textMuted, size: 20.w),
+                            fontFamily: 'Lexend',
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: textMuted.withValues(alpha: 0.92),
+                          ),
+                          prefixIcon: Icon(
+                            Symbols.search,
+                            color: textMuted,
+                            size: 20.sp,
+                          ),
+                          prefixIconConstraints: BoxConstraints(
+                            minWidth: 48.w,
+                            minHeight: 40.h,
+                          ),
                           border: InputBorder.none,
-                          contentPadding:
-                              EdgeInsets.symmetric(vertical: 14.h),
+                          contentPadding: EdgeInsets.fromLTRB(
+                            0,
+                            12.h,
+                            16.w,
+                            12.h,
+                          ),
                         ),
                       ),
                     ),

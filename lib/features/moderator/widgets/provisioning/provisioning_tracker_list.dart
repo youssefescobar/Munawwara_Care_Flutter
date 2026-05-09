@@ -50,26 +50,63 @@ class ProvisioningTrackerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
+    final textMuted =
+        isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Text(
-                'provisioning_tracker_title'.tr(),
-                style: TextStyle(
-                  fontFamily: 'Lexend',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16.sp,
-                  color: textPrimary,
-                ),
+            Container(
+              padding: EdgeInsets.all(10.w),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Symbols.fact_check,
+                color: AppColors.primary,
+                size: 24.sp,
               ),
             ),
-            _buildFilterDropdown(),
-            SizedBox(width: 4.w),
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'provisioning_tracker_title'.tr(),
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 19.sp,
+                      height: 1.2,
+                      color: textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'provisioning_tracker_subtitle'.tr(),
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 13.sp,
+                      height: 1.35,
+                      color: textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 20.h),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Flexible(child: _buildFilterDropdown()),
+            SizedBox(width: 8.w),
             PopupMenuButton<String>(
               tooltip: 'group_actions'.tr(),
               padding: EdgeInsets.zero,
@@ -162,8 +199,18 @@ class ProvisioningTrackerList extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 16.h),
-        if (items.isEmpty)
+        SizedBox(height: 18.h),
+        if (isLoading)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 36.h),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primary,
+                strokeWidth: 3,
+              ),
+            ),
+          )
+        else if (items.isEmpty)
           _buildEmptyState()
         else
           ListView.builder(
@@ -191,11 +238,15 @@ class ProvisioningTrackerList extends StatelessWidget {
 
   Widget _buildFilterDropdown() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w),
-      decoration: AppDropdownTheme.inlineContainerDecoration(isDark),
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A2230) : const Color(0xFFF5F5F7),
+        borderRadius: BorderRadius.circular(20.r),
+      ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: filterStatus,
+          isExpanded: true,
           items: [
             DropdownMenuItem(
               value: 'all',
@@ -240,19 +291,20 @@ class ProvisioningTrackerList extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(vertical: 40.h, horizontal: 20.w),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark.withValues(alpha: 0.5) : Colors.white,
+        color: isDark ? const Color(0xFF1A2230) : const Color(0xFFF5F5F7),
         borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-          style: BorderStyle.solid,
-        ),
       ),
       child: Column(
         children: [
-          Icon(Symbols.search_off, size: 48.w, color: AppColors.textMutedLight),
+          Icon(
+            Symbols.search_off,
+            size: 48.w,
+            color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
+          ),
           SizedBox(height: 12.h),
           Text(
             'provisioning_no_matching_pilgrims'.tr(),
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Lexend',
               fontSize: 14.sp,
@@ -296,19 +348,25 @@ class _TrackerItemCard extends StatelessWidget {
     final isActivated = item.status.toLowerCase() == 'activated';
     final isSelectable = !isActivated && item.token != null;
 
+    final shellBorder = isSelectionMode && isSelected
+        ? Border.all(color: AppColors.primary, width: 2)
+        : null;
+
     Widget cardContent = Container(
       margin: EdgeInsets.only(bottom: 12.h),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(
-          color: isSelectionMode && isSelected 
-              ? AppColors.primary 
-              : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-          width: isSelectionMode && isSelected ? 2 : 1,
-        ),
+        border: shellBorder,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(14.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -335,8 +393,8 @@ class _TrackerItemCard extends StatelessWidget {
                       item.fullName,
                       style: TextStyle(
                         fontFamily: 'Lexend',
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w800,
                         color: textPrimary,
                       ),
                     ),
@@ -344,7 +402,8 @@ class _TrackerItemCard extends StatelessWidget {
                       item.phoneNumber,
                       style: TextStyle(
                         fontFamily: 'Lexend',
-                        fontSize: 11.sp,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
                         color: textMuted,
                       ),
                     ),
@@ -566,23 +625,26 @@ class _Tag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(6.r),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+        color: isDark ? const Color(0xFF1A2230) : const Color(0xFFF5F5F7),
+        borderRadius: BorderRadius.circular(12.r),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10.w, color: AppColors.textMutedLight),
-          SizedBox(width: 4.w),
+          Icon(
+            icon,
+            size: 14.sp,
+            color: AppColors.primary.withValues(alpha: 0.85),
+          ),
+          SizedBox(width: 6.w),
           Text(
             label,
             style: TextStyle(
               fontFamily: 'Lexend',
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w500,
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
               color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
             ),
           ),

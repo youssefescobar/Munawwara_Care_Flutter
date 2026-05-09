@@ -19,6 +19,7 @@ import '../../../../core/widgets/custom_dialog.dart';
 import '../../../../core/widgets/standard_snackbar.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../models/provisioning_models.dart';
+import '../../screens/manage_pilgrims_screen.dart';
 import 'provisioning_summary.dart';
 import 'create_pilgrim_card.dart';
 import 'provisioning_tracker_list.dart';
@@ -499,91 +500,206 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
 
 
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _onPullRefresh() async {
+    await Future.wait([_loadGroups(), _loadProvisioningStatus()]);
+  }
+
+  BoxDecoration _provisionPanelDecoration(bool isDark) {
+    return BoxDecoration(
+      color: isDark ? AppColors.surfaceDark : Colors.white,
+      borderRadius: BorderRadius.circular(24.r),
+      border: Border.all(
+        color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.07),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    );
+  }
+
+  EdgeInsets _provisionPanelPadding() =>
+      EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 22.h);
+
+  Widget _buildProvisionTabBody(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final groupName = _groups.firstWhere((g) => g.id == _selectedGroupId, orElse: () => GroupOption(id: '', name: 'provisioning_fallback_group'.tr())).name;
-    final modName = ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
-    
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _onPullRefresh,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 100.h),
+        children: [
+          _buildHeader(context, isDark),
+          SizedBox(height: 20.h),
+          _buildGroupSelector(isDark),
+          SizedBox(height: 20.h),
+          CreatePilgrimCard(
+            key: ValueKey(
+              'create_${_selectedGroupId}_$_createPilgrimFormGeneration',
+            ),
+            isDark: isDark,
+            isProvisioning: _isProvisioning,
+            hotels: _hotels,
+            buses: _buses,
+            isLoadingResources: _isLoadingResources,
+            onCreate: _handleCreatePilgrim,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackerTabBody(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final groupName = _groups
+        .firstWhere(
+          (g) => g.id == _selectedGroupId,
+          orElse: () => GroupOption(
+            id: '',
+            name: 'provisioning_fallback_group'.tr(),
+          ),
+        )
+        .name;
+    final modName =
+        ref.read(authProvider).fullName ?? 'provisioning_fallback_moderator'.tr();
+
     final filteredItems = _items.where((i) {
       if (_filterStatus == 'pending') return i.status != 'activated';
       if (_filterStatus == 'activated') return i.status == 'activated';
       return true;
     }).toList();
 
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _onPullRefresh,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+        children: [
+          _buildHeader(context, isDark),
+          SizedBox(height: 24.h),
+          _buildGroupSelector(isDark),
+          SizedBox(height: 24.h),
+          ProvisioningSummaryCards(summary: _summary, isDark: isDark),
+          SizedBox(height: 24.h),
+          if (_selectedGroupId != null)
+            Container(
+              decoration: _provisionPanelDecoration(isDark),
+              padding: _provisionPanelPadding(),
+              child: ProvisioningTrackerList(
+                items: filteredItems,
+                isLoading: _isLoadingStatus,
+                isDark: isDark,
+                filterStatus: _filterStatus,
+                onFilterChanged: (v) => setState(() => _filterStatus = v),
+                onRefresh: _loadProvisioningStatus,
+                onShowQr: (item) =>
+                    _showCredentialDialog(item, groupName, modName),
+                onShareQr: _handleShareQr,
+                onShareSelectedText: _handleShareSelectedText,
+                onShareSelectedImages: _handleShareSelectedImages,
+                onReissue: _handleReissue,
+                onDelete: _handleDelete,
+                isSelectionMode: _isSelectionMode,
+                selectedIds: _selectedPilgrimIds,
+                onToggleSelectionMode: () {
+                  setState(() {
+                    _isSelectionMode = !_isSelectionMode;
+                    if (!_isSelectionMode) _selectedPilgrimIds.clear();
+                  });
+                },
+                onSelectionChanged: (id, selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedPilgrimIds.add(id);
+                    } else {
+                      _selectedPilgrimIds.remove(id);
+                    }
+                  });
+                },
+                onSelectAll: () {
+                  setState(() {
+                    final itemsWithTokens = filteredItems
+                        .where((i) => i.token != null)
+                        .map((i) => i.pilgrimId)
+                        .toList();
+                    if (_selectedPilgrimIds.length == itemsWithTokens.length) {
+                      _selectedPilgrimIds.clear();
+                    } else {
+                      _selectedPilgrimIds.addAll(itemsWithTokens);
+                    }
+                  });
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+
     return Stack(
       children: [
-        RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () async {
-            await Future.wait([_loadGroups(), _loadProvisioningStatus()]);
-          },
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
-            children: [
-              _buildHeader(isDark),
-              SizedBox(height: 24.h),
-              
-              _buildGroupSelector(isDark),
-              SizedBox(height: 24.h),
-              
-              ProvisioningSummaryCards(summary: _summary, isDark: isDark),
-              SizedBox(height: 24.h),
-              
-              CreatePilgrimCard(
-                key: ValueKey('create_${_selectedGroupId}_$_createPilgrimFormGeneration'),
-                isDark: isDark,
-                isProvisioning: _isProvisioning,
-                hotels: _hotels,
-                buses: _buses,
-                isLoadingResources: _isLoadingResources,
-                onCreate: _handleCreatePilgrim,
-              ),
-              SizedBox(height: 32.h),
-              
-              if (_selectedGroupId != null)
-                ProvisioningTrackerList(
-                  items: filteredItems,
-                  isLoading: _isLoadingStatus,
-                  isDark: isDark,
-                  filterStatus: _filterStatus,
-                  onFilterChanged: (v) => setState(() => _filterStatus = v),
-                  onRefresh: _loadProvisioningStatus,
-                  onShowQr: (item) => _showCredentialDialog(item, groupName, modName),
-                  onShareQr: (item) => _handleShareQr(item),
-                  onShareSelectedText: _handleShareSelectedText,
-                  onShareSelectedImages: _handleShareSelectedImages,
-                  onReissue: _handleReissue,
-                  onDelete: _handleDelete,
-                  isSelectionMode: _isSelectionMode,
-                  selectedIds: _selectedPilgrimIds,
-                  onToggleSelectionMode: () {
-                    setState(() {
-                      _isSelectionMode = !_isSelectionMode;
-                      if (!_isSelectionMode) _selectedPilgrimIds.clear();
-                    });
-                  },
-                  onSelectionChanged: (id, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedPilgrimIds.add(id);
-                      } else {
-                        _selectedPilgrimIds.remove(id);
-                      }
-                    });
-                  },
-                  onSelectAll: () {
-                    setState(() {
-                      final itemsWithTokens = filteredItems.where((i) => i.token != null).map((i) => i.pilgrimId).toList();
-                      if (_selectedPilgrimIds.length == itemsWithTokens.length) {
-                         _selectedPilgrimIds.clear();
-                      } else {
-                         _selectedPilgrimIds.addAll(itemsWithTokens);
-                      }
-                    });
-                  },
+        DefaultTabController(
+          length: 3,
+          child: Scaffold(
+            backgroundColor: pageBg,
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              toolbarHeight: 0,
+              backgroundColor: pageBg,
+              bottom: PreferredSize(
+                preferredSize: Size.fromHeight(52.h),
+                child: Material(
+                  color: pageBg,
+                  child: TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    padding: EdgeInsetsDirectional.only(start: 4.w),
+                    labelPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                    dividerHeight: 0,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorWeight: 3,
+                    indicatorColor: AppColors.primary,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: isDark
+                        ? AppColors.textMutedLight
+                        : AppColors.textMutedDark,
+                    labelStyle: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15.sp,
+                    ),
+                    unselectedLabelStyle: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15.sp,
+                    ),
+                    tabs: [
+                      Tab(text: 'provision_tab_provision'.tr()),
+                      Tab(text: 'provision_tab_tracker'.tr()),
+                      Tab(text: 'provision_tab_manage'.tr()),
+                    ],
+                  ),
                 ),
-            ],
+              ),
+            ),
+            body: TabBarView(
+              children: [
+                _buildProvisionTabBody(context),
+                _buildTrackerTabBody(context),
+                const ManagePilgrimsScreen(),
+              ],
+            ),
           ),
         ),
         if (_isBulkCapturing)
@@ -638,25 +754,32 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
     );
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader(BuildContext context, bool isDark) {
+    final theme = Theme.of(context);
+    final textPrimary = isDark ? Colors.white : AppColors.textDark;
+    final textMuted =
+        isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'provisioning_header_title'.tr(),
-          style: TextStyle(
+          style: theme.textTheme.headlineSmall?.copyWith(
             fontFamily: 'Lexend',
             fontWeight: FontWeight.w800,
-            fontSize: 28.sp,
-            color: isDark ? Colors.white : AppColors.textDark,
+            fontSize: 26.sp,
+            height: 1.12,
+            color: textPrimary,
           ),
         ),
+        SizedBox(height: 4.h),
         Text(
           'provisioning_header_subtitle'.tr(),
-          style: TextStyle(
+          style: theme.textTheme.bodyMedium?.copyWith(
             fontFamily: 'Lexend',
-            fontSize: 14.sp,
-            color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
+            fontSize: 13.sp,
+            height: 1.4,
+            color: textMuted,
           ),
         ),
       ],
@@ -664,9 +787,23 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
   }
 
   Widget _buildGroupSelector(bool isDark) {
+    final outline = isDark ? AppColors.dividerDark : AppColors.dividerLight;
     return Container(
-      decoration: AppDropdownTheme.inlineContainerDecoration(isDark),
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: outline.withValues(alpha: isDark ? 0.9 : 0.65),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedGroupId,
@@ -697,7 +834,7 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
                     _loadProvisioningStatus(),
                   ]);
                 },
-          style: AppDropdownTheme.valueStyle(isDark),
+          style: AppDropdownTheme.valueStyle(isDark, fontSize: 16),
           dropdownColor: AppDropdownTheme.menuBackground(isDark),
           borderRadius: AppDropdownTheme.menuBorderRadius(),
           elevation: AppDropdownTheme.menuElevation(),

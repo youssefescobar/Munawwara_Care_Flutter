@@ -74,10 +74,63 @@ class AppDropdownTheme {
     Widget? prefixIcon,
     EdgeInsetsGeometry? contentPadding,
     bool nested = false,
+    bool minimal = false,
   }) {
     final fill = nested ? fieldFillNested(isDark) : fieldFill(isDark);
     final borderClr = fieldBorder(isDark);
-    final r = fieldCornerRadius();
+    final radius = minimal ? 14.r : fieldCornerRadius();
+    final pad = contentPadding ??
+        (minimal
+            ? EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 14.h)
+            : EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h));
+
+    if (minimal) {
+      return InputDecoration(
+        labelText: labelText,
+        hintText: hintText,
+        prefixIcon: prefixIcon,
+        prefixIconConstraints: BoxConstraints(minWidth: 44.w, maxHeight: 28.h),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        floatingLabelAlignment: FloatingLabelAlignment.start,
+        labelStyle: labelStyle(isDark).copyWith(
+          fontSize: 12.sp,
+          fontWeight: FontWeight.w600,
+        ),
+        hintStyle: labelStyle(isDark),
+        filled: true,
+        fillColor: fill,
+        contentPadding: pad,
+        alignLabelWithHint: false,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.55),
+            width: 1.5,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: const BorderSide(color: AppColors.error, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+      );
+    }
+
     return InputDecoration(
       labelText: labelText,
       hintText: hintText,
@@ -86,22 +139,21 @@ class AppDropdownTheme {
       hintStyle: labelStyle(isDark),
       filled: true,
       fillColor: fill,
-      contentPadding: contentPadding ??
-          EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      contentPadding: pad,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: BorderSide(color: borderClr),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: BorderSide(color: borderClr),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: BorderSide(color: borderClr.withValues(alpha: 0.45)),
       ),
     );

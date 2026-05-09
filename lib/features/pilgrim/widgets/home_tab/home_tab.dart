@@ -14,7 +14,7 @@ import '../sos/sos_home_phase.dart';
 import 'home_cards.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Home Tab — header + body stitched together in a CustomScrollView
+// Home Tab — fixed app bar; greeting + dashboard scroll below
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PilgrimHomeTab extends StatelessWidget {
@@ -44,6 +44,8 @@ class PilgrimHomeTab extends StatelessWidget {
   final VoidCallback onSettingsTap;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
+  /// Opens weather tips / detail sheet (card remains tappable when not loading).
+  final VoidCallback onWeatherTap;
   final bool isGpsEnabled;
   final bool hasLocPermission;
   final VoidCallback onLocationInactiveTap;
@@ -80,6 +82,7 @@ class PilgrimHomeTab extends StatelessWidget {
     required this.onSettingsTap,
     required this.onGroupCardTap,
     required this.onHotspotsTap,
+    required this.onWeatherTap,
     required this.isGpsEnabled,
     required this.hasLocPermission,
     required this.onLocationInactiveTap,
@@ -99,7 +102,8 @@ class PilgrimHomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = pilgrimState.profile;
     final group = pilgrimState.groupInfo;
-    final headerBg = isDark ? AppColors.backgroundDark : const Color(0xFFFFF7ED);
+    final headerBg =
+        isDark ? AppColors.backgroundDark : const Color(0xFFFFF7ED);
     final headerText = isDark ? Colors.white : AppColors.textDark;
     final iconContainerBg = isDark
         ? Colors.white.withValues(alpha: 0.1)
@@ -109,241 +113,251 @@ class PilgrimHomeTab extends StatelessWidget {
       color: headerBg,
       child: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: onRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            slivers: [
-              // ── Header ─────────────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 16.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top row: logo + name + notification + settings
-                      Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10.r),
-                            child: Image.asset(
-                              'assets/static/logo.jpeg',
-                              width: 34.w,
-                              height: 34.w,
-                              fit: BoxFit.cover,
-                            ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 10.h),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10.r),
+                    child: Image.asset(
+                      'assets/static/logo.jpeg',
+                      width: 34.w,
+                      height: 34.w,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Text(
+                    'Munawwara Care',
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: onMissedCallsTap,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(10.w),
+                          decoration: BoxDecoration(
+                            color: iconContainerBg,
+                            borderRadius: BorderRadius.circular(14.r),
                           ),
-                          SizedBox(width: 10.w),
-                          Text(
-                            'Munawwara Care',
-                            style: TextStyle(
-                              fontFamily: 'Lexend',
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                          child: Icon(
+                            Symbols.notifications,
+                            size: 22.w,
+                            color: AppColors.primary,
                           ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: onMissedCallsTap,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(10.w),
-                                  decoration: BoxDecoration(
-                                    color: iconContainerBg,
-                                    borderRadius: BorderRadius.circular(14.r),
-                                  ),
-                                  child: Icon(
-                                    Symbols.notifications,
-                                    size: 22.w,
-                                    color: AppColors.primary,
-                                  ),
+                        ),
+                        if (missedCallUnreadCount > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 5.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade600,
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                              constraints: BoxConstraints(minWidth: 16.w),
+                              child: Text(
+                                missedCallUnreadCount > 9
+                                    ? '9+'
+                                    : '$missedCallUnreadCount',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.sp,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'Lexend',
+                                  height: 1,
                                 ),
-                                if (missedCallUnreadCount > 0)
-                                  Positioned(
-                                    right: -2,
-                                    top: -2,
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 5.w,
-                                        vertical: 2.h,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade600,
-                                        borderRadius:
-                                            BorderRadius.circular(10.r),
-                                      ),
-                                      constraints:
-                                          BoxConstraints(minWidth: 16.w),
-                                      child: Text(
-                                        missedCallUnreadCount > 9
-                                            ? '9+'
-                                            : '$missedCallUnreadCount',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9.sp,
-                                          fontWeight: FontWeight.w800,
-                                          fontFamily: 'Lexend',
-                                          height: 1,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  GestureDetector(
+                    onTap: onSettingsTap,
+                    child: Container(
+                      padding: EdgeInsets.all(10.w),
+                      decoration: BoxDecoration(
+                        color: iconContainerBg,
+                        borderRadius: BorderRadius.circular(14.r),
+                      ),
+                      child: Icon(
+                        Symbols.settings,
+                        size: 22.w,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: onRefresh,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 16.h),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'home_greeting'.tr(),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 22.sp,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              pilgrimState.isLoading
+                                  ? '...'
+                                  : _greetingDisplayName(profile),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 32.sp,
+                                fontWeight: FontWeight.w800,
+                                color: headerText,
+                                height: 1.1,
+                              ),
+                            ),
+                            if (!isGpsEnabled || !hasLocPermission)
+                              Align(
+                                alignment:
+                                    AlignmentDirectional.centerStart,
+                                child: Container(
+                                  margin: EdgeInsets.only(top: 20.h),
+                                  child: Material(
+                                    color: Colors.red.shade100,
+                                    borderRadius:
+                                        BorderRadius.circular(12.r),
+                                    child: InkWell(
+                                      borderRadius:
+                                          BorderRadius.circular(12.r),
+                                      onTap: onLocationInactiveTap,
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 16.w,
+                                          vertical: 8.h,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Symbols.location_off,
+                                              size: 16.w,
+                                              color: Colors.red.shade700,
+                                              fill: 1,
+                                            ),
+                                            SizedBox(width: 8.w),
+                                            Text(
+                                              'Inactive',
+                                              style: TextStyle(
+                                                fontFamily: 'Lexend',
+                                                fontSize: 13.sp,
+                                                fontWeight:
+                                                    FontWeight.w600,
+                                                color:
+                                                    Colors.red.shade700,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                          GestureDetector(
-                            onTap: onSettingsTap,
-                            child: Container(
-                              padding: EdgeInsets.all(10.w),
-                              decoration: BoxDecoration(
-                                color: iconContainerBg,
-                                borderRadius: BorderRadius.circular(14.r),
-                              ),
-                              child: Icon(
-                                Symbols.settings,
-                                size: 22.w,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 18.h),
-
-                      // Greeting
-                      Text(
-                        'home_greeting'.tr(),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 22.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        pilgrimState.isLoading
-                            ? '...'
-                            : _greetingDisplayName(profile),
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 32.sp,
-                          fontWeight: FontWeight.w800,
-                          color: headerText,
-                          height: 1.1,
-                        ),
-                      ),
-                      if (!isGpsEnabled || !hasLocPermission)
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Container(
-                            margin: EdgeInsets.only(top: 20.h),
-                            child: Material(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(12.r),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12.r),
-                                onTap: onLocationInactiveTap,
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 16.w, vertical: 8.h),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Symbols.location_off,
-                                          size: 16.w,
-                                          color: Colors.red.shade700,
-                                          fill: 1),
-                                      SizedBox(width: 8.w),
-                                      Text(
-                                        'Inactive',
-                                        style: TextStyle(
-                                          fontFamily: 'Lexend',
-                                          fontSize: 13.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.red.shade700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                            if (isGpsEnabled && hasLocPermission)
+                              SizedBox(height: 20.h),
+                          ],
                         ),
-                      if (isGpsEnabled && hasLocPermission)
-                        SizedBox(height: 20.h),
-                    ],
-                  ),
+                      ),
+                    ),
+                    if (navBeacons.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _HomeBody(
+                          isDark: isDark,
+                          pilgrimState: pilgrimState,
+                          group: group,
+                          weatherAlert: weatherAlert,
+                          sosPulseController: sosPulseController,
+                          sosHoldController: sosHoldController,
+                          isSosHolding: isSosHolding,
+                          sosCountdown: sosCountdown,
+                          onSosHoldStart: onSosHoldStart,
+                          onSosHoldEnd: onSosHoldEnd,
+                          onCancelSos: onCancelSos,
+                          onCallBackSos: onCallBackSos,
+                          showResolvedSosCard: showResolvedSosCard,
+                          sosHelpStatusKey: sosHelpStatusKey,
+                          sosModeratorName: sosModeratorName,
+                          sosHomePhase: sosHomePhase,
+                          onGroupCardTap: onGroupCardTap,
+                          onHotspotsTap: onHotspotsTap,
+                          onWeatherTap: onWeatherTap,
+                          navBeacons: navBeacons,
+                          myLocation: myLocation,
+                          onNavigateToModerator: onNavigateToModerator,
+                        ),
+                      )
+                    else
+                      SliverToBoxAdapter(
+                        child: _HomeBody(
+                          isDark: isDark,
+                          pilgrimState: pilgrimState,
+                          group: group,
+                          weatherAlert: weatherAlert,
+                          sosPulseController: sosPulseController,
+                          sosHoldController: sosHoldController,
+                          isSosHolding: isSosHolding,
+                          sosCountdown: sosCountdown,
+                          onSosHoldStart: onSosHoldStart,
+                          onSosHoldEnd: onSosHoldEnd,
+                          onCancelSos: onCancelSos,
+                          onCallBackSos: onCallBackSos,
+                          showResolvedSosCard: showResolvedSosCard,
+                          sosHelpStatusKey: sosHelpStatusKey,
+                          sosModeratorName: sosModeratorName,
+                          sosHomePhase: sosHomePhase,
+                          onGroupCardTap: onGroupCardTap,
+                          onHotspotsTap: onHotspotsTap,
+                          onWeatherTap: onWeatherTap,
+                          navBeacons: navBeacons,
+                          myLocation: myLocation,
+                          onNavigateToModerator: onNavigateToModerator,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-
-              // ── Body ───────────────────────────────────────────────────────
-              // SliverFillRemaining when no beacons (no dead-space);
-              // SliverToBoxAdapter when beacons present (list can grow).
-              if (navBeacons.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _HomeBody(
-                    isDark: isDark,
-                    pilgrimState: pilgrimState,
-                    group: group,
-                    weatherAlert: weatherAlert,
-                    sosPulseController: sosPulseController,
-                    sosHoldController: sosHoldController,
-                    isSosHolding: isSosHolding,
-                    sosCountdown: sosCountdown,
-                    onSosHoldStart: onSosHoldStart,
-                    onSosHoldEnd: onSosHoldEnd,
-                    onCancelSos: onCancelSos,
-                    onCallBackSos: onCallBackSos,
-                    showResolvedSosCard: showResolvedSosCard,
-                    sosHelpStatusKey: sosHelpStatusKey,
-                    sosModeratorName: sosModeratorName,
-                    sosHomePhase: sosHomePhase,
-                    onGroupCardTap: onGroupCardTap,
-                    onHotspotsTap: onHotspotsTap,
-                    navBeacons: navBeacons,
-                    myLocation: myLocation,
-                    onNavigateToModerator: onNavigateToModerator,
-                  ),
-                )
-              else
-                SliverToBoxAdapter(
-                  child: _HomeBody(
-                    isDark: isDark,
-                    pilgrimState: pilgrimState,
-                    group: group,
-                    weatherAlert: weatherAlert,
-                    sosPulseController: sosPulseController,
-                    sosHoldController: sosHoldController,
-                    isSosHolding: isSosHolding,
-                    sosCountdown: sosCountdown,
-                    onSosHoldStart: onSosHoldStart,
-                    onSosHoldEnd: onSosHoldEnd,
-                    onCancelSos: onCancelSos,
-                    onCallBackSos: onCallBackSos,
-                    showResolvedSosCard: showResolvedSosCard,
-                    sosHelpStatusKey: sosHelpStatusKey,
-                    sosModeratorName: sosModeratorName,
-                    sosHomePhase: sosHomePhase,
-                    onGroupCardTap: onGroupCardTap,
-                    onHotspotsTap: onHotspotsTap,
-                    navBeacons: navBeacons,
-                    myLocation: myLocation,
-                    onNavigateToModerator: onNavigateToModerator,
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -351,7 +365,7 @@ class PilgrimHomeTab extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _HomeBody — content shared by both sliver variants
+// _HomeBody — rounded panel: cards, SOS, moderator navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _HomeBody extends StatelessWidget {
@@ -373,6 +387,7 @@ class _HomeBody extends StatelessWidget {
   final SosHomePhase sosHomePhase;
   final VoidCallback onGroupCardTap;
   final VoidCallback onHotspotsTap;
+  final VoidCallback onWeatherTap;
   final Map<String, ModeratorBeacon> navBeacons;
   final LatLng? myLocation;
   final void Function(ModeratorBeacon) onNavigateToModerator;
@@ -396,6 +411,7 @@ class _HomeBody extends StatelessWidget {
     required this.sosHomePhase,
     required this.onGroupCardTap,
     required this.onHotspotsTap,
+    required this.onWeatherTap,
     required this.navBeacons,
     this.myLocation,
     required this.onNavigateToModerator,
@@ -435,7 +451,12 @@ class _HomeBody extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(child: WeatherCard(alert: weatherAlert)),
+                        Expanded(
+                          child: WeatherCard(
+                            alert: weatherAlert,
+                            onTapOpenDetail: onWeatherTap,
+                          ),
+                        ),
                         SizedBox(height: 12.h),
                         ExploreCard(onTap: onHotspotsTap),
                       ],

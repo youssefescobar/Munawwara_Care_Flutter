@@ -218,148 +218,144 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     final allGroups = state.groups;
     final remState = ref.watch(reminderProvider);
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 100.h),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'reminder_schedule_page_title'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontWeight: FontWeight.w800,
-                fontSize: 28.sp,
-                color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              'reminder_schedule_page_subtitle'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 14.sp,
-                color: AppColors.textMutedLight,
-              ),
-            ),
-            SizedBox(height: 24.h),
+    final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
+    final textMuted =
+        isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
+    final pageBg =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final outline = isDark ? AppColors.dividerDark : AppColors.dividerLight;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
-            // TARGET AUDIENCE
-            Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: Column(
+    return ColoredBox(
+      color: pageBg,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 100.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'reminder_target_audience'.tr(),
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12.sp,
-                      color: AppColors.textMutedLight,
-                      letterSpacing: 1.1,
-                    ),
+                  Icon(
+                    Symbols.notifications_active_rounded,
+                    color: AppColors.primary,
+                    size: 30.sp,
                   ),
-                  SizedBox(height: 12.h),
-                  Container(
-                    width: double.infinity,
-                    height: 50.h,
-                    padding: EdgeInsets.all(4.w),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF2A2A3C) : const Color(0xFFE5E7EB),
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final segmentWidth = constraints.maxWidth / 3;
-                        final isRtl = Directionality.of(context).name == 'rtl';
-                        final visualIndex = isRtl
-                            ? (2 - _targetAudienceIndex)
-                            : _targetAudienceIndex;
-                        return Stack(
-                          children: [
-                            // Animated Indicator
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.fastOutSlowIn,
-                              left: visualIndex * segmentWidth,
-                              width: segmentWidth,
-                              top: 0,
-                              bottom: 0,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                                  borderRadius: BorderRadius.circular(12.r),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: isDark ? 0.25 : 0.08,
-                                      ),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // Buttons
-                            Row(
-                              children: [
-                                _buildSegment(0, 'reminder_audience_system_wide', isDark),
-                                _buildSegment(1, 'reminder_audience_groups_tab', isDark),
-                                _buildSegment(2, 'reminder_audience_pilgrim_tab', isDark),
-                              ],
-                            ),
-                          ],
-                        );
-                      }
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'reminder_schedule_page_title'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 26.sp,
+                            height: 1.1,
+                            color: textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'reminder_schedule_page_subtitle'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontSize: 12.5.sp,
+                            height: 1.35,
+                            color: textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: 16.h),
+              SizedBox(height: 20.h),
 
-            // SPECIFIC GROUPS SELECTOR
-            if (_targetAudienceIndex == 1) ...[
-              Container(
-                padding: EdgeInsets.all(16.w),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
+              Card(
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                color: cardColor,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.backgroundDark
-                        : const Color(0xFFEEEEF8),
+                  side: BorderSide(
+                    color: outline.withValues(alpha: isDark ? 0.9 : 0.65),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.2 : 0.05,
-                      ),
-                      blurRadius: 12,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'reminder_select_recipient_groups'.tr(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(18.w, 18.h, 18.w, 16.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'reminder_target_audience'.tr(),
+                        style: TextStyle(
+                          fontFamily: 'Lexend',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.sp,
+                          color: textMuted,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 12.h),
-                    ...allGroups.map((g) {
+                      SizedBox(height: 10.h),
+                      SegmentedButton<int>(
+                        segments: [
+                          ButtonSegment<int>(
+                            value: 0,
+                            label: Text('reminder_audience_system_wide'.tr()),
+                            icon: Icon(Symbols.public, size: 18.sp),
+                          ),
+                          ButtonSegment<int>(
+                            value: 1,
+                            label: Text('reminder_audience_groups_tab'.tr()),
+                            icon: Icon(Symbols.groups, size: 18.sp),
+                          ),
+                          ButtonSegment<int>(
+                            value: 2,
+                            label: Text('reminder_audience_pilgrim_tab'.tr()),
+                            icon: Icon(Symbols.person, size: 18.sp),
+                          ),
+                        ],
+                        selected: {_targetAudienceIndex},
+                        onSelectionChanged: (next) {
+                          if (next.isEmpty) return;
+                          setState(() => _targetAudienceIndex = next.first);
+                        },
+                        multiSelectionEnabled: false,
+                        emptySelectionAllowed: false,
+                        showSelectedIcon: false,
+                        style: SegmentedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 10.h,
+                          ),
+                          side: BorderSide(color: outline),
+                          foregroundColor: textMuted,
+                          selectedForegroundColor: AppColors.primary,
+                          selectedBackgroundColor:
+                              AppColors.primary.withValues(alpha: 0.12),
+                          textStyle: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ),
+                      if (_targetAudienceIndex == 1) ...[
+                        Divider(height: 24.h, thickness: 1, color: outline),
+                        Text(
+                          'reminder_select_recipient_groups'.tr(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.sp,
+                            color: textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 10.h),
+                        ...allGroups.map((g) {
                       final isSelected = _selectedGroupIds.contains(g.id);
                       return GestureDetector(
                         onTap: () {
@@ -374,23 +370,29 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                         child: Container(
                           margin: EdgeInsets.only(bottom: 8.h),
                           padding: EdgeInsets.symmetric(
-                            horizontal: 16.w,
+                            horizontal: 14.w,
                             vertical: 12.h,
                           ),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF2A2A3C)
-                                : const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : outline.withValues(alpha: 0.75),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                            color: isSelected
+                                ? AppColors.primary.withValues(alpha: 0.07)
+                                : Colors.transparent,
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 Symbols.groups,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF8A6A30),
-                                size: 20.w,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : textMuted,
+                                size: 20.sp,
                               ),
                               SizedBox(width: 12.w),
                               Expanded(
@@ -398,11 +400,9 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                   g.groupName,
                                   style: TextStyle(
                                     fontFamily: 'Lexend',
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 14.sp,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF1A1A4E),
+                                    color: textPrimary,
                                   ),
                                 ),
                               ),
@@ -411,76 +411,28 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                     ? Symbols.check_circle
                                     : Symbols.radio_button_unchecked,
                                 color: isSelected
-                                    ? const Color(0xFFC05621)
-                                    : AppColors.textMutedLight,
-                                size: 20.w,
+                                    ? AppColors.primary
+                                    : textMuted,
+                                size: 22.sp,
                               ),
                             ],
                           ),
                         ),
                       );
                     }),
-                    SizedBox(height: 8.h),
-                    Center(
-                      child: TextButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(
-                          Symbols.add_circle,
-                          color: Color(0xFF9A3412),
-                          size: 18,
-                        ),
-                        label: Text(
-                          'reminder_browse_more_groups'.tr(),
+                      ],
+                      if (_targetAudienceIndex == 2) ...[
+                        Divider(height: 24.h, thickness: 1, color: outline),
+                        Text(
+                          'reminder_select_pilgrim_section'.tr(),
                           style: TextStyle(
                             fontFamily: 'Lexend',
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF9A3412),
+                            fontWeight: FontWeight.w700,
                             fontSize: 13.sp,
+                            color: textPrimary,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16.h),
-            ],
-
-            // SPECIFIC PILGRIM SELECTOR
-            if (_targetAudienceIndex == 2) ...[
-              Container(
-                padding: EdgeInsets.all(16.w),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                  borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.backgroundDark
-                        : const Color(0xFFEEEEF8),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.2 : 0.05,
-                      ),
-                      blurRadius: 12,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'reminder_select_pilgrim_section'.tr(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-                      ),
-                    ),
-                    SizedBox(height: 12.h),
+                        SizedBox(height: 10.h),
                     DropdownButtonFormField<String>(
                       key: const ValueKey('system_reminder_specific_group'),
                       initialValue: _selectedGroupIdForPilgrim != null &&
@@ -585,128 +537,103 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                       ),
                     ],
                   ],
-                ),
-              ),
-              SizedBox(height: 16.h),
-            ],
-
-            // REMINDER MESSAGE
-            Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(
-                  color: isDark
-                      ? AppColors.backgroundDark
-                      : const Color(0xFFEEEEF8),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'reminder_text_label'.tr(),
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  Container(
-                    height: 120.h,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF2A2A3C)
-                          : const Color(0xFFE5E7EB),
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: TextField(
-                      controller: _messageController,
-                      maxLines: null,
-                      minLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      cursorColor: AppColors.primary,
-                      selectionControls: MaterialTextSelectionControls(),
-                      style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                      Divider(height: 24.h, thickness: 1, color: outline),
+                      Row(
+                        children: [
+                          Icon(
+                            Symbols.chat_bubble,
+                            color: AppColors.primary,
+                            size: 20.sp,
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              'reminder_message_short_title'.tr(),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.sp,
+                                color: textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'reminder_text_hint'.tr(),
-                        hintStyle: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 14.sp,
-                          color: AppColors.textMutedLight,
-                        ),
-                        border: OutlineInputBorder(
+                      SizedBox(height: 8.h),
+                      Container(
+                        height: 100.h,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1A2230)
+                              : AppColors.iconBgLight.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            width: 1.5,
+                          border: Border.all(
+                            color: outline.withValues(alpha: 0.65),
                           ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide.none,
+                        child: TextField(
+                          controller: _messageController,
+                          maxLines: null,
+                          minLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          cursorColor: AppColors.primary,
+                          selectionControls: MaterialTextSelectionControls(),
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontSize: 14.sp,
+                            color: textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            filled: false,
+                            hintText: 'reminder_text_hint'.tr(),
+                            hintStyle: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w500,
+                              color: textMuted.withValues(alpha: 0.9),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                              borderSide: BorderSide(
+                                color: AppColors.primary.withValues(alpha: 0.45),
+                                width: 1.5,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.all(14.w),
+                          ),
                         ),
-                        contentPadding: EdgeInsets.all(16.w),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 16.h),
-
-            // SCHEDULING OPTIONS
-            Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(
-                  color: isDark
-                      ? AppColors.backgroundDark
-                      : const Color(0xFFEEEEF8),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'reminder_scheduling_section'.tr(),
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  Row(
+                      Divider(height: 24.h, thickness: 1, color: outline),
+                      Row(
+                        children: [
+                          Icon(
+                            Symbols.schedule,
+                            color: AppColors.primary,
+                            size: 20.sp,
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'reminder_scheduling_section'.tr(),
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.sp,
+                              color: textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12.h),
+                      Row(
                     children: [
                       Expanded(
                         child: Column(
@@ -717,12 +644,11 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontWeight: FontWeight.w600,
-                                fontSize: 10.sp,
-                                color: AppColors.textMutedLight,
-                                letterSpacing: 1.1,
+                                fontSize: 11.sp,
+                                color: textMuted,
                               ),
                             ),
-                            SizedBox(height: 8.h),
+                            SizedBox(height: 6.h),
                             GestureDetector(
                               onTap: _onSelectDate,
                               child: Container(
@@ -730,18 +656,21 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                 padding: EdgeInsets.symmetric(horizontal: 12.w),
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? const Color(0xFF2A2A3C)
-                                      : const Color(0xFFE5E7EB),
+                                      ? const Color(0xFF1A2230)
+                                      : AppColors.iconBgLight.withValues(
+                                          alpha: 0.65,
+                                        ),
                                   borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: outline.withValues(alpha: 0.65),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       Symbols.calendar_today,
-                                      size: 18.w,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF1A1A4E),
+                                      size: 18.sp,
+                                      color: AppColors.primary,
                                     ),
                                     SizedBox(width: 8.w),
                                     Expanded(
@@ -754,10 +683,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                         style: TextStyle(
                                           fontFamily: 'Lexend',
                                           fontSize: 14.sp,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDark
-                                              ? Colors.white
-                                              : const Color(0xFF1A1A4E),
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
                                         ),
                                       ),
                                     ),
@@ -778,12 +705,11 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                               style: TextStyle(
                                 fontFamily: 'Lexend',
                                 fontWeight: FontWeight.w600,
-                                fontSize: 10.sp,
-                                color: AppColors.textMutedLight,
-                                letterSpacing: 1.1,
+                                fontSize: 11.sp,
+                                color: textMuted,
                               ),
                             ),
-                            SizedBox(height: 8.h),
+                            SizedBox(height: 6.h),
                             GestureDetector(
                               onTap: _onSelectTime,
                               child: Container(
@@ -791,18 +717,21 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                 padding: EdgeInsets.symmetric(horizontal: 12.w),
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? const Color(0xFF2A2A3C)
-                                      : const Color(0xFFE5E7EB),
+                                      ? const Color(0xFF1A2230)
+                                      : AppColors.iconBgLight.withValues(
+                                          alpha: 0.65,
+                                        ),
                                   borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: outline.withValues(alpha: 0.65),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       Symbols.schedule,
-                                      size: 18.w,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF1A1A4E),
+                                      size: 18.sp,
+                                      color: AppColors.primary,
                                     ),
                                     SizedBox(width: 8.w),
                                     Expanded(
@@ -813,10 +742,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                         style: TextStyle(
                                           fontFamily: 'Lexend',
                                           fontSize: 14.sp,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDark
-                                              ? Colors.white
-                                              : const Color(0xFF1A1A4E),
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
                                         ),
                                       ),
                                     ),
@@ -834,9 +761,9 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     'reminder_weekdays_section'.tr(),
                     style: TextStyle(
                       fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.sp,
+                      color: textPrimary,
                     ),
                   ),
                   SizedBox(height: 4.h),
@@ -845,7 +772,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                     style: TextStyle(
                       fontFamily: 'Lexend',
                       fontSize: 11.sp,
-                      color: AppColors.textMutedLight,
+                      height: 1.35,
+                      color: textMuted,
                     ),
                   ),
                   SizedBox(height: 10.h),
@@ -863,9 +791,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             fontSize: 11.sp,
                             fontWeight:
                                 selected ? FontWeight.w700 : FontWeight.w500,
-                            color: selected
-                                ? Colors.white
-                                : (isDark ? Colors.white70 : Colors.black87),
+                            color: selected ? Colors.white : textPrimary,
                           ),
                         ),
                         selected: selected,
@@ -878,18 +804,20 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             }
                           });
                         },
-                        selectedColor: const Color(0xFFF97316),
+                        selectedColor: AppColors.primary,
                         backgroundColor: isDark
-                            ? const Color(0xFF2A2A3C)
-                            : const Color(0xFFE5E7EB),
+                            ? const Color(0xFF1A2230)
+                            : AppColors.iconBgLight.withValues(alpha: 0.65),
+                        side: BorderSide(
+                          color: outline.withValues(alpha: 0.5),
+                        ),
                         checkmarkColor: Colors.white,
                         showCheckmark: false,
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
                       );
                     }),
                   ),
-                  SizedBox(height: 20.h),
-// REPEAT SETTINGS
+                  SizedBox(height: 18.h),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -898,18 +826,17 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                         style: TextStyle(
                           fontFamily: 'Lexend',
                           fontWeight: FontWeight.w600,
-                          fontSize: 14.sp,
-                          color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                          fontSize: 13.sp,
+                          color: textPrimary,
                         ),
                       ),
-                       Row(
+                      Row(
                         children: [
                           IconButton(
                             onPressed: () {
                               if (_repeatCount > 1) {
                                 setState(() {
                                   _repeatCount--;
-                                  // Reset interval when going back to 1
                                   if (_repeatCount == 1) {
                                     _selectedIntervalMin = null;
                                     _isCustomInterval = false;
@@ -919,16 +846,16 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             },
                             icon: Icon(
                               Icons.remove_circle_outline,
-                              color: isDark ? Colors.white70 : Colors.black54,
+                              color: textMuted,
                             ),
                           ),
                           Text(
                             '$_repeatCount',
                             style: TextStyle(
                               fontFamily: 'Lexend',
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                               fontSize: 16.sp,
-                              color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                              color: textPrimary,
                             ),
                           ),
                           IconButton(
@@ -944,9 +871,9 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                                 }
                               });
                             },
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.add_circle_outline,
-                              color: Color(0xFFF97316),
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -961,8 +888,8 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A4E),
+                        fontSize: 13.sp,
+                        color: textPrimary,
                       ),
                     ),
                     SizedBox(height: 12.h),
@@ -978,16 +905,14 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                               fontFamily: 'Lexend',
                               fontWeight: FontWeight.w500,
                               fontSize: 12.sp,
-                              color: isSelected
-                                  ? Colors.white
-                                  : (isDark ? Colors.white70 : Colors.black87),
+                              color: isSelected ? Colors.white : textPrimary,
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: const Color(0xFFF97316),
+                          selectedColor: AppColors.primary,
                           backgroundColor: isDark
-                              ? const Color(0xFF2A2A3C)
-                              : const Color(0xFFE5E7EB),
+                              ? const Color(0xFF1A2230)
+                              : AppColors.iconBgLight.withValues(alpha: 0.65),
                           onSelected: (val) {
                             if (val) {
                               setState(() {
@@ -999,24 +924,24 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                       }).toList(),
                     ),
                   ],
-                ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-            SizedBox(height: 32.h),
+            SizedBox(height: 16.h),
 
             // CREATE BUTTON
             SizedBox(
               width: double.infinity,
-              height: 56.h,
-              child: ElevatedButton.icon(
+              height: 52.h,
+              child: FilledButton.icon(
                 onPressed: _isCreating ? null : _createReminders,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF97316),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28.r),
+                    borderRadius: BorderRadius.circular(14.r),
                   ),
-                  elevation: 2,
                 ),
                 icon: _isCreating
                     ? SizedBox(
@@ -1027,30 +952,39 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Icon(Symbols.add_alert, size: 24),
+                    : Icon(Symbols.add_alert, size: 22.sp),
                 label: Text(
                   _isCreating ? 'reminder_creating'.tr() : 'reminder_create_btn'.tr(),
                   style: TextStyle(
                     fontFamily: 'Lexend',
                     fontWeight: FontWeight.w700,
-                    fontSize: 16.sp,
+                    fontSize: 15.sp,
                   ),
                 ),
               ),
             ),
             
-            SizedBox(height: 48.h),
-            
-            Text(
-              'reminder_history_section'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontWeight: FontWeight.w700,
-                fontSize: 20.sp,
-                color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-              ),
+            SizedBox(height: 36.h),
+            Row(
+              children: [
+                Icon(
+                  Symbols.history,
+                  color: AppColors.primary,
+                  size: 24.sp,
+                ),
+                SizedBox(width: 10.w),
+                Text(
+                  'reminder_history_section'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20.sp,
+                    color: textPrimary,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 14.h),
             
             // HISTORY FILTER
             Container(
@@ -1088,11 +1022,11 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
                             padding: EdgeInsets.symmetric(vertical: 32.h),
                             child: Text(
                               'reminder_empty_history_filter'.tr(),
-                              style: TextStyle(
-                                fontFamily: 'Lexend',
-                                color: AppColors.textMutedLight,
-                                fontSize: 14.sp,
-                              ),
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              color: textMuted,
+                              fontSize: 14.sp,
+                            ),
                             ),
                           ),
                         );
@@ -1171,13 +1105,15 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
-
-
   Widget _buildFilterChip(int index, String labelKey, bool isDark) {
     final isSelected = _historyFilterIndex == index;
+    final outline = isDark ? AppColors.dividerDark : AppColors.dividerLight;
+    final textMutedChip =
+        isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
     return GestureDetector(
       onTap: () => setState(() => _historyFilterIndex = index),
       child: Container(
@@ -1185,13 +1121,17 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFF97316)
-              : (isDark ? const Color(0xFF2A2A3C) : const Color(0xFFF3F4F6)),
+              ? AppColors.primary
+              : (isDark
+                  ? const Color(0xFF1A2230)
+                  : AppColors.iconBgLight.withValues(alpha: 0.7)),
           borderRadius: BorderRadius.circular(20.r),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFF97316)
-                : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                ? AppColors.primary
+                : (isDark
+                    ? outline.withValues(alpha: 0.5)
+                    : outline.withValues(alpha: 0.55)),
           ),
         ),
         child: Center(
@@ -1201,7 +1141,7 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
               fontFamily: 'Lexend',
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 12.sp,
-              color: isSelected ? Colors.white : AppColors.textMutedLight,
+              color: isSelected ? Colors.white : textMutedChip,
             ),
           ),
         ),
@@ -1209,28 +1149,5 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen> {
     );
   }
 
-  Widget _buildSegment(int index, String labelKey, bool isDark) {
-    final isSelected = _targetAudienceIndex == index;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _targetAudienceIndex = index),
-        child: Center(
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            style: TextStyle(
-              fontFamily: 'Lexend',
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 13.sp,
-              color: isSelected
-                  ? (isDark ? Colors.white : const Color(0xFF1A1A4E))
-                  : AppColors.textMutedLight,
-            ),
-            child: Text(labelKey.tr()),
-          ),
-        ),
-      ),
-    );
-  }
 }
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
 import '../../../core/utils/app_logger.dart';
+import '../helpers/chat_popup_dedup.dart';
 import '../models/message_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +98,9 @@ class MessageNotifier extends Notifier<MessageState> {
       parsed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       if (parsed.isEmpty) return;
       state = state.copyWith(messages: parsed);
+      await ChatPopupDedup.mergeKnownMessageIds(
+        parsed.map((m) => m.id),
+      );
     } catch (_) {}
   }
 
@@ -117,8 +121,10 @@ class MessageNotifier extends Notifier<MessageState> {
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   Future<void> loadMessages(String groupId) async {
-    await _hydrateMessagesFromCache(groupId);
+    // Enter loading before cache hydrate so listeners never see 0→N growth
+    // while isLoading is false (avoids phantom receive SFX / tab pulses).
     state = state.copyWith(isLoading: true, error: null);
+    await _hydrateMessagesFromCache(groupId);
     try {
       final res = await ApiService.dio.get('/messages/group/$groupId');
       final body = Map<String, dynamic>.from(res.data as Map);
@@ -129,12 +135,16 @@ class MessageNotifier extends Notifier<MessageState> {
       // oldest first (chronological / chat order)
       raw.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       state = state.copyWith(messages: raw, isLoading: false);
+      await ChatPopupDedup.mergeKnownMessageIds(raw.map((m) => m.id));
     } on DioException catch (e) {
       if (state.messages.isEmpty) {
         await _hydrateMessagesFromCache(groupId);
       }
       if (state.messages.isNotEmpty) {
         state = state.copyWith(isLoading: false, error: null);
+        await ChatPopupDedup.mergeKnownMessageIds(
+          state.messages.map((m) => m.id),
+        );
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -170,13 +180,16 @@ class MessageNotifier extends Notifier<MessageState> {
 
   /// Silently appends a single message received from a socket event.
   /// No loading state is touched, so the list never flickers.
-  void appendMessage(Map<String, dynamic> json) {
+  /// Returns false when the message was already present or could not be parsed.
+  bool appendMessage(Map<String, dynamic> json) {
     try {
       final msg = GroupMessage.fromJson(json);
-      if (state.messages.any((m) => m.id == msg.id)) return; // dedup
-      
-      bool isReadingNow = state.activeGroupId == msg.groupId;
-      
+      if (state.messages.any((m) => m.id == msg.id)) {
+        return false;
+      }
+
+      final isReadingNow = state.activeGroupId == msg.groupId;
+
       state = state.copyWith(
         messages: [...state.messages, msg],
         unreadCount: isReadingNow ? state.unreadCount : state.unreadCount + 1,
@@ -185,8 +198,10 @@ class MessageNotifier extends Notifier<MessageState> {
       if (isReadingNow) {
         markAllRead(msg.groupId);
       }
+      return true;
     } catch (e) {
       AppLogger.w('[MessageNotifier] Error appending message: $e');
+      return false;
     }
   }
 

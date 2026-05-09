@@ -21,29 +21,29 @@ class ProvisioningSummaryCards extends StatelessWidget {
       children: [
         Expanded(
           child: _ModernStatCard(
-            title: 'provisioning_total'.tr(),
+            title: 'provisioning_total'.tr().toUpperCase(),
             value: summary.totalProvisioned,
-            icon: Symbols.group,
+            icon: Symbols.groups,
             color: AppColors.primary,
             isDark: isDark,
           ),
         ),
-        SizedBox(width: 12.w),
+        SizedBox(width: 8.w),
         Expanded(
           child: _ModernStatCard(
-            title: 'status_pending'.tr(),
+            title: 'status_pending'.tr().toUpperCase(),
             value: summary.pendingCount,
-            icon: Symbols.pending_actions,
-            color: const Color(0xFFF59E0B),
+            icon: Symbols.schedule,
+            color: const Color(0xFFEAB308),
             isDark: isDark,
           ),
         ),
-        SizedBox(width: 12.w),
+        SizedBox(width: 8.w),
         Expanded(
           child: _ModernStatCard(
-            title: 'group_status_activated'.tr(),
+            title: 'group_status_activated'.tr().toUpperCase(),
             value: summary.activatedCount,
-            icon: Symbols.verified,
+            icon: Symbols.verified_user,
             color: const Color(0xFF10B981),
             isDark: isDark,
           ),
@@ -70,49 +70,52 @@ class _ModernStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final outline = isDark ? AppColors.dividerDark : AppColors.dividerLight;
     return Container(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 14.h),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(
-          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          color: outline.withValues(alpha: isDark ? 0.9 : 0.65),
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: isDark ? 0.05 : 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.all(6.w),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: Icon(icon, size: 18.w, color: color),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  '$value',
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                    color: isDark ? Colors.white : AppColors.textDark,
+                  ),
+                ),
+              ),
+              Icon(icon, size: 22.sp, color: color.withValues(alpha: 0.9)),
+            ],
           ),
-          SizedBox(height: 12.h),
-          Text(
-            '$value',
-            style: TextStyle(
-              fontFamily: 'Lexend',
-              fontSize: 24.sp,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : AppColors.textDark,
-            ),
-          ),
+          SizedBox(height: 6.h),
           Text(
             title,
             style: TextStyle(
               fontFamily: 'Lexend',
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w500,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
               color: isDark ? AppColors.textMutedLight : AppColors.textMutedDark,
             ),
           ),

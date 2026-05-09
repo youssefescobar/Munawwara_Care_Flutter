@@ -60,6 +60,8 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
   Timer? _highlightClearTimer;
   int _preLoadUnread = 0; // unread count captured before _load() runs
   bool _initialLoadDone = false; // true once the first load has completed
+  /// After [loadMessages] leaves loading, socket-style SFX/tab pulse may run.
+  bool _receiveSfxArmed = false;
 
   bool _hasUnreadAll = false;
   bool _hasUnreadPrivate = false;
@@ -281,10 +283,14 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
 
     // Scroll & highlight driven by provider changes
     ref.listen(messageProvider, (prev, next) {
+      final loadFinished =
+          (prev?.isLoading ?? false) && !next.isLoading;
+      if (loadFinished) {
+        _receiveSfxArmed = true;
+      }
+
       // ── Initial / pull-to-refresh load finished ──────────────────────────
-      if ((prev?.isLoading ?? false) &&
-          !next.isLoading &&
-          next.messages.isNotEmpty) {
+      if (loadFinished && next.messages.isNotEmpty) {
         if (!_initialLoadDone) {
           // Highlight the last N messages that were unread before opening
           final count = _preLoadUnread.clamp(1, next.messages.length);
@@ -304,30 +310,36 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
         _scrollToBottom(jump: true);
         return;
       }
+
+      if (loadFinished && next.messages.isEmpty && !_initialLoadDone) {
+        if (mounted) {
+          setState(() => _initialLoadDone = true);
+        }
+      }
+
       // ── New socket message appended (no loading state) ───────────────────
-      if (!next.isLoading &&
-          (prev?.messages.length ?? 0) < next.messages.length) {
-        final prevIds = prev?.messages.map((m) => m.id).toSet() ?? {};
-        final arrived = next.messages.where((m) => !prevIds.contains(m.id));
-        final arrivedIds = arrived.map((m) => m.id).toSet();
-        if (arrivedIds.isNotEmpty) {
-          setState(() => _newMessageIds.addAll(arrivedIds));
-          _highlightClearTimer?.cancel();
-          _highlightClearTimer = Timer(const Duration(seconds: 3), () {
-            if (mounted) setState(() => _newMessageIds.clear());
-          });
-          _scrollToBottom(); // smooth animate — no flicker
-          // Play receive sound for any new message while this screen is open.
-          for (final m in arrived) {
-            unawaited(_playReceiveSfx(m));
-          }
-          // Pulse the relevant tab only if user is not currently on it.
-          for (final m in arrived) {
-            final targetTab = (m.recipientId != null) ? 'private' : 'all';
-            if (_filter != targetTab) {
-              setState(() => _triggerTabPulse(targetTab));
-            }
-          }
+      if (!_receiveSfxArmed || prev == null) return;
+      if (prev.isLoading || next.isLoading) return;
+      if (prev.messages.length >= next.messages.length) return;
+
+      final prevIds = prev.messages.map((m) => m.id).toSet();
+      final arrived = next.messages.where((m) => !prevIds.contains(m.id));
+      final arrivedIds = arrived.map((m) => m.id).toSet();
+      if (arrivedIds.isEmpty) return;
+
+      setState(() => _newMessageIds.addAll(arrivedIds));
+      _highlightClearTimer?.cancel();
+      _highlightClearTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _newMessageIds.clear());
+      });
+      _scrollToBottom(); // smooth animate — no flicker
+      for (final m in arrived) {
+        unawaited(_playReceiveSfx(m));
+      }
+      for (final m in arrived) {
+        final targetTab = (m.recipientId != null) ? 'private' : 'all';
+        if (_filter != targetTab) {
+          setState(() => _triggerTabPulse(targetTab));
         }
       }
     });

@@ -359,7 +359,11 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
               return;
             }
             // Append the single message without a full reload (no spinner)
-            ref.read(messageProvider.notifier).appendMessage(map);
+            final appended =
+                ref.read(messageProvider.notifier).appendMessage(map);
+            if (!appended) {
+              return;
+            }
 
             // Don't show popup or play sound when app is not in foreground
             if (_lifecycleState != AppLifecycleState.resumed) {
@@ -801,36 +805,54 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       final current = payload['current'] as Map<String, dynamic>?;
       final temp = (current?['temperature_2m'] as num?)?.toDouble();
       final weatherCode = (current?['weather_code'] as num?)?.toInt() ?? 0;
+      final isDayRaw = (current?['is_day'] as num?)?.round() ?? 1;
+      final isDaytime = isDayRaw != 0;
 
       if (temp == null) throw Exception('Missing temperature payload');
 
       if (!mounted) return;
       setState(() {
-        _weatherAlert = _buildWeatherAlert(temp, weatherCode);
+        _weatherAlert = _buildWeatherAlert(
+          temp,
+          weatherCode,
+          isDaytime: isDaytime,
+        );
         _lastWeatherFetchAt = DateTime.now();
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _weatherAlert = const WeatherAlert.error(
-          'Unable to fetch weather now. It will retry automatically.',
+        _weatherAlert = WeatherAlert(
+          temperatureC: 0,
+          condition: 'weather_unavailable'.tr(),
+          cardTip: 'weather_card_error_short'.tr(),
+          detailTip: 'weather_detail_error_body'.tr(),
+          icon: Icons.cloud_off,
+          iconColor: AppColors.textMutedLight,
+          isLoading: false,
+          isError: true,
         );
         // Don't set _lastWeatherFetchAt on error so it retries immediately
       });
     }
   }
 
-  WeatherAlert _buildWeatherAlert(double temperatureC, int weatherCode) {
+  WeatherAlert _buildWeatherAlert(
+    double temperatureC,
+    int weatherCode, {
+    required bool isDaytime,
+  }) {
     final temp = temperatureC.round();
     final condition = _weatherCondition(weatherCode, temp);
-    final reminder = _weatherReminder(weatherCode, temp);
+    final keys = _weatherTipKeys(weatherCode, temp, isDaytime);
     final icon = _weatherIcon(weatherCode, temp);
     final iconColor = _weatherIconColor(weatherCode, temp);
 
     return WeatherAlert(
       temperatureC: temp,
       condition: condition,
-      reminder: reminder,
+      cardTip: keys.cardKey.tr(),
+      detailTip: keys.detailKey.tr(),
       icon: icon,
       iconColor: iconColor,
       isLoading: false,
@@ -854,7 +876,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
   Color _weatherIconColor(int weatherCode, int temperatureC) {
     if (_isRainCode(weatherCode)) return const Color(0xFF2F80ED);
     if (weatherCode == 45 || weatherCode == 48) return const Color(0xFF8B6D4E);
-    if (temperatureC <= 14 || (weatherCode >= 71 && weatherCode <= 77)) {
+    if (temperatureC <= 16 || (weatherCode >= 71 && weatherCode <= 77)) {
       return const Color(0xFF56CCF2);
     }
     if (temperatureC >= 36) return const Color(0xFFE67E22);
@@ -867,7 +889,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
   String _weatherCondition(int weatherCode, int temperatureC) {
     if (_isRainCode(weatherCode)) return 'weather_rainy'.tr();
     if (weatherCode == 45 || weatherCode == 48) return 'weather_sandy'.tr();
-    if (temperatureC <= 14 || (weatherCode >= 71 && weatherCode <= 77)) {
+    if (temperatureC <= 16 || (weatherCode >= 71 && weatherCode <= 77)) {
       return 'weather_cold'.tr();
     }
     if (temperatureC >= 36) return 'weather_extreme_heat'.tr();
@@ -877,20 +899,62 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     return 'weather_clear'.tr();
   }
 
-  String _weatherReminder(int weatherCode, int temperatureC) {
-    if (temperatureC <= 14 || (weatherCode >= 71 && weatherCode <= 77)) {
-      return 'weather_reminder_jacket'.tr();
+  /// Short line for the dashboard card (`weather_card_*`) and long body
+  /// (`weather_reminder_*` / legacy detail keys).
+  ({
+    String cardKey,
+    String detailKey,
+  }) _weatherTipKeys(
+    int weatherCode,
+    int temperatureC,
+    bool isDaytime,
+  ) {
+    if (temperatureC <= 16 || (weatherCode >= 71 && weatherCode <= 77)) {
+      return (
+        cardKey: 'weather_card_jacket',
+        detailKey: 'weather_reminder_jacket',
+      );
     }
-    if (temperatureC >= 36) {
-      return 'weather_reminder_hydrate'.tr();
+    if (weatherCode >= 95) {
+      return (
+        cardKey: 'weather_card_storm',
+        detailKey: 'weather_reminder_storm',
+      );
+    }
+    if (_isRainCode(weatherCode)) {
+      return (cardKey: 'weather_card_rain', detailKey: 'weather_reminder_rain');
     }
     if (weatherCode == 45 || weatherCode == 48) {
-      return 'weather_reminder_mask'.tr();
+      return (cardKey: 'weather_card_mask', detailKey: 'weather_reminder_mask');
     }
-    if (_isRainCode(weatherCode) || weatherCode <= 1) {
-      return 'weather_reminder_umbrella'.tr();
+    if (isDaytime && temperatureC >= 32) {
+      return (
+        cardKey: 'weather_card_heat_sun',
+        detailKey: 'weather_reminder_heat_sun_umbrella',
+      );
     }
-    return 'weather_reminder_default'.tr();
+    if (!isDaytime && temperatureC >= 30) {
+      return (
+        cardKey: 'weather_card_hot_night',
+        detailKey: 'weather_reminder_hot_night_hydrate',
+      );
+    }
+    if (isDaytime && temperatureC >= 28 && temperatureC < 32) {
+      return (
+        cardKey: 'weather_card_warm',
+        detailKey: 'weather_reminder_warm_hijaz',
+      );
+    }
+    if (weatherCode <= 1) {
+      return (
+        cardKey: 'weather_card_sunny',
+        detailKey: 'weather_reminder_sun_hijaz',
+      );
+    }
+    return (
+      cardKey: 'weather_card_default',
+      detailKey: 'weather_reminder_default',
+    );
   }
 
   bool _isRainCode(int code) {
@@ -1340,6 +1404,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
             ),
           );
         },
+        onWeatherTap: () => showWeatherDetailBottomSheet(context, _weatherAlert),
       ),
       PilgrimMapTab(
         myLocation: _myLatLng,
