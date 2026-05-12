@@ -129,6 +129,8 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
   String _filter = 'all'; // all | assigned | unassigned
   String _unassignedSubFilter = 'all'; // all | manual | deleted
   String _search = '';
+  final Set<String> _selectedPilgrimIds = {};
+  bool _bulkSelectionMode = false;
 
   @override
   void initState() {
@@ -166,6 +168,10 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                 ))
             .where((g) => g.id.isNotEmpty)
             .toList();
+        _selectedPilgrimIds.removeWhere(
+          (id) => !_all.any((p) => p.id == id),
+        );
+        _bulkSelectionMode = false;
       });
     } on DioException catch (e) {
       setState(() => _error = ApiService.parseError(e));
@@ -203,12 +209,105 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
     }).toList();
   }
 
+  void _showNoAssignableGroupsDialog(String titleKey) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.surfaceDark : Colors.white;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: bg,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
+        contentPadding: EdgeInsets.fromLTRB(24.w, 28.h, 24.w, 20.h),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Symbols.group_off,
+              size: 48.w,
+              color: AppColors.primary.withValues(alpha: 0.9),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              titleKey.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Lexend',
+                fontWeight: FontWeight.w700,
+                fontSize: 18.sp,
+                color: isDark ? Colors.white : AppColors.textDark,
+              ),
+            ),
+            SizedBox(height: 10.h),
+            Text(
+              'assign_to_group_no_available'.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Lexend',
+                fontSize: 14.sp,
+                height: 1.45,
+                color: isDark ? Colors.white70 : AppColors.textMutedLight,
+              ),
+            ),
+            SizedBox(height: 24.h),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14.r),
+                  ),
+                ),
+                child: Text(
+                  'dialog_ok'.tr(),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15.sp,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _enterBulkSelection(_PilgrimItem pilgrim) {
+    setState(() {
+      _bulkSelectionMode = true;
+      _selectedPilgrimIds.add(pilgrim.id);
+    });
+  }
+
+  void _exitBulkSelection() {
+    setState(() {
+      _bulkSelectionMode = false;
+      _selectedPilgrimIds.clear();
+    });
+  }
+
+  void _togglePilgrimSelection(String id) {
+    setState(() {
+      if (_selectedPilgrimIds.contains(id)) {
+        _selectedPilgrimIds.remove(id);
+      } else {
+        _selectedPilgrimIds.add(id);
+      }
+    });
+  }
+
   Future<void> _assignToGroup(
       _PilgrimItem pilgrim, _GroupOption group) async {
     try {
       await ApiService.dio.post(
         '/groups/${group.id}/add-pilgrim',
-        data: {'identifier': pilgrim.phoneNumber},
+        data: {'user_id': pilgrim.id},
       );
       if (!mounted) return;
       StandardSnackBar.showSuccess(
@@ -320,12 +419,7 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
     final available = _groups.where((g) => g.id != pilgrim.currentGroupId).toList();
     
     if (available.isEmpty) {
-      StandardDialog.show(
-        context: context,
-        title: 'assign_to_group_title',
-        content: 'assign_to_group_no_available',
-        confirmText: 'confirm',
-      );
+      _showNoAssignableGroupsDialog('assign_to_group_title');
       return;
     }
 
@@ -410,6 +504,236 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16.r),
                       side: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
+                    ),
+                  ),
+                  child: Text(
+                    'cancel'.tr(),
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMutedLight,
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _bulkMoveToGroup(
+    List<_PilgrimItem> pilgrims,
+    _GroupOption group,
+  ) async {
+    const batch = 4;
+    var ok = 0;
+    final errors = <String>[];
+    for (var i = 0; i < pilgrims.length; i += batch) {
+      final end =
+          i + batch > pilgrims.length ? pilgrims.length : i + batch;
+      final slice = pilgrims.sublist(i, end);
+      await Future.wait(
+        slice.map((p) async {
+          try {
+            await ApiService.dio.post(
+              '/groups/${group.id}/add-pilgrim',
+              data: {'user_id': p.id},
+            );
+            ok++;
+          } on DioException catch (e) {
+            errors.add('${p.fullName}: ${ApiService.parseError(e)}');
+          } catch (e) {
+            errors.add('${p.fullName}: $e');
+          }
+        }),
+      );
+    }
+    if (!mounted) return;
+    if (errors.isEmpty) {
+      StandardSnackBar.showSuccess(
+        context,
+        'manage_bulk_move_success'.tr(
+          namedArgs: {
+            'moved': '$ok',
+            'total': '${pilgrims.length}',
+            'groupName': group.name,
+          },
+        ),
+      );
+      setState(() {
+        _selectedPilgrimIds.clear();
+        _bulkSelectionMode = false;
+      });
+      await _load();
+    } else if (ok > 0) {
+      StandardSnackBar.showWarning(
+        context,
+        'manage_bulk_move_partial'.tr(
+          namedArgs: {
+            'moved': '$ok',
+            'total': '${pilgrims.length}',
+          },
+        ),
+      );
+      setState(() {
+        _selectedPilgrimIds.clear();
+        _bulkSelectionMode = false;
+      });
+      await _load();
+    } else {
+      StandardSnackBar.showError(
+        context,
+        errors.isNotEmpty ? errors.first : 'edit_profile_error_generic'.tr(),
+      );
+    }
+  }
+
+  bool _allSelectedInSameGroup(
+    List<_PilgrimItem> pilgrims,
+    String groupId,
+  ) =>
+      pilgrims.isNotEmpty &&
+      pilgrims.every((p) => p.currentGroupId == groupId);
+
+  void _showBulkMoveGroupDialog() {
+    final selected = _all.where((p) => _selectedPilgrimIds.contains(p.id)).toList();
+    if (selected.isEmpty) return;
+
+    final available = _groups
+        .where((g) => !_allSelectedInSameGroup(selected, g.id))
+        .toList();
+
+    if (available.isEmpty) {
+      _showNoAssignableGroupsDialog('manage_bulk_move_title');
+      return;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String searchQuery = '';
+
+    StandardDialog.show(
+      context: context,
+      title: 'manage_bulk_move_title',
+      showActions: false,
+      contentWidget: SizedBox(
+        width: double.maxFinite,
+        child: StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filteredList = available
+                .where(
+                  (g) => g.name.toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      ),
+                )
+                .toList();
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'manage_bulk_move_subtitle'.tr(
+                    namedArgs: {'count': '${selected.length}'},
+                  ),
+                  style: TextStyle(
+                    fontFamily: 'Lexend',
+                    fontSize: 13.sp,
+                    color: isDark
+                        ? AppColors.textMutedLight
+                        : AppColors.textMutedDark,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                if (available.length > 5) ...[
+                  TextField(
+                    onChanged: (v) => setDialogState(() => searchQuery = v),
+                    style: TextStyle(fontFamily: 'Lexend', fontSize: 14.sp),
+                    decoration: InputDecoration(
+                      hintText: 'manage_search_groups_hint'.tr(),
+                      prefixIcon: Icon(Symbols.search, size: 20.w),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 8.h,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                ],
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 400.h),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: filteredList.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1.h, indent: 48.w),
+                    itemBuilder: (ctx, i) {
+                      final g = filteredList[i];
+                      return ListTile(
+                        onTap: () {
+                          Navigator.pop(ctx, true);
+                          _bulkMoveToGroup(selected, g);
+                        },
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8.w,
+                          vertical: 4.h,
+                        ),
+                        leading: Container(
+                          padding: EdgeInsets.all(8.w),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Symbols.group,
+                            size: 20.w,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          g.name,
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Symbols.chevron_right,
+                          size: 18.w,
+                          color: AppColors.textMutedLight,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (filteredList.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.h),
+                    child: Text(
+                      'manage_no_matching_groups'.tr(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
+                  ),
+                SizedBox(height: 24.h),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.r),
+                      side: BorderSide(
+                        color: Colors.black.withValues(alpha: 0.05),
+                      ),
                     ),
                   ),
                   child: Text(
@@ -618,6 +942,97 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                         ),
                       ),
                     ],
+                    if (!_isLoading &&
+                        _error == null &&
+                        filtered.isNotEmpty &&
+                        _bulkSelectionMode) ...[
+                      SizedBox(height: 12.h),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 10.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: isDark
+                                ? AppColors.dividerDark
+                                : AppColors.dividerLight,
+                          ),
+                        ),
+                        child: Wrap(
+                          spacing: 8.w,
+                          runSpacing: 8.h,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'manage_bulk_n_selected'.tr(
+                                namedArgs: {
+                                  'count': '${_selectedPilgrimIds.length}',
+                                },
+                              ),
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() {
+                                for (final p in filtered) {
+                                  _selectedPilgrimIds.add(p.id);
+                                }
+                              }),
+                              child: Text(
+                                'manage_bulk_select_all_visible'.tr(),
+                                style: const TextStyle(
+                                  fontFamily: 'Lexend',
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _selectedPilgrimIds.isEmpty
+                                  ? null
+                                  : () => setState(
+                                        () => _selectedPilgrimIds.clear(),
+                                      ),
+                              child: Text(
+                                'manage_bulk_clear_selection'.tr(),
+                                style: const TextStyle(
+                                  fontFamily: 'Lexend',
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _exitBulkSelection,
+                              child: Text(
+                                'manage_bulk_done'.tr(),
+                                style: const TextStyle(
+                                  fontFamily: 'Lexend',
+                                ),
+                              ),
+                            ),
+                            if (_selectedPilgrimIds.isNotEmpty)
+                              FilledButton.tonalIcon(
+                                onPressed: _showBulkMoveGroupDialog,
+                                icon: Icon(
+                                  Symbols.drive_file_move,
+                                  size: 18.w,
+                                ),
+                                label: Text(
+                                  'manage_bulk_move_to_group'.tr(),
+                                  style: const TextStyle(
+                                    fontFamily: 'Lexend',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     SizedBox(height: 16.h),
                   ],
                 ),
@@ -682,6 +1097,22 @@ class _ManagePilgrimsScreenState extends ConsumerState<ManagePilgrimsScreen> {
                     (_, i) => _PilgrimCard(
                       pilgrim: filtered[i],
                       isDark: isDark,
+                      selectionMode: _bulkSelectionMode,
+                      isSelected: _selectedPilgrimIds.contains(filtered[i].id),
+                      onLongPressEnterSelection: () =>
+                          _enterBulkSelection(filtered[i]),
+                      onToggleFromRow: () =>
+                          _togglePilgrimSelection(filtered[i].id),
+                      onSelectionChanged: (v) {
+                        if (v == null) return;
+                        setState(() {
+                          if (v) {
+                            _selectedPilgrimIds.add(filtered[i].id);
+                          } else {
+                            _selectedPilgrimIds.remove(filtered[i].id);
+                          }
+                        });
+                      },
                       onAction: () =>
                           _showActions(filtered[i], isDark),
                     ),
@@ -702,11 +1133,21 @@ class _PilgrimCard extends StatelessWidget {
   final _PilgrimItem pilgrim;
   final bool isDark;
   final VoidCallback onAction;
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback onLongPressEnterSelection;
+  final VoidCallback onToggleFromRow;
+  final ValueChanged<bool?> onSelectionChanged;
 
   const _PilgrimCard({
     required this.pilgrim,
     required this.isDark,
     required this.onAction,
+    required this.selectionMode,
+    required this.isSelected,
+    required this.onLongPressEnterSelection,
+    required this.onToggleFromRow,
+    required this.onSelectionChanged,
   });
 
   @override
@@ -716,15 +1157,24 @@ class _PilgrimCard extends StatelessWidget {
     final textMuted =
         isDark ? AppColors.textMutedLight : AppColors.textMutedDark;
 
+    final borderColor = isSelected
+        ? AppColors.primary.withValues(alpha: 0.85)
+        : (selectionMode
+            ? (isDark
+                ? AppColors.dividerDark
+                : AppColors.dividerLight)
+            : (pilgrim.isAssigned
+                ? Colors.transparent
+                : const Color(0xFFFF8400).withValues(alpha: 0.4)));
+
     return Container(
       margin: EdgeInsets.only(bottom: 10.h),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(14.r),
         border: Border.all(
-          color: pilgrim.isAssigned
-              ? Colors.transparent
-              : const Color(0xFFFF8400).withValues(alpha: 0.4),
+          color: borderColor,
+          width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -740,61 +1190,75 @@ class _PilgrimCard extends StatelessWidget {
         padding: EdgeInsets.all(14.w),
         child: Row(
           children: [
-            // Avatar circle
-            Container(
-              width: 44.w,
-              height: 44.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: pilgrim.isAssigned
-                    ? AppColors.primary.withValues(alpha: 0.12)
-                    : const Color(0xFFFF8400).withValues(alpha: 0.12),
+            if (selectionMode) ...[
+              Checkbox(
+                value: isSelected,
+                onChanged: onSelectionChanged,
+                activeColor: AppColors.primary,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Center(
-                child: Text(
-                  pilgrim.fullName.isNotEmpty
-                      ? pilgrim.fullName[0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    fontFamily: 'Lexend',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18.sp,
-                    color: pilgrim.isAssigned
-                        ? AppColors.primary
-                        : const Color(0xFFFF8400),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 12.w),
-
-            // Info
+              SizedBox(width: 4.w),
+            ],
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pilgrim.fullName,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: textPrimary,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress: onLongPressEnterSelection,
+                onTap: selectionMode ? onToggleFromRow : null,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44.w,
+                      height: 44.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: pilgrim.isAssigned
+                            ? AppColors.primary.withValues(alpha: 0.12)
+                            : const Color(0xFFFF8400).withValues(alpha: 0.12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          pilgrim.fullName.isNotEmpty
+                              ? pilgrim.fullName[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18.sp,
+                            color: pilgrim.isAssigned
+                                ? AppColors.primary
+                                : const Color(0xFFFF8400),
+                          ),
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 2.h),
-                  Text(
-                    pilgrim.phoneNumber,
-                    style: TextStyle(
-                        fontFamily: 'Lexend',
-                        fontSize: 12.sp,
-                        color: textMuted),
-                  ),
-                  SizedBox(height: 6.h),
-                  // Group badge
-                  Container(
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pilgrim.fullName,
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14.sp,
+                              color: textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 2.h),
+                          Text(
+                            pilgrim.phoneNumber,
+                            style: TextStyle(
+                              fontFamily: 'Lexend',
+                              fontSize: 12.sp,
+                              color: textMuted,
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Container(
                     padding: EdgeInsets.symmetric(
                         horizontal: 8.w, vertical: 3.h),
                     decoration: BoxDecoration(
@@ -894,15 +1358,16 @@ class _PilgrimCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ],
               ),
             ),
-
-
-            // Action button
+          ],
+        ),
+      ),
+    ),
             IconButton(
               onPressed: onAction,
               icon: Icon(
