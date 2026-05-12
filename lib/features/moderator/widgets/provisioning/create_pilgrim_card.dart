@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dropdown_theme.dart';
 import '../../models/provisioning_models.dart';
+import '../../models/pilgrim_field_options.dart';
 import 'provisioning_form_theme.dart';
 
 class CreatePilgrimCard extends StatefulWidget {
@@ -14,6 +15,8 @@ class CreatePilgrimCard extends StatefulWidget {
   final List<HotelOption> hotels;
   final List<BusOption> buses;
   final bool isLoadingResources;
+  final List<String> ethnicityOptions;
+  final List<PilgrimLanguageOption> languageOptions;
   final Function(Map<String, dynamic> data) onCreate;
 
   const CreatePilgrimCard({
@@ -23,6 +26,8 @@ class CreatePilgrimCard extends StatefulWidget {
     required this.hotels,
     required this.buses,
     required this.isLoadingResources,
+    required this.ethnicityOptions,
+    required this.languageOptions,
     required this.onCreate,
   });
 
@@ -46,19 +51,6 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
   String? _selectedBusId;
   Set<String> _genderSelection = {'male'};
 
-  static const List<Map<String, String>> _ethnicityOptions = [
-    {'value': 'Arab', 'labelKey': 'ethnic_arab'},
-    {'value': 'South Asian', 'labelKey': 'ethnic_south_asian'},
-    {'value': 'Turkic', 'labelKey': 'ethnic_turkic'},
-    {'value': 'Persian', 'labelKey': 'ethnic_persian'},
-    {'value': 'Malay/Indonesian', 'labelKey': 'ethnic_malay_indo'},
-    {'value': 'African', 'labelKey': 'ethnic_african'},
-    {'value': 'Kurdish', 'labelKey': 'ethnic_kurdish'},
-    {'value': 'Berber', 'labelKey': 'ethnic_berber'},
-    {'value': 'European Muslim', 'labelKey': 'ethnic_european_muslim'},
-    {'value': 'Other', 'labelKey': 'ethnic_other'},
-  ];
-
   @override
   void dispose() {
     _fullNameCtrl.dispose();
@@ -72,35 +64,62 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
   @override
   void didUpdateWidget(covariant CreatePilgrimCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.hotels == widget.hotels && oldWidget.buses == widget.buses) {
-      return;
+    final hotelsBusesChanged =
+        oldWidget.hotels != widget.hotels || oldWidget.buses != widget.buses;
+    final optionsChanged = oldWidget.ethnicityOptions != widget.ethnicityOptions ||
+        oldWidget.languageOptions != widget.languageOptions;
+
+    if (hotelsBusesChanged) {
+      final hotelOk = _selectedHotelId == null ||
+          widget.hotels.any((h) => h.id == _selectedHotelId);
+      final busOk = _selectedBusId == null ||
+          widget.buses.any((b) => b.id == _selectedBusId);
+      var roomOk = true;
+      if (_selectedRoomId != null) {
+        final h =
+            widget.hotels.where((x) => x.id == _selectedHotelId).firstOrNull;
+        final rooms = (h?.rooms ?? const <RoomOption>[])
+            .where((r) => r.active)
+            .toList();
+        roomOk = rooms.any((r) => r.id == _selectedRoomId);
+      }
+      if (!hotelOk || !roomOk || !busOk) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            if (!hotelOk) {
+              _selectedHotelId = null;
+              _selectedRoomId = null;
+            } else if (!roomOk) {
+              _selectedRoomId = null;
+            }
+            if (!busOk) _selectedBusId = null;
+          });
+        });
+      }
     }
-    final hotelOk = _selectedHotelId == null ||
-        widget.hotels.any((h) => h.id == _selectedHotelId);
-    final busOk = _selectedBusId == null ||
-        widget.buses.any((b) => b.id == _selectedBusId);
-    var roomOk = true;
-    if (_selectedRoomId != null) {
-      final h =
-          widget.hotels.where((x) => x.id == _selectedHotelId).firstOrNull;
-      final rooms = (h?.rooms ?? const <RoomOption>[])
-          .where((r) => r.active)
-          .toList();
-      roomOk = rooms.any((r) => r.id == _selectedRoomId);
-    }
-    if (hotelOk && roomOk && busOk) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        if (!hotelOk) {
-          _selectedHotelId = null;
-          _selectedRoomId = null;
-        } else if (!roomOk) {
-          _selectedRoomId = null;
-        }
-        if (!busOk) _selectedBusId = null;
+
+    if (optionsChanged) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          final langCodes =
+              widget.languageOptions.map((l) => l.code).toSet();
+          if (!langCodes.contains(_selectedLanguage)) {
+            _selectedLanguage = widget.languageOptions.isNotEmpty
+                ? widget.languageOptions.first.code
+                : 'en';
+          }
+          final ethn = widget.ethnicityOptions.toSet();
+          if (_selectedEthnicity == null ||
+              !ethn.contains(_selectedEthnicity)) {
+            _selectedEthnicity = widget.ethnicityOptions.isNotEmpty
+                ? widget.ethnicityOptions.first
+                : null;
+          }
+        });
       });
-    });
+    }
   }
 
   void _handleSubmit() {
@@ -347,64 +366,24 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                         borderRadius: AppDropdownTheme.menuBorderRadius(),
                         elevation: AppDropdownTheme.menuElevation(),
                         style: AppDropdownTheme.valueStyle(widget.isDark),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'en',
-                            child: Text(
-                              'lang_english'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
+                        items: widget.languageOptions
+                            .map(
+                              (opt) => DropdownMenuItem<String>(
+                                value: opt.code,
+                                child: Text(
+                                  opt.label,
+                                  style: AppDropdownTheme.menuItemStyle(
+                                    widget.isDark,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ar',
-                            child: Text(
-                              'lang_arabic'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ur',
-                            child: Text(
-                              'lang_urdu'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'fr',
-                            child: Text(
-                              'lang_french'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'id',
-                            child: Text(
-                              'lang_indonesian'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'tr',
-                            child: Text(
-                              'lang_turkish'.tr(),
-                              style: AppDropdownTheme.menuItemStyle(
-                                widget.isDark,
-                              ),
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => _selectedLanguage = v!),
+                            )
+                            .toList(),
+                        onChanged: widget.languageOptions.isEmpty
+                            ? null
+                            : (v) => setState(
+                                  () => _selectedLanguage = v ?? 'en',
+                                ),
                       ),
                     ),
                   ],
@@ -438,12 +417,12 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                               elevation: AppDropdownTheme.menuElevation(),
                               style:
                                   AppDropdownTheme.valueStyle(widget.isDark),
-                              items: _ethnicityOptions
+                              items: widget.ethnicityOptions
                                   .map(
                                     (e) => DropdownMenuItem<String?>(
-                                      value: e['value'],
+                                      value: e,
                                       child: Text(
-                                        (e['labelKey'] ?? '').tr(),
+                                        e,
                                         style:
                                             AppDropdownTheme.menuItemStyle(
                                           widget.isDark,
@@ -452,8 +431,14 @@ class _CreatePilgrimCardState extends State<CreatePilgrimCard> {
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _selectedEthnicity = v),
+                              onChanged: widget.ethnicityOptions.isEmpty
+                                  ? null
+                                  : (v) =>
+                                      setState(() => _selectedEthnicity = v),
+                              validator: (v) =>
+                                  v == null || v.trim().isEmpty
+                                      ? 'provisioning_required'.tr()
+                                      : null,
                             ),
                           ),
                           SizedBox(width: gSm),

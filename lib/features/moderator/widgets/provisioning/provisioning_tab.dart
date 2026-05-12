@@ -19,6 +19,7 @@ import '../../../../core/widgets/custom_dialog.dart';
 import '../../../../core/widgets/standard_snackbar.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../models/provisioning_models.dart';
+import '../../models/pilgrim_field_options.dart';
 import '../../screens/manage_pilgrims_screen.dart';
 import 'provisioning_summary.dart';
 import 'create_pilgrim_card.dart';
@@ -39,9 +40,12 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
   bool _isSharing = false;
   final ScreenshotController _screenshotController = ScreenshotController();
 
-
   String? _selectedGroupId;
   List<GroupOption> _groups = const [];
+
+  List<String> _ethnicityOptions = PilgrimFieldOptions.fallback().ethnicities;
+  List<PilgrimLanguageOption> _languageOptions =
+      PilgrimFieldOptions.fallback().languages;
   List<HotelOption> _hotels = const [];
   List<BusOption> _buses = const [];
   List<ProvisioningItem> _items = const [];
@@ -60,6 +64,32 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
   void initState() {
     super.initState();
     _loadGroups();
+    _loadPilgrimFieldOptions();
+  }
+
+  Future<void> _loadPilgrimFieldOptions() async {
+    try {
+      final resp =
+          await ApiService.dio.get('/auth/platform-options/pilgrim-fields');
+      final raw = resp.data;
+      final map = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+      final opts = PilgrimFieldOptions.fromJson(map);
+      final fb = PilgrimFieldOptions.fallback();
+      if (!mounted) return;
+      setState(() {
+        _ethnicityOptions =
+            opts.ethnicities.isNotEmpty ? opts.ethnicities : fb.ethnicities;
+        _languageOptions =
+            opts.languages.isNotEmpty ? opts.languages : fb.languages;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      final fb = PilgrimFieldOptions.fallback();
+      setState(() {
+        _ethnicityOptions = fb.ethnicities;
+        _languageOptions = fb.languages;
+      });
+    }
   }
 
   Future<void> _loadGroups() async {
@@ -501,7 +531,11 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
 
 
   Future<void> _onPullRefresh() async {
-    await Future.wait([_loadGroups(), _loadProvisioningStatus()]);
+    await Future.wait([
+      _loadGroups(),
+      _loadProvisioningStatus(),
+      _loadPilgrimFieldOptions(),
+    ]);
   }
 
   BoxDecoration _provisionPanelDecoration(bool isDark) {
@@ -545,6 +579,8 @@ class _ProvisioningTabState extends ConsumerState<ProvisioningTab> {
             hotels: _hotels,
             buses: _buses,
             isLoadingResources: _isLoadingResources,
+            ethnicityOptions: _ethnicityOptions,
+            languageOptions: _languageOptions,
             onCreate: _handleCreatePilgrim,
           ),
         ],
