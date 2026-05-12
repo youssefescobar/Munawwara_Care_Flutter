@@ -824,8 +824,9 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
     final lat = (mp?['latitude'] as num?)?.toDouble();
     final lng = (mp?['longitude'] as num?)?.toDouble();
     final timeStr = mp?['meetpoint_time']?.toString();
-    final DateTime? meetTime =
+    final DateTime? meetTimeUtc =
         timeStr != null ? DateTime.tryParse(timeStr) : null;
+    final DateTime? meetTime = meetTimeUtc?.toLocal();
 
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -862,7 +863,7 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'area_meetpoint'.tr().toUpperCase(),
+                      'popup_urgent_meetpoint'.tr().toUpperCase(),
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w800,

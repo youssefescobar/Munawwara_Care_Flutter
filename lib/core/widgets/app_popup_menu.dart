@@ -16,8 +16,11 @@ abstract final class AppPopupMenu {
   static Color? panelColor(bool isDark) =>
       isDark ? AppColors.surfaceDark : null;
 
-  static BoxConstraints panelConstraints({double? minWidth}) =>
-      BoxConstraints(minWidth: (minWidth ?? 200).w);
+  static BoxConstraints panelConstraints({double? minWidth, double? maxWidth}) =>
+      BoxConstraints(
+        minWidth: (minWidth ?? 200).w,
+        maxWidth: (maxWidth ?? 280).w,
+      );
 
   /// Below the group map top-right circular control (40×40).
   static const Offset offsetBelowCircular40 = Offset(0, 48);
@@ -47,15 +50,20 @@ abstract final class AppPopupMenu {
       resolvedText = textColor ?? (isDark ? Colors.white : null);
     }
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 18.w, color: resolvedIcon),
         SizedBox(width: 12.w),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 14.sp,
-            color: resolvedText,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 14.sp,
+              color: resolvedText,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -71,19 +79,25 @@ abstract final class AppPopupMenu {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Lexend',
-            fontSize: 14.sp,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected
-                ? AppColors.primary
-                : (isDark ? Colors.white : AppColors.textDark),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Lexend',
+              fontSize: 14.sp,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected
+                  ? AppColors.primary
+                  : (isDark ? Colors.white : AppColors.textDark),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (isSelected)
+        if (isSelected) ...[
+          SizedBox(width: 8.w),
           Icon(Symbols.check, size: 18.w, color: AppColors.primary),
+        ],
       ],
     );
   }

@@ -1316,7 +1316,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                       if (ok) {
                                         StandardSnackBar.showSuccess(
                                           context,
-                                          'area_deleted',
+                                          'area_deleted'.tr(),
                                         );
                                       }
                                     },
