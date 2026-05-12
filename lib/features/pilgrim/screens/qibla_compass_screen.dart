@@ -58,6 +58,16 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen>
     _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
     _startAccuracyWatch();
     _startQiblaTracking();
+
+    // Fallback: If after 4 seconds we are still loading, forcefully show the UI.
+    // This handles cases where both QiblahStream and CompassStream are completely silent (e.g. some emulators).
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted && _loading) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    });
   }
 
   Future<void> _startQiblaTracking() async {
@@ -148,19 +158,34 @@ class _QiblaCompassScreenState extends State<QiblaCompassScreen>
 
   /// Listens to the raw compass accuracy. Shows the calibration UI while
   /// the magnetometer is unreliable (accuracy < 2) and hides it once ready.
+  /// Also serves as a fallback driver for the compass heading if flutter_qiblah hangs.
   void _startAccuracyWatch() {
     _calibrationSub = FlutterCompass.events?.listen((event) {
-      final acc = (event.accuracy?.toInt() ?? 3).clamp(0, 3);
       if (!mounted) return;
+      final acc = (event.accuracy?.toInt() ?? 3).clamp(0, 3);
       final needsCal = acc < 2;
+      
       setState(() {
         _sensorAccuracy = acc;
         _showCalibration = needsCal;
+        
+        // If we get a compass event, we can stop loading immediately!
+        if (event.heading != null) {
+          _loading = false;
+          _qiblahDirection = QiblahDirection(
+            _qiblahDirection?.qiblah ?? 0.0,
+            event.heading!,
+            _qiblahDirection?.offset ?? 0.0,
+          );
+        }
       });
+
+      // Keep the subscription alive to continuously drive the compass,
+      // but toggle the calibration animation based on accuracy.
       if (!needsCal) {
         _figure8Ctrl.stop();
-        _calibrationSub?.cancel();
-        _calibrationSub = null;
+      } else if (!_figure8Ctrl.isAnimating) {
+        _figure8Ctrl.repeat();
       }
     });
   }
