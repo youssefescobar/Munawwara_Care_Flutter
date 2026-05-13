@@ -19,6 +19,7 @@ import '../../moderator/services/sos_alert_coordinator.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/callkit_service.dart';
+import '../../../core/services/call_ringback_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/router/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -177,6 +178,7 @@ class CallNotifier extends Notifier<CallState> {
       isGroupRingingOut: true,
       displayPeerAsSupportBranding: true,
     );
+    _syncPreConnectRingback(CallStatus.calling);
     unawaited(_persistOutgoingCall(remoteUserId: ids.first, isGroup: true));
 
     try {
@@ -232,6 +234,7 @@ class CallNotifier extends Notifier<CallState> {
       displayPeerAsSupportBranding: isPilgrimCaller,
       remotePeerGender: isPilgrimCaller ? null : remotePeerGender,
     );
+    _syncPreConnectRingback(CallStatus.calling);
     unawaited(
       _persistOutgoingCall(remoteUserId: remoteUserId, isGroup: false),
     );
@@ -330,6 +333,14 @@ class CallNotifier extends Notifier<CallState> {
     _ringPollTimer = null;
   }
 
+  void _syncPreConnectRingback(CallStatus status) {
+    if (status == CallStatus.calling) {
+      unawaited(CallRingbackService.start());
+      return;
+    }
+    unawaited(CallRingbackService.stop());
+  }
+
   Future<String?> _getMyUserId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -352,6 +363,7 @@ class CallNotifier extends Notifier<CallState> {
       durationSeconds: 0,
       clearIncomingDisplayName: true,
     );
+    _syncPreConnectRingback(CallStatus.connected);
 
     try {
       await [Permission.microphone].request();
@@ -582,6 +594,7 @@ class CallNotifier extends Notifier<CallState> {
           remoteUserName: calleeDisplayName,
           displayPeerAsSupportBranding: isPilgrimCallee,
         );
+        _syncPreConnectRingback(CallStatus.ended);
         _scheduleReset();
         return;
       }
@@ -661,14 +674,16 @@ class CallNotifier extends Notifier<CallState> {
 
   void toggleMute() {
     final muted = !state.isMuted;
-    _engine?.muteLocalAudioStream(muted);
     state = state.copyWith(isMuted: muted);
+    _engine?.muteLocalAudioStream(muted);
   }
 
   Future<void> toggleSpeaker() async {
     final on = !state.isSpeakerOn;
-    await _engine?.setEnableSpeakerphone(on);
     state = state.copyWith(isSpeakerOn: on);
+    if (_engine != null) {
+      await _engine!.setEnableSpeakerphone(on);
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -772,6 +787,7 @@ class CallNotifier extends Notifier<CallState> {
           ? answererId
           : state.remoteUserId,
     );
+    _syncPreConnectRingback(CallStatus.connected);
   }
 
   void _onRemoteDecline(dynamic _) {
@@ -854,7 +870,7 @@ class CallNotifier extends Notifier<CallState> {
           // otherwise the SDK returns ERR_NOT_READY (-3).
           // Must match [CallState.isSpeakerOn] or UI shows earpiece while audio is on speaker.
           _engine?.setEnableSpeakerphone(state.isSpeakerOn);
-          _engine?.muteLocalAudioStream(false);
+          _engine?.muteLocalAudioStream(state.isMuted);
           _engine?.muteAllRemoteAudioStreams(false);
           _engine?.adjustRecordingSignalVolume(400);
           _engine?.adjustPlaybackSignalVolume(400);
@@ -899,6 +915,7 @@ class CallNotifier extends Notifier<CallState> {
   void _cleanup() {
     _callTimer?.cancel();
     _callTimer = null;
+    _syncPreConnectRingback(CallStatus.ended);
     _engine?.leaveChannel();
     // Do NOT release the engine here, we reuse it for consecutive calls.
     // It will be disposed only when the app is terminated or CallProvider is disposed.

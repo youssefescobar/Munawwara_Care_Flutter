@@ -1189,9 +1189,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
 
   Widget _buildReminderOptions(bool isDark, Color accentColor) {
     // Calculate minutes until meetpoint to decide which reminder chips are valid.
-    final minutesUntil = _meetpointTime != null
-        ? _meetpointTime!.difference(DateTime.now()).inMinutes
-        : null;
+    final minutesUntil = _meetpointTime?.difference(DateTime.now()).inMinutes;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

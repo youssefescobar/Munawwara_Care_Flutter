@@ -8,8 +8,8 @@ import '../../notifications/screens/alerts_tab_v2.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PilgrimNotificationsScreen extends StatelessWidget {
-  /// When true (e.g. home missed-calls chip), list is filtered to missed only
-  /// and marks them read — same behavior as the old [CallHistoryScreen].
+  /// When true (e.g. home missed-calls chip), list is filtered to missed only.
+  /// Unread missed calls are marked read when the list is shown.
   final bool missedCallsOnly;
 
   const PilgrimNotificationsScreen({

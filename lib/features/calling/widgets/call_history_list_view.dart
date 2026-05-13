@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -12,9 +14,14 @@ import '../data/call_history_api.dart';
 import '../providers/missed_calls_unread_provider.dart';
 
 class CallHistoryListView extends ConsumerStatefulWidget {
-  const CallHistoryListView({super.key, this.missedOnly = false});
+  const CallHistoryListView({
+    super.key,
+    this.missedOnly = false,
+    this.highlightUnreadMissed = false,
+  });
 
   final bool missedOnly;
+  final bool highlightUnreadMissed;
 
   @override
   ConsumerState<CallHistoryListView> createState() => _CallHistoryListViewState();
@@ -24,11 +31,37 @@ class _CallHistoryListViewState extends ConsumerState<CallHistoryListView> {
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
   String? _error;
+  bool _hadUnreadMissedHighlight = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    if (_hadUnreadMissedHighlight) {
+      unawaited(_markUnreadMissedSeen());
+    }
+    super.dispose();
+  }
+
+  Future<void> _markUnreadMissedSeen() async {
+    try {
+      await CallHistoryApi.markMissedCallsRead();
+      await ref.read(missedCallsUnreadProvider.notifier).refresh();
+    } catch (e) {
+      AppLogger.w('[CallHistoryListView] mark-read on dispose: $e');
+    }
+  }
+
+  bool _isUnreadMissedInbound(Map<String, dynamic> row, String myId) {
+    if (myId.isEmpty) return false;
+    final callerId = _idOf(row['caller_id']);
+    if (callerId == myId) return false;
+    if (row['status']?.toString() != 'missed') return false;
+    return row['is_read'] != true;
   }
 
   Future<void> _load() async {
@@ -43,13 +76,22 @@ class _CallHistoryListViewState extends ConsumerState<CallHistoryListView> {
           ? all.where((c) => c['status']?.toString() == 'missed').toList()
           : all;
       if (!mounted) return;
+      final myId = ref.read(authProvider).userId ?? '';
+      final hasUnreadHighlight = widget.highlightUnreadMissed &&
+          rows.any((row) => _isUnreadMissedInbound(row, myId));
       setState(() {
         _rows = rows;
         _loading = false;
+        _hadUnreadMissedHighlight = hasUnreadHighlight;
       });
-      if (widget.missedOnly && rows.isNotEmpty) {
+      final shouldMarkUnreadSeen = hasUnreadHighlight ||
+          (widget.missedOnly &&
+              rows.isNotEmpty &&
+              !widget.highlightUnreadMissed);
+      if (shouldMarkUnreadSeen) {
         try {
           await CallHistoryApi.markMissedCallsRead();
+          if (!mounted) return;
           await ref.read(missedCallsUnreadProvider.notifier).refresh();
         } catch (e) {
           AppLogger.w('[CallHistoryListView] mark-read: $e');
@@ -211,15 +253,21 @@ class _CallHistoryListViewState extends ConsumerState<CallHistoryListView> {
             } catch (_) {}
           }
           final timeStr = dt != null ? DateFormat.yMMMd().add_jm().format(dt) : '';
+          final isUnreadMissed = widget.highlightUnreadMissed &&
+              _isUnreadMissedInbound(c, myId);
 
           return Material(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
+            color: isUnreadMissed
+                ? AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.1)
+                : (isDark ? AppColors.surfaceDark : Colors.white),
             borderRadius: BorderRadius.circular(14.r),
             elevation: 0,
             child: ListTile(
               contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               leading: CircleAvatar(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                backgroundColor: isUnreadMissed
+                    ? AppColors.primary.withValues(alpha: 0.28)
+                    : AppColors.primary.withValues(alpha: 0.15),
                 child: Icon(
                   outgoing ? Icons.call_made : Icons.call_received,
                   color: AppColors.primary,
@@ -230,7 +278,8 @@ class _CallHistoryListViewState extends ConsumerState<CallHistoryListView> {
                 otherName,
                 style: TextStyle(
                   fontFamily: 'Lexend',
-                  fontWeight: FontWeight.w600,
+                  fontWeight:
+                      isUnreadMissed ? FontWeight.w700 : FontWeight.w600,
                   fontSize: 14.sp,
                   color: textPrimary,
                 ),

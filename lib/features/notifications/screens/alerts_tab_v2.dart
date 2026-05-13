@@ -222,13 +222,14 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
     );
   }
 
-  Widget _callHistoryTab({required bool missedOnly}) {
+  Widget _callHistoryTab({required bool missedOnly, required bool isModerator}) {
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: _refresh,
       child: CallHistoryListView(
         key: ValueKey('${_callHistoryReloadSeed}_$missedOnly'),
         missedOnly: missedOnly,
+        highlightUnreadMissed: !isModerator,
       ),
     );
   }
@@ -279,7 +280,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
                 children: [
                   _moderatorActiveSosTab(groups: groups),
                   _moderatorResolvedSosTab(isDark: isDark),
-                  _callHistoryTab(missedOnly: false),
+                  _callHistoryTab(missedOnly: false, isModerator: true),
                 ],
               ),
             ),
@@ -297,6 +298,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
           Expanded(
             child: _callHistoryTab(
               missedOnly: widget.pilgrimMissedCallsOnly,
+              isModerator: false,
             ),
           ),
         ],

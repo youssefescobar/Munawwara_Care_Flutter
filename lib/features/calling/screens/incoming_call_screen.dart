@@ -134,7 +134,46 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
                   const Spacer(flex: 2),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 32.w),
-                    child: _SpeakerRow(call: call, palette: c, ref: ref),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 12.h,
+                        horizontal: 12.w,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.panelFill,
+                        borderRadius: BorderRadius.circular(18.r),
+                        border: Border.all(color: c.panelBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _IncomingControlTile(
+                            icon: call.isMuted ? Symbols.mic_off : Symbols.mic,
+                            label: call.isMuted
+                                ? 'call_unmute'.tr()
+                                : 'call_mute'.tr(),
+                            active: call.isMuted,
+                            palette: c,
+                            onTap: () => ref
+                                .read(callProvider.notifier)
+                                .toggleMute(),
+                          ),
+                          _IncomingControlTile(
+                            icon: call.isSpeakerOn
+                                ? Symbols.volume_up
+                                : Symbols.hearing,
+                            label: call.isSpeakerOn
+                                ? 'call_speaker'.tr()
+                                : 'call_earpiece'.tr(),
+                            active: call.isSpeakerOn,
+                            palette: c,
+                            onTap: () => ref
+                                .read(callProvider.notifier)
+                                .toggleSpeaker(),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   SizedBox(height: 28.h),
                   Container(
@@ -338,48 +377,62 @@ class _IncomingAvatarRing extends StatelessWidget {
   }
 }
 
-class _SpeakerRow extends StatelessWidget {
-  const _SpeakerRow({
-    required this.call,
+class _IncomingControlTile extends StatelessWidget {
+  const _IncomingControlTile({
+    required this.icon,
+    required this.label,
+    required this.active,
     required this.palette,
-    required this.ref,
+    required this.onTap,
   });
 
-  final CallState call;
+  final IconData icon;
+  final String label;
+  final bool active;
   final _IncomingPalette palette;
-  final WidgetRef ref;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => ref.read(callProvider.notifier).toggleSpeaker(),
-        borderRadius: BorderRadius.circular(18.r),
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-          decoration: BoxDecoration(
-            color: palette.chipFill,
-            borderRadius: BorderRadius.circular(18.r),
-            border: Border.all(color: palette.chipBorder),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16.r),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                call.isSpeakerOn ? Symbols.volume_up : Symbols.hearing,
-                fill: 1,
-                color: call.isSpeakerOn ? AppColors.primary : palette.textSecondary,
-                size: 22.sp,
+              Container(
+                width: 52.w,
+                height: 52.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : palette.chipFill,
+                  border: Border.all(
+                    color: active
+                        ? AppColors.primary.withValues(alpha: 0.5)
+                        : palette.chipBorder,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  fill: 1,
+                  color: active ? AppColors.primary : palette.textPrimary,
+                  size: 24.sp,
+                ),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(height: 8.h),
               Text(
-                call.isSpeakerOn ? 'call_speaker'.tr() : 'call_earpiece'.tr(),
+                label,
                 style: TextStyle(
-                  color: palette.textSecondary,
-                  fontSize: 13.sp,
+                  color: palette.textMuted,
+                  fontSize: 11.sp,
                   fontFamily: 'Lexend',
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

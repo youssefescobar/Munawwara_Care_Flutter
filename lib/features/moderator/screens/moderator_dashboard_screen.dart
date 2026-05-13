@@ -21,7 +21,6 @@ import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
-import '../../calling/screens/incoming_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
 import '../../notifications/providers/notification_provider.dart';
@@ -465,15 +464,6 @@ class _ModeratorDashboardScreenState
     // Fallback: if an incoming call was accepted and we're connected,
     // navigate to VoiceCallScreen from here.
     ref.listen(callProvider, (prev, next) {
-      if (next.status == CallStatus.ringing &&
-          prev?.status != CallStatus.ringing &&
-          mounted &&
-          !isNavigatingToCall &&
-          !VoiceCallScreen.isActive) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
-        );
-      }
       if (next.status == CallStatus.connected &&
           prev?.status == CallStatus.ringing &&
           mounted &&

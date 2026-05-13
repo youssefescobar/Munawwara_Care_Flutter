@@ -37,23 +37,17 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
   late List<Map<String, String>> _queue;
   String? _cachedName;
   Timer? _autoPopTimer;
-  bool _canCancel = false;
-  Timer? _cancelLockTimer;
 
   @override
   void initState() {
     super.initState();
     VoiceCallScreen.isActive = true;
     _queue = List.from(widget.autoRouteMods ?? []);
-    _cancelLockTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _canCancel = true);
-    });
   }
 
   @override
   void dispose() {
     _autoPopTimer?.cancel();
-    _cancelLockTimer?.cancel();
     VoiceCallScreen.isActive = false;
     super.dispose();
   }
@@ -206,10 +200,15 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                               : null,
                         ),
                         const Spacer(flex: 3),
-                        if (call.status == CallStatus.connected) ...[
+                        if (call.status == CallStatus.calling ||
+                            call.status == CallStatus.ringing ||
+                            call.status == CallStatus.connected) ...[
                           Container(
                             margin: EdgeInsets.symmetric(horizontal: 28.w),
-                            padding: EdgeInsets.symmetric(vertical: 18.h, horizontal: 12.w),
+                            padding: EdgeInsets.symmetric(
+                              vertical: 18.h,
+                              horizontal: 12.w,
+                            ),
                             decoration: BoxDecoration(
                               color: c.panelFill,
                               borderRadius: BorderRadius.circular(22.r),
@@ -219,20 +218,30 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 _ControlTile(
-                                  icon: call.isMuted ? Symbols.mic_off : Symbols.mic,
-                                  label: call.isMuted ? 'call_unmute'.tr() : 'call_mute'.tr(),
+                                  icon: call.isMuted
+                                      ? Symbols.mic_off
+                                      : Symbols.mic,
+                                  label: call.isMuted
+                                      ? 'call_unmute'.tr()
+                                      : 'call_mute'.tr(),
                                   active: call.isMuted,
                                   palette: c,
-                                  onTap: () => ref.read(callProvider.notifier).toggleMute(),
+                                  onTap: () => ref
+                                      .read(callProvider.notifier)
+                                      .toggleMute(),
                                 ),
                                 _ControlTile(
-                                  icon: call.isSpeakerOn ? Symbols.volume_up : Symbols.hearing,
+                                  icon: call.isSpeakerOn
+                                      ? Symbols.volume_up
+                                      : Symbols.hearing,
                                   label: call.isSpeakerOn
                                       ? 'call_speaker'.tr()
                                       : 'call_earpiece'.tr(),
                                   active: call.isSpeakerOn,
                                   palette: c,
-                                  onTap: () => ref.read(callProvider.notifier).toggleSpeaker(),
+                                  onTap: () => ref
+                                      .read(callProvider.notifier)
+                                      .toggleSpeaker(),
                                 ),
                               ],
                             ),
@@ -240,66 +249,41 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                           SizedBox(height: 28.h),
                         ],
                         if (call.status != CallStatus.ended) ...[
-                          Builder(
-                            builder: (context) {
-                              final isLocked =
-                                  call.status == CallStatus.calling && !_canCancel;
-                              return Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: isLocked
-                                        ? null
-                                        : () {
-                                            if (call.status == CallStatus.calling) {
-                                              _queue.clear();
-                                              ref
-                                                  .read(callProvider.notifier)
-                                                  .cancelOutgoingRing();
-                                            } else {
-                                              _queue.clear();
-                                              ref.read(callProvider.notifier).endCall();
-                                            }
-                                          },
-                                    child: AnimatedOpacity(
-                                      opacity: isLocked ? 0.4 : 1,
-                                      duration: const Duration(milliseconds: 280),
-                                      child: Container(
-                                        width: 76.w,
-                                        height: 76.w,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: AppColors.error,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: AppColors.error.withValues(alpha: 0.35),
-                                              blurRadius: 20,
-                                              offset: const Offset(0, 8),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Icon(
-                                          Symbols.call_end,
-                                          color: Colors.white,
-                                          size: 34.sp,
-                                          fill: 1,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (isLocked) ...[
-                                    SizedBox(height: 10.h),
-                                    Text(
-                                      'call_calling'.tr(),
-                                      style: TextStyle(
-                                        fontSize: 11.sp,
-                                        fontFamily: 'Lexend',
-                                        color: c.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              );
+                          GestureDetector(
+                            onTap: () {
+                              _queue.clear();
+                              final notifier = ref.read(callProvider.notifier);
+                              if (call.status == CallStatus.calling) {
+                                notifier.cancelOutgoingRing();
+                              } else if (call.status == CallStatus.ringing) {
+                                notifier.declineCall();
+                              } else {
+                                notifier.endCall();
+                              }
                             },
+                            child: Container(
+                              width: 76.w,
+                              height: 76.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.error,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.error.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Symbols.call_end,
+                                color: Colors.white,
+                                size: 34.sp,
+                                fill: 1,
+                              ),
+                            ),
                           ),
                         ],
                         SizedBox(height: 48.h),
