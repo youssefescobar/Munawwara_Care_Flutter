@@ -333,7 +333,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
             final groupName = map['group_name'] as String? ?? 'the group';
             StandardSnackBar.showWarning(
               context,
-              'You have been removed from $groupName',
+              'msg_removed_from_group'.tr(args: [groupName]),
               duration: const Duration(seconds: 5),
             );
             // Reload from server to confirm state (force bypasses throttle)
@@ -464,7 +464,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           if (!mounted) return;
           ref.read(authProvider.notifier).logout();
           context.go('/login');
-          StandardSnackBar.showError(context, 'Your login code was refreshed. You have been logged out.', duration: const Duration(seconds: 5));
+          StandardSnackBar.showError(context, 'msg_force_logout'.tr(), duration: const Duration(seconds: 5));
         });
 
         // Listen for group membership changes (moderator controlled)

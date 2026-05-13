@@ -189,7 +189,7 @@ class ChatNotificationHelper {
         String? displayTime;
         if (mTimeRaw != null) {
           try {
-            final dt = DateTime.parse(mTimeRaw.toString());
+            final dt = DateTime.parse(mTimeRaw.toString()).toLocal();
             displayTime = DateFormat('hh:mm a').format(dt);
           } catch (_) {}
         }

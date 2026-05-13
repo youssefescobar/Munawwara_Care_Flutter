@@ -1,4 +1,4 @@
-﻿{
+{
   "share": "اشتراک کریں",
   "offline_showing_saved_data": "کنکشن نہیں — محفوظ شدہ ڈیٹا دکھایا جا رہا ہے۔ تازہ کرنے کے لیے منسلک ہوں۔",
   "welcome_back": "خوش آمدید",
@@ -951,5 +951,12 @@
   "location_onboarding_title": "جاری رکھنے کے لیے مقام کو فعال کریں",
   "location_onboarding_desc": "اس ایپ کو آپ کے مقام کی ضرورت ہے تاکہ آپ کا ماڈریٹر آپ کی مدد کر سکے اور آپ کی حفاظت کو یقینی بنا سکے۔",
   "location_onboarding_important": "اہم: براہ کرم اپنے سسٹم کی ترتیبات کے ذریعہ پوچھے جانے پر \"ہر وقت اجازت دیں\" کا انتخاب کریں۔",
-  "location_onboarding_btn": "مقام کو فعال کریں"
+  "location_onboarding_btn": "مقام کو فعال کریں",
+  "msg_removed_from_group": "آپ کو {} سے ہٹا دیا گیا ہے",
+  "msg_force_logout": "آپ کا لاگ ان کوڈ ریفریش کر دیا گیا ہے۔ آپ لاگ آؤٹ ہو چکے ہیں۔",
+  "error_location_unavailable": "موجودہ مقام حاصل نہیں کیا جا سکا",
+  "msg_sos_broadcast_sent": "🚨 ہنگامی پیغام بھیج دیا گیا!",
+  "msg_sos_broadcast_failed": "ہنگامی پیغام بھیجنے میں ناکامی۔ دوبارہ کوشش کریں۔",
+  "msg_group_deleted": "\"{}\" حذف کر دیا گیا۔",
+  "msg_group_delete_failed": "گروپ کو حذف کرنے میں ناکام"
 }

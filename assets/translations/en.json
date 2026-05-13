@@ -1,4 +1,4 @@
-﻿{
+{
   "area_deleted": "Area deleted",
   "share": "Share",
   "offline_showing_saved_data": "No connection — showing saved data. Connect to refresh.",
@@ -353,7 +353,6 @@
   "area_meetpoint": "Meetpoint",
   "area_meetpoint_exists": "A meetpoint already exists. Delete it first.",
   "area_view_all": "View All Areas",
-  "area_deleted": "Area deleted",
   "area_search_hint": "Search for a place...",
   "area_location_refine_timeout": "GPS is slow — using your last known position. Move outdoors or try again for a finer fix.",
   "area_name_hint": "Name this location",
@@ -949,5 +948,12 @@
   "location_onboarding_title": "Enable location to continue",
   "location_onboarding_desc": "This app needs your location so your moderator can assist you and ensure your safety.",
   "location_onboarding_important": "Important: Please choose \"Allow all the time\" when prompted by your system settings.",
-  "location_onboarding_btn": "Enable location"
+  "location_onboarding_btn": "Enable location",
+  "msg_removed_from_group": "You have been removed from {}",
+  "msg_force_logout": "Your login code was refreshed. You have been logged out.",
+  "error_location_unavailable": "Could not get current location",
+  "msg_sos_broadcast_sent": "🚨 SOS broadcast sent!",
+  "msg_sos_broadcast_failed": "Failed to send SOS. Try again.",
+  "msg_group_deleted": "\"{}\" deleted.",
+  "msg_group_delete_failed": "Failed to delete group"
 }

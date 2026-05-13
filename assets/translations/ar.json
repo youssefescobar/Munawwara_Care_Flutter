@@ -1,4 +1,4 @@
-﻿{
+{
   "share": "مشاركة",
   "offline_showing_saved_data": "لا يوجد اتصال — عرض البيانات المحفوظة. اتصل للتحديث.",
   "welcome_back": "مرحباً بعودتك",
@@ -950,5 +950,12 @@
   "location_onboarding_title": "قم بتمكين الموقع للمتابعة",
   "location_onboarding_desc": "يحتاج هذا التطبيق إلى موقعك حتى يتمكن المشرف من مساعدتك وضمان سلامتك.",
   "location_onboarding_important": "هام: يرجى اختيار \"السماح طوال الوقت\" عندما يطلب منك نظامك ذلك.",
-  "location_onboarding_btn": "تمكين الموقع"
+  "location_onboarding_btn": "تمكين الموقع",
+  "msg_removed_from_group": "لقد تمت إزالتك من {}",
+  "msg_force_logout": "تم تحديث رمز تسجيل الدخول الخاص بك. لقد تم تسجيل خروجك.",
+  "error_location_unavailable": "تعذر الحصول على الموقع الحالي",
+  "msg_sos_broadcast_sent": "🚨 تم إرسال نداء الاستغاثة!",
+  "msg_sos_broadcast_failed": "فشل في إرسال نداء الاستغاثة. حاول مرة أخرى.",
+  "msg_group_deleted": "تم حذف \"{}\".",
+  "msg_group_delete_failed": "فشل في حذف المجموعة"
 }

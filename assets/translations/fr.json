@@ -1,4 +1,4 @@
-﻿{
+{
   "share": "Partager",
   "offline_showing_saved_data": "Pas de connexion — affichage des données enregistrées. Connectez-vous pour actualiser.",
   "welcome_back": "Bienvenue à nouveau",
@@ -951,5 +951,12 @@
   "location_onboarding_title": "Activez la localisation pour continuer",
   "location_onboarding_desc": "Cette application a besoin de votre position pour que votre modérateur puisse vous aider et assurer votre sécurité.",
   "location_onboarding_important": "Important : Veuillez choisir « Toujours autoriser » lorsque vos paramètres système vous le demandent.",
-  "location_onboarding_btn": "Activer la localisation"
+  "location_onboarding_btn": "Activer la localisation",
+  "msg_removed_from_group": "Vous avez été retiré de {}",
+  "msg_force_logout": "Votre code de connexion a été actualisé. Vous avez été déconnecté.",
+  "error_location_unavailable": "Impossible d'obtenir la position actuelle",
+  "msg_sos_broadcast_sent": "🚨 Diffusion SOS envoyée !",
+  "msg_sos_broadcast_failed": "Échec de l'envoi du SOS. Réessayez.",
+  "msg_group_deleted": "\"{}\" supprimé.",
+  "msg_group_delete_failed": "Échec de la suppression du groupe"
 }

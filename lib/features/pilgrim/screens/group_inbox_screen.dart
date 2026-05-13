@@ -962,7 +962,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
     final lng = (mp?['longitude'] as num?)?.toDouble();
     final timeStr = mp?['meetpoint_time']?.toString();
     final DateTime? meetTime =
-        timeStr != null ? DateTime.tryParse(timeStr) : null;
+        timeStr != null ? DateTime.tryParse(timeStr)?.toLocal() : null;
 
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -1333,7 +1333,7 @@ class _GroupInboxScreenState extends ConsumerState<GroupInboxScreen> {
       final name = _langNames[targetLang] ?? targetLang;
       StandardSnackBar.showInfo(
         context,
-        'This message already appears to be in $name.',
+        'msg_already_in_lang'.tr(args: [name]),
       );
       return;
     }

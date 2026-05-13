@@ -210,7 +210,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
       final ok = await hasLocationAlwaysPermission();
       if (!ok) {
         if (mounted) {
-          StandardSnackBar.showError(context, 'Could not get current location');
+          StandardSnackBar.showError(context, 'error_location_unavailable'.tr());
         }
         return;
       }
@@ -242,7 +242,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
       } on TimeoutException {
         if (!mounted) return;
         if (lastKnown == null) {
-          StandardSnackBar.showError(context, 'Could not get current location');
+          StandardSnackBar.showError(context, 'error_location_unavailable'.tr());
         } else {
           StandardSnackBar.showWarning(
             context,
@@ -251,9 +251,7 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
-        StandardSnackBar.showError(context, 'Could not get current location');
-      }
+        StandardSnackBar.showError(context, 'error_location_unavailable'.tr());
     } finally {
       if (mounted) setState(() => _recenteringGps = false);
     }

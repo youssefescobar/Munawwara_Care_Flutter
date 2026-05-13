@@ -237,9 +237,9 @@ class _ModeratorGroupMapScreenState
     if (!mounted) return;
     setState(() => _sosLoading = false);
     if (ok) {
-      StandardSnackBar.showSuccess(context, '🚨 SOS broadcast sent!');
+      StandardSnackBar.showSuccess(context, 'msg_sos_broadcast_sent'.tr());
     } else {
-      StandardSnackBar.showError(context, 'Failed to send SOS. Try again.');
+      StandardSnackBar.showError(context, 'msg_sos_broadcast_failed'.tr());
     }
   }
 

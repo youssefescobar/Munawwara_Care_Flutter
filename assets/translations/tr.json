@@ -1,4 +1,4 @@
-﻿{
+{
   "share": "Paylaş",
   "offline_showing_saved_data": "Bağlantı yok — kayıtlı veriler gösteriliyor. Yenilemek için bağlanın.",
   "welcome_back": "Tekrar hoş geldiniz",
@@ -951,5 +951,12 @@
   "location_onboarding_title": "Devam etmek için konumu etkinleştirin",
   "location_onboarding_desc": "Bu uygulama, moderatörünüzün size yardımcı olabilmesi ve güvenliğinizi sağlayabilmesi için konumunuza ihtiyaç duyar.",
   "location_onboarding_important": "Önemli: Sistem ayarlarınız tarafından istendiğinde lütfen \"Her zaman izin ver\"i seçin.",
-  "location_onboarding_btn": "Konumu etkinleştir"
+  "location_onboarding_btn": "Konumu etkinleştir",
+  "msg_removed_from_group": "{} grubundan çıkarıldınız",
+  "msg_force_logout": "Giriş kodunuz yenilendi. Çıkış yaptınız.",
+  "error_location_unavailable": "Geçerli konum alınamadı",
+  "msg_sos_broadcast_sent": "🚨 SOS yayını gönderildi!",
+  "msg_sos_broadcast_failed": "SOS gönderilemedi. Tekrar deneyin.",
+  "msg_group_deleted": "\"{}\" silindi.",
+  "msg_group_delete_failed": "Grup silinemedi"
 }

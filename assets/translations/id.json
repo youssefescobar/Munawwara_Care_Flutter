@@ -1,4 +1,4 @@
-﻿{
+{
   "share": "Bagikan",
   "offline_showing_saved_data": "Tidak ada koneksi — menampilkan data tersimpan. Hubungkan untuk memperbarui.",
   "welcome_back": "Selamat datang kembali",
@@ -951,5 +951,12 @@
   "location_onboarding_title": "Aktifkan lokasi untuk melanjutkan",
   "location_onboarding_desc": "Aplikasi ini membutuhkan lokasi Anda agar moderator dapat membantu dan memastikan keselamatan Anda.",
   "location_onboarding_important": "Penting: Silakan pilih \"Izinkan sepanjang waktu\" saat diminta oleh pengaturan sistem Anda.",
-  "location_onboarding_btn": "Aktifkan lokasi"
+  "location_onboarding_btn": "Aktifkan lokasi",
+  "msg_removed_from_group": "Anda telah dihapus dari {}",
+  "msg_force_logout": "Kode masuk Anda telah diperbarui. Anda telah keluar.",
+  "error_location_unavailable": "Tidak bisa mendapatkan lokasi saat ini",
+  "msg_sos_broadcast_sent": "🚨 Siaran SOS terkirim!",
+  "msg_sos_broadcast_failed": "Gagal mengirim SOS. Coba lagi.",
+  "msg_group_deleted": "\"{}\" dihapus.",
+  "msg_group_delete_failed": "Gagal menghapus grup"
 }

@@ -1438,9 +1438,9 @@ class _GroupCard extends ConsumerWidget {
         .deleteGroup(group.id);
     if (!context.mounted) return;
     if (ok) {
-      StandardSnackBar.showSuccess(context, '"${group.groupName}" deleted.');
+      StandardSnackBar.showSuccess(context, 'msg_group_deleted'.tr(args: [group.groupName]));
     } else {
-      StandardSnackBar.showError(context, err ?? 'Failed to delete group');
+      StandardSnackBar.showError(context, err ?? 'msg_group_delete_failed'.tr());
     }
   }
 
