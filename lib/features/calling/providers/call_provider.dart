@@ -120,6 +120,9 @@ class CallState {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class CallNotifier extends Notifier<CallState> {
+  static const _outgoingReceiverIdKey = 'outgoing_call_receiver_id';
+  static const _outgoingIsGroupKey = 'outgoing_call_is_group';
+
   RtcEngine? _engine;
   String? _pendingChannelName;
   String? _pendingFromId;
@@ -174,6 +177,7 @@ class CallNotifier extends Notifier<CallState> {
       isGroupRingingOut: true,
       displayPeerAsSupportBranding: true,
     );
+    unawaited(_persistOutgoingCall(remoteUserId: ids.first, isGroup: true));
 
     try {
       await [Permission.microphone].request();
@@ -227,6 +231,9 @@ class CallNotifier extends Notifier<CallState> {
       isGroupRingingOut: false,
       displayPeerAsSupportBranding: isPilgrimCaller,
       remotePeerGender: isPilgrimCaller ? null : remotePeerGender,
+    );
+    unawaited(
+      _persistOutgoingCall(remoteUserId: remoteUserId, isGroup: false),
     );
 
     try {
@@ -494,24 +501,23 @@ class CallNotifier extends Notifier<CallState> {
   /// as a missed call and mis-notifies the recipient.
   void cancelOutgoingRing() {
     _stopRingPoll();
-    if (state.isGroupRingingOut) {
-      CallSignaling.emitWhenConnected('group-call-cancel', <String, dynamic>{});
-    } else {
-      final remoteId = state.remoteUserId;
-      if (remoteId != null && remoteId.isNotEmpty) {
-        CallSignaling.emitWhenConnected('call-cancel', {'to': remoteId});
-      }
-    }
+    final snapshot = state;
+    unawaited(
+      _signalOutgoingCancel(
+        isGroup: snapshot.isGroupRingingOut,
+        remoteId: snapshot.remoteUserId,
+      ),
+    );
     // If moderator cancels outgoing ring (never connected), downgrade SOS
     // from "in call" back to "being handled".
-    final remoteId = state.remoteUserId;
+    final remoteId = snapshot.remoteUserId;
     final isMod = ref.read(authProvider).role?.toLowerCase() != 'pilgrim';
     if (isMod && remoteId != null && remoteId.isNotEmpty) {
       unawaited(SosAlertCoordinator.afterModeratorEndedCall(remoteId));
     }
     CallKitService.instance.endCurrentCall();
     _cleanup();
-    state = state.copyWith(
+    state = snapshot.copyWith(
       status: CallStatus.ended,
       endReason: 'cancelled',
       isGroupRingingOut: false,
@@ -634,6 +640,22 @@ class CallNotifier extends Notifier<CallState> {
         '[CallProvider] Found pending declined call for caller=${pending.callerId} noAnswer=${pending.noAnswer}',
       );
       declineCallFromCallerId(pending.callerId, noAnswer: pending.noAnswer);
+    }
+  }
+
+  /// Reconcile native / persisted call state after the process was killed.
+  Future<void> reconcileCallStateAfterProcessDeath() async {
+    await _reconcilePendingOutgoingStopFromFcm();
+    await _reconcilePendingIncomingCall();
+    await _reconcileStaleOutgoingPersistence();
+  }
+
+  Future<void> _reconcilePendingOutgoingStopFromFcm() async {
+    final reason = await CallKitService.consumePendingOutgoingStop();
+    if (reason == null) return;
+    if (state.status == CallStatus.calling ||
+        state.status == CallStatus.ringing) {
+      stopLocalCallSession(endReason: reason);
     }
   }
 
@@ -882,6 +904,128 @@ class CallNotifier extends Notifier<CallState> {
     // It will be disposed only when the app is terminated or CallProvider is disposed.
     _pendingChannelName = null;
     _pendingFromId = null;
+    unawaited(_clearOutgoingCallPersistence());
+  }
+
+  Future<void> _persistOutgoingCall({
+    required String remoteUserId,
+    required bool isGroup,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_outgoingReceiverIdKey, remoteUserId);
+      await prefs.setBool(_outgoingIsGroupKey, isGroup);
+    } catch (e) {
+      AppLogger.w('[CallProvider] persist outgoing call failed: $e');
+    }
+  }
+
+  Future<void> _clearOutgoingCallPersistence() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_outgoingReceiverIdKey);
+      await prefs.remove(_outgoingIsGroupKey);
+    } catch (_) {}
+  }
+
+  Future<String?> _readPersistedOutgoingReceiverId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getString(_outgoingReceiverIdKey);
+      if (id != null && id.isNotEmpty) return id;
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _signalOutgoingCancel({
+    required bool isGroup,
+    String? remoteId,
+  }) async {
+    final myId = await _getMyUserId();
+    if (isGroup) {
+      CallSignaling.emitWhenConnected('group-call-cancel', <String, dynamic>{});
+      if (myId != null && myId.isNotEmpty) {
+        CallSignaling.notifyGroupCancelHttp(myId);
+      }
+      return;
+    }
+
+    var to = remoteId;
+    if (to == null || to.isEmpty) {
+      to = await _readPersistedOutgoingReceiverId();
+    }
+    if (to == null || to.isEmpty) return;
+
+    CallSignaling.emitWhenConnected('call-cancel', {'to': to});
+    if (myId != null && myId.isNotEmpty) {
+      CallSignaling.notifyCancelHttp(myId, to);
+    }
+  }
+
+  Future<void> _reconcilePendingIncomingCall() async {
+    final pending = await CallKitService.readRecentPendingIncomingCall(
+      maxAgeSeconds: 120,
+    );
+    if (pending == null) return;
+
+    final callerId = pending['callerId'] ?? '';
+    if (callerId.isEmpty) return;
+
+    try {
+      final response = await ApiService.dio.get(
+        '/call-history/check-active',
+        queryParameters: {'callerId': callerId},
+      );
+      if (response.data?['active'] == true) return;
+
+      AppLogger.w(
+        '[CallProvider] Pending native call is no longer active on server',
+      );
+      await CallKitService.instance.endCurrentCall();
+      if (!state.isInCall) {
+        stopLocalCallSession(endReason: 'cancelled');
+      }
+    } catch (e) {
+      AppLogger.w('[CallProvider] incoming reconcile skipped: $e');
+    }
+  }
+
+  Future<void> _reconcileStaleOutgoingPersistence() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final receiverId = prefs.getString(_outgoingReceiverIdKey) ?? '';
+      final isGroup = prefs.getBool(_outgoingIsGroupKey) ?? false;
+      if (receiverId.isEmpty && !isGroup) return;
+
+      final myId = prefs.getString('user_id');
+      if (myId == null || myId.isEmpty) {
+        await _clearOutgoingCallPersistence();
+        return;
+      }
+
+      final resp = await ApiService.dio.get(
+        '/call-history/check-active',
+        queryParameters: {'callerId': myId},
+      );
+      final active = resp.data['active'] as bool? ?? false;
+      if (!active) {
+        await _clearOutgoingCallPersistence();
+        return;
+      }
+
+      if (!state.isInCall) {
+        AppLogger.w(
+          '[CallProvider] Server still ringing after process death — cancelling',
+        );
+        await _signalOutgoingCancel(
+          isGroup: isGroup,
+          remoteId: receiverId.isNotEmpty ? receiverId : null,
+        );
+      }
+      await _clearOutgoingCallPersistence();
+    } catch (e) {
+      AppLogger.w('[CallProvider] outgoing reconcile skipped: $e');
+    }
   }
 }
 

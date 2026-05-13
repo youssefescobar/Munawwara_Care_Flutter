@@ -23,6 +23,7 @@ import 'core/router/app_router.dart' show AppRouter;
 import 'features/auth/providers/auth_provider.dart';
 import 'features/calling/calling_scope.dart';
 import 'features/calling/native_call_coordinator.dart';
+import 'core/services/callkit_service.dart';
 import 'core/utils/app_logger.dart';
 import 'core/widgets/reminder_popup.dart';
 import 'core/services/incoming_chat_sfx.dart';
@@ -120,6 +121,20 @@ void main() async {
         AppLogger.i('FCM onMessage: ${msg.notification?.title} ${msg.data}');
         final notifType = msg.data['notification_type']?.toString() ?? '';
         final dataType = msg.data['type']?.toString() ?? '';
+        final callControlType = CallKitService.fcmCallControlType(msg.data);
+        // ── call_declined / call_cancel arriving via FCM ────────────────────
+        // When the pilgrim's app is killed and declines, the backend's 30-second
+        // ring timeout fires and sends a silent FCM with type=call_declined
+        // directly to the moderator. Handle it here to immediately stop ringing.
+        if (callControlType == 'call_declined' ||
+            callControlType == 'call_cancel') {
+          NativeCallCoordinator.handleForegroundCallControl(msg.data);
+          return;
+        }
+        if (CallKitService.isIncomingCallFcm(msg.data)) {
+          await CallKitService.handleFcmMessage(msg);
+          return;
+        }
         final msgType = msg.data['messageType']?.toString() ?? '';
         final isReminderTts = msgType == 'reminder_tts';
         final isUrgentTts =
@@ -127,14 +142,6 @@ void main() async {
             (msgType == 'tts' || msgType == 'reminder_tts');
         final messageKey =
             msg.data['message_id']?.toString() ?? msg.messageId ?? '';
-        // ── call_declined / call_cancel arriving via FCM ────────────────────
-        // When the pilgrim's app is killed and declines, the backend's 30-second
-        // ring timeout fires and sends a silent FCM with type=call_declined
-        // directly to the moderator. Handle it here to immediately stop ringing.
-        if (dataType == 'call_declined' || dataType == 'call_cancel') {
-          NativeCallCoordinator.handleForegroundCallControl(msg.data);
-          return;
-        }
         // Skip tray + TTS for chat when foreground — socket +
         // ChatNotificationHelper (in-app popup + playRobust) already handle UX.
         // Urgent TTS must be included here; otherwise FCM also calls speakTts and
@@ -290,10 +297,12 @@ void main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   AppLogger.d('main: initializing EasyLocalization');
   await EasyLocalization.ensureInitialized();
+  await CallKitService.cacheSupportDisplayNameFromBundle();
   AppLogger.d('main: loading dotenv');
   await dotenv.load(fileName: '.env');
   AppLogger.d('main: verifying env');
   await verifyEnv();
+  await ApiService.cacheNativeCallPrefs();
   AppLogger.d('main: screenutil ensureScreenSize');
   await ScreenUtil.ensureScreenSize();
 

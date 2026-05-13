@@ -47,6 +47,8 @@ class CallDeclineReceiver : BroadcastReceiver() {
         // with a "flutter." prefix on every key.
         private const val PREFS_NAME = "FlutterSharedPreferences"
         private const val KEY_CALLER_ID = "flutter.pending_call_caller_id"
+        private const val KEY_CALL_RECORD_ID = "flutter.pending_call_record_id"
+        private const val KEY_DECLINER_ID = "flutter.user_id"
         private const val KEY_API_BASE_URL = "flutter.api_base_url"
 
         // Production fallback URL (same as in notification_service.dart)
@@ -60,24 +62,36 @@ class CallDeclineReceiver : BroadcastReceiver() {
 
         Log.i(TAG, "📵 $action received")
 
-        val callerId = resolveCallerId(context, intent)
-        if (callerId.isNullOrBlank()) {
-            Log.w(TAG, "📵 callerId not found — cannot notify backend")
+        val callerId = resolveCallerId(context, intent).orEmpty()
+        val callRecordId = resolveCallRecordId(context)
+        if (callerId.isBlank() && callRecordId.isBlank()) {
+            Log.w(TAG, "📵 callerId/callRecordId not found — cannot notify backend")
             return
         }
 
         val baseUrl = resolveBaseUrl(context)
-        Log.i(TAG, "📵 Declining callerId=$callerId via $baseUrl")
+        val declinerId = resolveDeclinerId(context)
+        Log.i(TAG, "📵 Declining callerId=$callerId callRecordId=$callRecordId via $baseUrl")
 
-        // BroadcastReceivers must not block the main thread.
+        val pendingResult = goAsync()
         val noAnswer = action == ACTION_TIMEOUT
         thread(name = "CallDeclineHTTP") {
-            sendDeclineHttp(baseUrl, callerId, noAnswer)
+            try {
+                sendDeclineHttp(
+                    baseUrl,
+                    callerId,
+                    declinerId,
+                    callRecordId,
+                    noAnswer,
+                )
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
     private fun resolveCallerId(context: Context, intent: Intent): String? {
-        // 1. Try the plugin's Bundle: EXTRA_CALLKIT_INCOMING_DATA → EXTRA_CALLKIT_EXTRA → callerId
+        // 1. Try the plugin's Bundle: EXTRA_CALLKIT_INCOMING_DATA → EXTRA_CALLKIT_EXTRA
         val bundle: Bundle? =
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 intent.getBundleExtra(EXTRA_INCOMING_DATA)
@@ -87,12 +101,16 @@ class CallDeclineReceiver : BroadcastReceiver() {
             }
 
         if (bundle != null) {
-            // The "extra" map is stored as a nested Bundle
+            @Suppress("UNCHECKED_CAST", "DEPRECATION")
+            val extraMap = bundle.getSerializable(EXTRA_CALLKIT_EXTRA)
+                as? HashMap<String, Any?>
+            val fromMap = extraMap?.get("callerId")?.toString()
+            if (!fromMap.isNullOrBlank()) return fromMap
+
             val extraBundle = bundle.getBundle(EXTRA_CALLKIT_EXTRA)
             val fromExtra = extraBundle?.getString("callerId")
             if (!fromExtra.isNullOrBlank()) return fromExtra
 
-            // Also try flat keys in the outer bundle (older plugin versions)
             val flat = bundle.getString("callerId")
             if (!flat.isNullOrBlank()) return flat
         }
@@ -118,7 +136,33 @@ class CallDeclineReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun sendDeclineHttp(baseUrl: String, callerId: String, noAnswer: Boolean) {
+    private fun resolveDeclinerId(context: Context): String {
+        return try {
+            val prefs: SharedPreferences =
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.getString(KEY_DECLINER_ID, null).orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun resolveCallRecordId(context: Context): String {
+        return try {
+            val prefs: SharedPreferences =
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.getString(KEY_CALL_RECORD_ID, null).orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun sendDeclineHttp(
+        baseUrl: String,
+        callerId: String,
+        declinerId: String,
+        callRecordId: String,
+        noAnswer: Boolean,
+    ) {
         repeat(2) { attempt -> // retry once on failure
             try {
                 val url = URL("$baseUrl/call-history/decline")
@@ -129,9 +173,19 @@ class CallDeclineReceiver : BroadcastReceiver() {
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
 
-                val body =
-                    if (noAnswer) """{"callerId":"$callerId","noAnswer":true}"""
-                    else """{"callerId":"$callerId"}"""
+                val body = buildString {
+                    append("{\"callerId\":\"$callerId\"")
+                    if (declinerId.isNotBlank()) {
+                        append(",\"declinerId\":\"$declinerId\"")
+                    }
+                    if (callRecordId.isNotBlank()) {
+                        append(",\"callRecordId\":\"$callRecordId\"")
+                    }
+                    if (noAnswer) {
+                        append(",\"noAnswer\":true")
+                    }
+                    append("}")
+                }
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body) }
 
                 val code = conn.responseCode

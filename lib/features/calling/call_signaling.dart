@@ -59,4 +59,50 @@ class CallSignaling {
           (e) => AppLogger.e('[CallSignaling] HTTP call-decline failed: $e'),
         );
   }
+
+  static void notifyCancelHttp(
+    String callerId,
+    String receiverId, {
+    String? callRecordId,
+  }) {
+    ApiService.dio
+        .post(
+          '/call-history/cancel',
+          data: {
+            'callerId': callerId,
+            'receiverId': receiverId,
+            if (callRecordId != null && callRecordId.isNotEmpty)
+              'callRecordId': callRecordId,
+          },
+        )
+        .then(
+          (_) => AppLogger.i(
+            '[CallSignaling] HTTP call-cancel → $receiverId',
+          ),
+        )
+        .catchError(
+          (e) => AppLogger.e('[CallSignaling] HTTP call-cancel failed: $e'),
+        );
+  }
+
+  static void notifyGroupCancelHttp(String callerId, {String? callRecordId}) {
+    ApiService.dio
+        .post(
+          '/call-history/cancel',
+          data: {
+            'callerId': callerId,
+            'groupCancel': true,
+            if (callRecordId != null && callRecordId.isNotEmpty)
+              'callRecordId': callRecordId,
+          },
+        )
+        .then(
+          (_) => AppLogger.i('[CallSignaling] HTTP group-call-cancel'),
+        )
+        .catchError(
+          (e) => AppLogger.e(
+            '[CallSignaling] HTTP group-call-cancel failed: $e',
+          ),
+        );
+  }
 }

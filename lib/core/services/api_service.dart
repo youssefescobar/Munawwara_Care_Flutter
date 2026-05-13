@@ -190,6 +190,12 @@ class ApiService {
     return token;
   }
 
+  /// Native decline/answer HTTP uses SharedPreferences, not Dart [dio].
+  static Future<void> cacheNativeCallPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('api_base_url', baseUrl);
+  }
+
   // ── Parse human-readable error from DioException response ────────────────────
   static String parseError(DioException e) {
     final data = e.response?.data;

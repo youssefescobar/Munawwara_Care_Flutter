@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -128,17 +130,17 @@ abstract final class NativeCallCoordinator {
           final c = CallingScope.riverpod;
           if (endedCallerId.isNotEmpty && c != null) {
             final currentState = c.read(callProvider);
-            if (!currentState.isInCall) {
-              c
-                  .read(callProvider.notifier)
-                  .declineCallFromCallerId(endedCallerId);
+            if (currentState.status == CallStatus.ringing) {
+              c.read(callProvider.notifier).declineCall();
             }
           } else if (endedCallerId.isNotEmpty && c == null) {
-            _pendingDeclined = PendingDecline(callerId: endedCallerId);
-            AppLogger.w(
-              '📵 Ended mapped to queued decline (container not ready) for callerId=$endedCallerId',
-            );
-            await _sendBackgroundDecline(endedCallerId, noAnswer: false);
+            if (_pendingAcceptedCall == null) {
+              _pendingDeclined = PendingDecline(callerId: endedCallerId);
+              AppLogger.w(
+                '📵 Ended mapped to queued decline (container not ready) for callerId=$endedCallerId',
+              );
+              await _sendBackgroundDecline(endedCallerId, noAnswer: false);
+            }
             await CallKitService.instance.endCurrentCall();
           }
           _pendingAcceptedCall = null;
@@ -182,19 +184,22 @@ abstract final class NativeCallCoordinator {
 
   /// FCM foreground: `call_declined` / `call_cancel` from backend.
   static void handleForegroundCallControl(Map<String, dynamic> data) {
-    final dataType = data['type']?.toString() ?? '';
-    if (dataType != 'call_declined' && dataType != 'call_cancel') return;
+    final dataType = CallKitService.fcmCallControlType(data);
+    if (dataType == null) return;
 
     AppLogger.w('📵 FCM call_declined/call_cancel — stopping call');
+    final endReason = dataType == 'call_cancel' ? 'cancelled' : 'declined';
     final c = CallingScope.riverpod;
-    if (c == null) return;
-
-    final cs = c.read(callProvider);
-    if (cs.status == CallStatus.calling || cs.status == CallStatus.ringing) {
-      c.read(callProvider.notifier).stopLocalCallSession(
-            endReason: dataType == 'call_cancel' ? 'cancelled' : 'declined',
-          );
+    if (c != null) {
+      final cs = c.read(callProvider);
+      if (cs.status == CallStatus.calling || cs.status == CallStatus.ringing) {
+        c.read(callProvider.notifier).stopLocalCallSession(endReason: endReason);
+        return;
+      }
     }
+
+    unawaited(CallKitService.persistPendingOutgoingStop(endReason));
+    unawaited(CallKitService.instance.endCurrentCall());
   }
 }
 
@@ -335,16 +340,23 @@ void _tryPushVoiceCall({required int attemptsLeft}) {
   }
 }
 
-Future<void> _sendBackgroundDecline(String callerId, {bool noAnswer = false}) async {
+Future<void> _sendBackgroundDecline(
+  String callerId, {
+  bool noAnswer = false,
+}) async {
   if (callerId.isEmpty) return;
   const fallbackUrl =
       'https://mcbackendapp-199324116788.europe-west8.run.app/api';
   try {
     String baseUrl = fallbackUrl;
+    String declinerId = '';
+    String callRecordId = '';
     try {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('api_base_url');
       if (cached != null && cached.isNotEmpty) baseUrl = cached;
+      declinerId = prefs.getString('user_id') ?? '';
+      callRecordId = prefs.getString('pending_call_record_id') ?? '';
     } catch (_) {}
 
     final dio = Dio(
@@ -357,6 +369,8 @@ Future<void> _sendBackgroundDecline(String callerId, {bool noAnswer = false}) as
     );
     await dio.post('/call-history/decline', data: {
       'callerId': callerId,
+      if (declinerId.isNotEmpty) 'declinerId': declinerId,
+      if (callRecordId.isNotEmpty) 'callRecordId': callRecordId,
       if (noAnswer) 'noAnswer': true,
     });
     AppLogger.i('❌ Background HTTP decline sent to $callerId (url=$baseUrl)');

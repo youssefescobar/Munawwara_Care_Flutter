@@ -278,10 +278,18 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         // Check if there's a pending call accepted from native call screen.
         // Must run AFTER the socket handshake so the call-answer emit goes through.
         if (SocketService.isConnected) {
+          unawaited(
+            ref.read(callProvider.notifier).reconcileCallStateAfterProcessDeath(),
+          );
           ref.read(callProvider.notifier).checkPendingAcceptedCall();
           ref.read(callProvider.notifier).checkPendingDeclinedCall();
         } else {
           void checkOnce() {
+            unawaited(
+              ref
+                  .read(callProvider.notifier)
+                  .reconcileCallStateAfterProcessDeath(),
+            );
             ref.read(callProvider.notifier).checkPendingAcceptedCall();
             ref.read(callProvider.notifier).checkPendingDeclinedCall();
             SocketService.offConnected(checkOnce);
@@ -1223,6 +1231,15 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
       if (next.status == CallStatus.connected &&
           prev?.status == CallStatus.ringing &&
+          mounted &&
+          !isNavigatingToCall &&
+          !VoiceCallScreen.isActive) {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const VoiceCallScreen()));
+      }
+      if (next.status == CallStatus.calling &&
+          prev?.status != CallStatus.calling &&
           mounted &&
           !isNavigatingToCall &&
           !VoiceCallScreen.isActive) {

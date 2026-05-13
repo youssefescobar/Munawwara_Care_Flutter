@@ -371,44 +371,46 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
      */
     @Suppress("UNCHECKED_CAST")
     private fun sendDeclineToBackend(context: Context, data: Bundle, noAnswer: Boolean = false) {
-        val pendingResult = goAsync() // Keep receiver alive for background work
+        val pendingResult = goAsync()
         thread(name = "CallDeclineHTTP") {
             try {
-                // 1. Try to get callerId from the Bundle's EXTRA_CALLKIT_EXTRA HashMap
                 var callerId = ""
+                var callRecordId = ""
+                var apiBaseUrl = ""
                 try {
                     val extraMap = data.getSerializable(CallkitConstants.EXTRA_CALLKIT_EXTRA)
                         as? HashMap<*, *>
-                    callerId = extraMap?.get("callerId")?.toString() ?: ""
+                    callerId = extraMap?.get("callerId")?.toString().orEmpty()
+                    callRecordId = extraMap?.get("callRecordId")?.toString().orEmpty()
+                    apiBaseUrl = extraMap?.get("apiBaseUrl")?.toString().orEmpty()
                 } catch (_: Exception) {}
 
-                // 2. Fall back to SharedPreferences written by Flutter when the call FCM arrived
+                val prefs: SharedPreferences = context.getSharedPreferences(
+                    "FlutterSharedPreferences", Context.MODE_PRIVATE
+                )
                 if (callerId.isBlank()) {
-                    val prefs: SharedPreferences = context.getSharedPreferences(
-                        "FlutterSharedPreferences", Context.MODE_PRIVATE
-                    )
-                    callerId = prefs.getString("flutter.pending_call_caller_id", null) ?: ""
+                    callerId = prefs.getString("flutter.pending_call_caller_id", null).orEmpty()
                 }
+                if (callRecordId.isBlank()) {
+                    callRecordId =
+                        prefs.getString("flutter.pending_call_record_id", null).orEmpty()
+                }
+                val declinerId = prefs.getString("flutter.user_id", null).orEmpty()
 
-                if (callerId.isBlank()) {
-                    Log.w(TAG, "📵 sendDeclineToBackend: callerId not found")
+                if (callerId.isBlank() && callRecordId.isBlank()) {
+                    Log.w(TAG, "📵 sendDeclineToBackend: callerId/callRecordId not found")
                     return@thread
                 }
 
-                // 3. Resolve base URL
-                val baseUrl = try {
-                    val prefs: SharedPreferences = context.getSharedPreferences(
-                        "FlutterSharedPreferences", Context.MODE_PRIVATE
-                    )
-                    prefs.getString("flutter.api_base_url", null)
+                val baseUrl = apiBaseUrl.takeIf { it.isNotBlank() }
+                    ?: prefs.getString("flutter.api_base_url", null)
                         ?.takeIf { it.isNotBlank() }
-                        ?: "https://mcbackendapp-199324116788.europe-west8.run.app/api"
-                } catch (_: Exception) {
-                    "https://mcbackendapp-199324116788.europe-west8.run.app/api"
-                }
+                    ?: "https://mcbackendapp-199324116788.europe-west8.run.app/api"
 
-                // 4. Send HTTP POST with retry
-                Log.i(TAG, "📵 Declining callerId=$callerId to $baseUrl")
+                Log.i(
+                    TAG,
+                    "📵 Declining callerId=$callerId callRecordId=$callRecordId to $baseUrl",
+                )
                 repeat(2) { attempt ->
                     try {
                         val url = URL("$baseUrl/call-history/decline")
@@ -418,11 +420,21 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                         conn.doOutput = true
                         conn.connectTimeout = 8000
                         conn.readTimeout = 8000
-                        val json =
-                            if (noAnswer) """{"callerId":"$callerId","noAnswer":true}"""
-                            else """{"callerId":"$callerId"}"""
+                        val body = buildString {
+                            append("{\"callerId\":\"$callerId\"")
+                            if (declinerId.isNotBlank()) {
+                                append(",\"declinerId\":\"$declinerId\"")
+                            }
+                            if (callRecordId.isNotBlank()) {
+                                append(",\"callRecordId\":\"$callRecordId\"")
+                            }
+                            if (noAnswer) {
+                                append(",\"noAnswer\":true")
+                            }
+                            append("}")
+                        }
                         OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                            it.write(json)
+                            it.write(body)
                         }
                         val code = conn.responseCode
                         conn.disconnect()
@@ -436,7 +448,7 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 Log.e(TAG, "📵 sendDeclineToBackend error: ${e.message}")
             } finally {
-                pendingResult.finish() // Release the BroadcastReceiver
+                pendingResult.finish()
             }
         }
     }

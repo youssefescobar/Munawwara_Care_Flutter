@@ -21,6 +21,7 @@ import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
+import '../../calling/screens/incoming_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
 import '../../notifications/providers/notification_provider.dart';
@@ -210,10 +211,18 @@ class _ModeratorDashboardScreenState
         // Check if there's a pending call accepted from native call screen.
         // Must run AFTER the socket handshake so the call-answer emit goes through.
         if (SocketService.isConnected) {
+          unawaited(
+            ref.read(callProvider.notifier).reconcileCallStateAfterProcessDeath(),
+          );
           ref.read(callProvider.notifier).checkPendingAcceptedCall();
           ref.read(callProvider.notifier).checkPendingDeclinedCall();
         } else {
           void checkOnce() {
+            unawaited(
+              ref
+                  .read(callProvider.notifier)
+                  .reconcileCallStateAfterProcessDeath(),
+            );
             ref.read(callProvider.notifier).checkPendingAcceptedCall();
             ref.read(callProvider.notifier).checkPendingDeclinedCall();
             SocketService.offConnected(checkOnce);
@@ -456,6 +465,15 @@ class _ModeratorDashboardScreenState
     // Fallback: if an incoming call was accepted and we're connected,
     // navigate to VoiceCallScreen from here.
     ref.listen(callProvider, (prev, next) {
+      if (next.status == CallStatus.ringing &&
+          prev?.status != CallStatus.ringing &&
+          mounted &&
+          !isNavigatingToCall &&
+          !VoiceCallScreen.isActive) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
+        );
+      }
       if (next.status == CallStatus.connected &&
           prev?.status == CallStatus.ringing &&
           mounted &&

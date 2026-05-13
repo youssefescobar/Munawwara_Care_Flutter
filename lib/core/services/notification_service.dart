@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -94,23 +95,38 @@ Future<void> _speakWithTts(String text) async {
 /// No Riverpod, no dotenv — uses SharedPreferences for URL, falls back
 /// to the hardcoded production URL.
 @pragma('vm:entry-point')
-Future<void> _sendDeclineHttp(String callerId) async {
-  if (callerId.isEmpty) return;
+Future<void> _sendDeclineHttp(
+  String callerId, {
+  bool noAnswer = false,
+}) async {
   const fallbackUrl =
       'https://mcbackendapp-199324116788.europe-west8.run.app/api';
   try {
     String baseUrl = fallbackUrl;
+    String declinerId = '';
+    String callRecordId = '';
     try {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('api_base_url');
       if (cached != null && cached.isNotEmpty) baseUrl = cached;
+      if (callerId.isEmpty) {
+        callerId = prefs.getString('pending_call_caller_id') ?? '';
+      }
+      declinerId = prefs.getString('user_id') ?? '';
+      callRecordId = prefs.getString('pending_call_record_id') ?? '';
     } catch (_) {}
-    // Use dart:io HttpClient — avoids importing Dio in the bg isolate
+    if (callerId.isEmpty && callRecordId.isEmpty) return;
     final uri = Uri.parse('$baseUrl/call-history/decline');
     final client = HttpClient();
+    final body = <String, dynamic>{
+      'callerId': callerId,
+      if (declinerId.isNotEmpty) 'declinerId': declinerId,
+      if (callRecordId.isNotEmpty) 'callRecordId': callRecordId,
+      if (noAnswer) 'noAnswer': true,
+    };
     final req = await client.postUrl(uri)
       ..headers.set('Content-Type', 'application/json')
-      ..write('{"callerId":"$callerId"}');
+      ..write(jsonEncode(body));
     final resp = await req.close();
     await resp.drain<void>();
     AppLogger.i('❌ [BG] HTTP decline sent for $callerId → ${resp.statusCode}');
@@ -146,12 +162,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   AppLogger.i('   Data: ${message.data}');
 
   // ── Incoming call → show native call screen (like WhatsApp) ─────────────
-  final dataTypeEarly = message.data['type']?.toString() ?? '';
+  final callControlType = CallKitService.fcmCallControlType(message.data);
   final handled = await CallKitService.handleFcmMessage(message);
   if (handled) {
-    // Dismissing a call must not block this isolate on the CallKit listener —
-    // that path is only for `incoming_call` ringing.
-    if (dataTypeEarly == 'call_cancel') {
+    if (callControlType == 'call_cancel' ||
+        callControlType == 'call_declined') {
       return;
     }
     // ── CRITICAL: Keep this isolate alive while the call is ringing ─────────
@@ -174,6 +189,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           (eventName.contains('start') && eventName.contains('call'));
       if (isDecline) {
         String callerId = '';
+        var noAnswer = eventName.contains('timeout');
         try {
           final body = event.body;
           if (body is Map) {
@@ -188,7 +204,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           } catch (_) {}
         }
         AppLogger.w('❌ [BG isolate] Decline — callerId=$callerId');
-        await _sendDeclineHttp(callerId);
+        await _sendDeclineHttp(callerId, noAnswer: noAnswer);
         try {
           await CallKitService.instance.endCurrentCall();
         } catch (e) {

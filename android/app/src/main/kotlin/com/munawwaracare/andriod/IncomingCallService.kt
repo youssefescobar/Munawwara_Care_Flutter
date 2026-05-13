@@ -51,6 +51,8 @@ class IncomingCallService : Service() {
 
         private const val PREFS_NAME = "FlutterSharedPreferences"
         private const val KEY_API_BASE_URL = "flutter.api_base_url"
+        private const val KEY_DECLINER_ID = "flutter.user_id"
+        private const val KEY_CALL_RECORD_ID = "flutter.pending_call_record_id"
         private const val FALLBACK_URL =
             "https://mcbackendapp-199324116788.europe-west8.run.app/api"
     }
@@ -60,6 +62,7 @@ class IncomingCallService : Service() {
     private var callControlScope: CallControlScope? = null
     private var currentCallerId: String? = null
     private var callJob: Job? = null
+    private var callWasAnswered = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -75,6 +78,7 @@ class IncomingCallService : Service() {
         when (action) {
             ACTION_INCOMING -> handleIncoming(intent)
             ACTION_DECLINE -> handleDecline(
+                intent,
                 intent?.getBooleanExtra("noAnswer", false) == true,
             )
             ACTION_ACCEPT -> handleAccept()
@@ -89,6 +93,7 @@ class IncomingCallService : Service() {
         callJob?.cancel()
         callScope?.cancel()
         callControlScope = null
+        callWasAnswered = false
 
         val callerId = intent.getStringExtra(EXTRA_CALLER_ID) ?: ""
         val callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "Unknown"
@@ -138,17 +143,21 @@ class IncomingCallService : Service() {
                     attributes,
                     onAnswer = { callType ->
                         Log.i(TAG, "📞 Core-Telecom onAnswer")
+                        callWasAnswered = true
                     },
                     onDisconnect = { disconnectCause ->
                         Log.i(TAG, "📞 Core-Telecom onDisconnect: ${disconnectCause.reason}")
                         val cid = currentCallerId
-                        if (!cid.isNullOrBlank()) {
+                        if (!cid.isNullOrBlank() && !callWasAnswered) {
                             sendDeclineHttp(cid, noAnswer = false)
+                        } else if (callWasAnswered) {
+                            Log.i(TAG, "📞 Skip decline HTTP — call was already answered")
                         }
                         resetCallState()
                     },
                     onSetActive = {
                         Log.i(TAG, "📞 Core-Telecom onSetActive")
+                        callWasAnswered = true
                     },
                     onSetInactive = {
                         Log.i(TAG, "📞 Core-Telecom onSetInactive")
@@ -168,18 +177,21 @@ class IncomingCallService : Service() {
         }
     }
 
-    private fun handleDecline(noAnswer: Boolean = false) {
+    private fun handleDecline(intent: Intent?, noAnswer: Boolean = false) {
         Log.i(TAG, "📞 handleDecline called noAnswer=$noAnswer")
-        val cid = currentCallerId
+        var cid = currentCallerId
+        if (cid.isNullOrBlank()) {
+            cid = intent?.getStringExtra(EXTRA_CALLER_ID)
+        }
+        if (cid.isNullOrBlank()) {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            cid = prefs.getString("flutter.pending_call_caller_id", null)
+        }
         if (!cid.isNullOrBlank()) {
-            // Use the call's scope if available, otherwise create a temporary one
             val scope = callScope ?: CoroutineScope(Dispatchers.IO)
-
-            // 1. HTTP POST to backend — this is the critical part
             scope.launch {
                 sendDeclineHttp(cid, noAnswer = noAnswer)
             }
-            // 2. Disconnect from Core-Telecom
             scope.launch {
                 try {
                     callControlScope?.disconnect(DisconnectCause(DisconnectCause.REJECTED))
@@ -187,8 +199,18 @@ class IncomingCallService : Service() {
                     Log.w(TAG, "📞 Core-Telecom disconnect failed: ${e.message}")
                 }
             }
+        } else {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val callRecordId = prefs.getString(KEY_CALL_RECORD_ID, null).orEmpty()
+            if (callRecordId.isNotBlank()) {
+                val scope = callScope ?: CoroutineScope(Dispatchers.IO)
+                scope.launch {
+                    sendDeclineHttp("", noAnswer = noAnswer)
+                }
+            } else {
+                Log.w(TAG, "📞 handleDecline skipped — no callerId/callRecordId")
+            }
         }
-        // Give HTTP time to complete, then reset
         val scope = callScope ?: CoroutineScope(Dispatchers.IO)
         scope.launch {
             delay(3000)
@@ -198,6 +220,7 @@ class IncomingCallService : Service() {
 
     private fun handleAccept() {
         Log.i(TAG, "📞 handleAccept called")
+        callWasAnswered = true
         val scope = callScope ?: return
         scope.launch {
             try {
@@ -244,6 +267,7 @@ class IncomingCallService : Service() {
         callJob = null
         callControlScope = null
         currentCallerId = null
+        callWasAnswered = false
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (e: Exception) {
@@ -253,7 +277,17 @@ class IncomingCallService : Service() {
 
     private fun sendDeclineHttp(callerId: String, noAnswer: Boolean = false) {
         val baseUrl = resolveBaseUrl()
-        Log.i(TAG, "📞 Sending decline HTTP for callerId=$callerId noAnswer=$noAnswer to $baseUrl")
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val declinerId = prefs.getString(KEY_DECLINER_ID, null).orEmpty()
+        val callRecordId = prefs.getString(KEY_CALL_RECORD_ID, null).orEmpty()
+        if (callerId.isBlank() && callRecordId.isBlank()) {
+            Log.w(TAG, "📞 Decline HTTP skipped — no callerId/callRecordId")
+            return
+        }
+        Log.i(
+            TAG,
+            "📞 Sending decline HTTP for callerId=$callerId callRecordId=$callRecordId noAnswer=$noAnswer to $baseUrl",
+        )
 
         repeat(3) { attempt ->
             try {
@@ -265,9 +299,19 @@ class IncomingCallService : Service() {
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
 
-                val body =
-                    if (noAnswer) """{"callerId":"$callerId","noAnswer":true}"""
-                    else """{"callerId":"$callerId"}"""
+                val body = buildString {
+                    append("{\"callerId\":\"$callerId\"")
+                    if (declinerId.isNotBlank()) {
+                        append(",\"declinerId\":\"$declinerId\"")
+                    }
+                    if (callRecordId.isNotBlank()) {
+                        append(",\"callRecordId\":\"$callRecordId\"")
+                    }
+                    if (noAnswer) {
+                        append(",\"noAnswer\":true")
+                    }
+                    append("}")
+                }
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body) }
 
                 val code = conn.responseCode

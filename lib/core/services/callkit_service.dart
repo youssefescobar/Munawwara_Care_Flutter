@@ -8,6 +8,12 @@ import '../utils/app_logger.dart';
 
 /// Shown on CallKit / prefs when a pilgrim receives a moderator call (native asset path).
 const String kCallKitSupportAvatarAsset = 'assets/static/app_icon.png';
+const String kDefaultSupportDisplayName = 'Munawwara Care';
+const String kSupportDisplayNamePrefsKey = 'support_display_name';
+const String kPendingCallRecordIdKey = 'pending_call_record_id';
+const String kNativeApiBaseUrlPrefsKey = 'api_base_url';
+const String kNativeApiBaseUrlFallback =
+    'https://mcbackendapp-199324116788.europe-west8.run.app/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CallKitService — Shows native incoming call screen (like WhatsApp)
@@ -26,7 +32,35 @@ class CallKitService {
   static const _pendingChannelNameKey = 'pending_call_channel_name';
   static const _pendingCreatedAtMsKey = 'pending_call_created_at_ms';
   static const _pendingCallUuidKey = 'pending_call_uuid';
+  static const _pendingCallRecordIdKey = kPendingCallRecordIdKey;
   static const _prefsUserRoleKey = 'user_role';
+  static const _pendingOutgoingStopReasonKey = 'pending_outgoing_stop_reason';
+
+  /// FCM may send call control under [type] or [notification_type].
+  static String? fcmCallControlType(Map<String, dynamic> data) {
+    final type = data['type']?.toString() ?? '';
+    if (type == 'call_declined' || type == 'call_cancel') return type;
+    final notificationType = data['notification_type']?.toString() ?? '';
+    if (notificationType == 'call_declined' ||
+        notificationType == 'call_cancel') {
+      return notificationType;
+    }
+    return null;
+  }
+
+  static Future<void> persistPendingOutgoingStop(String reason) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingOutgoingStopReasonKey, reason);
+  }
+
+  static Future<String?> consumePendingOutgoingStop() async {
+    final prefs = await SharedPreferences.getInstance();
+    final reason = prefs.getString(_pendingOutgoingStopReasonKey);
+    if (reason != null && reason.isNotEmpty) {
+      await prefs.remove(_pendingOutgoingStopReasonKey);
+    }
+    return reason;
+  }
 
   // Track the current call UUID so we can end it later
   String? _currentCallId;
@@ -53,6 +87,8 @@ class CallKitService {
     required String callerName,
     required String channelName,
     String? callerRole,
+    String? callRecordId,
+    String? displayName,
   }) async {
     // ── Guard 1: Dart-side flag (with stale-state recovery) ─────────────
     if (_currentCallId != null) {
@@ -106,15 +142,19 @@ class CallKitService {
     final role = prefs.getString(_prefsUserRoleKey) ?? '';
     final useSupportBranding = role == 'pilgrim';
     final nativeCallerLine = useSupportBranding
-        ? _supportDisplayName()
-        : callerName;
+        ? await _resolveSupportDisplayName(displayName)
+        : (displayName?.trim().isNotEmpty == true ? displayName!.trim() : callerName);
     final avatarAsset = useSupportBranding ? kCallKitSupportAvatarAsset : null;
+    final apiBaseUrl = prefs.getString(kNativeApiBaseUrlPrefsKey) ??
+        kNativeApiBaseUrlFallback;
 
     await _savePendingIncomingCall(
       callerId: callerId,
       callerName: nativeCallerLine,
       callerRole: callerRole ?? '',
       channelName: channelName,
+      callRecordId: callRecordId,
+      apiBaseUrl: apiBaseUrl,
     );
 
     final androidParams = AndroidParams(
@@ -153,6 +193,9 @@ class CallKitService {
         'peerCallerName': callerName,
         'callerRole': callerRole ?? '',
         'channelName': channelName,
+        'apiBaseUrl': apiBaseUrl,
+        if (callRecordId != null && callRecordId.isNotEmpty)
+          'callRecordId': callRecordId,
       },
       headers: <String, dynamic>{},
       android: androidParams,
@@ -170,6 +213,37 @@ class CallKitService {
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
     AppLogger.i('📞 Native incoming call screen shown ($nativeCallerLine)');
+  }
+
+  static Future<void> cacheSupportDisplayNameFromBundle() async {
+    final label = _supportDisplayName();
+    if (label == 'call_support_display_name') return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(kSupportDisplayNamePrefsKey, label);
+    } catch (_) {}
+  }
+
+  static Future<String> _resolveSupportDisplayName(String? fcmDisplayName) async {
+    final fromFcm = fcmDisplayName?.trim();
+    if (fromFcm != null && fromFcm.isNotEmpty) return fromFcm;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(kSupportDisplayNamePrefsKey);
+      if (cached != null && cached.isNotEmpty) return cached;
+    } catch (_) {}
+
+    final translated = _supportDisplayName();
+    if (translated != 'call_support_display_name') return translated;
+    return kDefaultSupportDisplayName;
+  }
+
+  static bool isIncomingCallFcm(Map<String, dynamic> data) {
+    final type = data['type']?.toString() ?? '';
+    if (type == 'incoming_call') return true;
+    final notificationType = data['notification_type']?.toString() ?? '';
+    return notificationType == 'incoming_call';
   }
 
   static String _supportDisplayName() {
@@ -300,12 +374,23 @@ class CallKitService {
     required String callerName,
     required String callerRole,
     required String channelName,
+    String? callRecordId,
+    String? apiBaseUrl,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingCallerIdKey, callerId);
     await prefs.setString(_pendingCallerNameKey, callerName);
     await prefs.setString(_pendingCallerRoleKey, callerRole);
     await prefs.setString(_pendingChannelNameKey, channelName);
+    final resolvedApiBaseUrl = apiBaseUrl?.trim();
+    if (resolvedApiBaseUrl != null && resolvedApiBaseUrl.isNotEmpty) {
+      await prefs.setString(kNativeApiBaseUrlPrefsKey, resolvedApiBaseUrl);
+    }
+    if (callRecordId != null && callRecordId.isNotEmpty) {
+      await prefs.setString(_pendingCallRecordIdKey, callRecordId);
+    } else {
+      await prefs.remove(_pendingCallRecordIdKey);
+    }
     await prefs.setInt(
       _pendingCreatedAtMsKey,
       DateTime.now().millisecondsSinceEpoch,
@@ -332,6 +417,7 @@ class CallKitService {
       'callerName': callerName,
       'callerRole': callerRole,
       'channelName': channelName,
+      'callRecordId': prefs.getString(_pendingCallRecordIdKey) ?? '',
       'createdAtMs': (prefs.getInt(_pendingCreatedAtMsKey) ?? 0).toString(),
     };
   }
@@ -361,15 +447,16 @@ class CallKitService {
     await prefs.remove(_pendingChannelNameKey);
     await prefs.remove(_pendingCreatedAtMsKey);
     await prefs.remove(_pendingCallUuidKey);
+    await prefs.remove(_pendingCallRecordIdKey);
   }
 
   /// Process an FCM message and show incoming call if it's a call notification.
   /// Returns true if it was a call message and was handled.
   static Future<bool> handleFcmMessage(RemoteMessage message) async {
     final data = message.data;
-    final type = data['type'];
+    final controlType = fcmCallControlType(data);
 
-    if (type == 'call_cancel') {
+    if (controlType == 'call_cancel') {
       AppLogger.i('📞 FCM call_cancel detected — dismissing native call UI');
       try {
         await CallKitService.instance.endCurrentCall();
@@ -383,23 +470,45 @@ class CallKitService {
       return true;
     }
 
-    if (type != 'incoming_call') return false;
+    if (controlType == 'call_declined') {
+      AppLogger.i('📞 FCM call_declined detected — stopping outgoing ring');
+      await persistPendingOutgoingStop('declined');
+      try {
+        await CallKitService.instance.endCurrentCall();
+      } catch (e) {
+        AppLogger.e('📞 call_declined endCurrentCall failed: $e');
+      }
+      return true;
+    }
+
+    final type = data['type'];
+    if (!isIncomingCallFcm(data)) return false;
 
     final callerId = data['callerId'] ?? '';
     final callerName = data['callerName'] ?? data['title'] ?? 'Unknown';
     final callerRole = data['callerRole'] ?? '';
     final channelName = data['channelName'] ?? '';
+    final callRecordId = data['callRecordId']?.toString() ?? '';
+    final displayName = data['displayName']?.toString() ??
+        data['callerDisplayName']?.toString();
 
     AppLogger.i('📞 FCM incoming_call detected — showing native call screen');
     AppLogger.i('   Caller: $callerName ($callerId)');
     AppLogger.i('   Channel: $channelName');
 
-    await CallKitService.instance.showIncomingCall(
-      callerId: callerId,
-      callerName: callerName,
-      channelName: channelName,
-      callerRole: callerRole,
-    );
+    try {
+      await CallKitService.instance.showIncomingCall(
+        callerId: callerId,
+        callerName: callerName,
+        channelName: channelName,
+        callerRole: callerRole,
+        callRecordId: callRecordId.isNotEmpty ? callRecordId : null,
+        displayName: displayName,
+      );
+    } catch (e, st) {
+      AppLogger.e('📞 FCM incoming_call showIncomingCall failed: $e\n$st');
+      return false;
+    }
 
     return true;
   }
