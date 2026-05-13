@@ -283,19 +283,43 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
     );
     if (picked != null) {
       final current = _meetpointTime ?? DateTime.now();
-      setState(() => _meetpointTime = DateTime(
-            current.year,
-            current.month,
-            current.day,
-            picked.hour,
-            picked.minute,
-          ));
+      final candidate = DateTime(
+        current.year,
+        current.month,
+        current.day,
+        picked.hour,
+        picked.minute,
+      );
+      if (candidate.isBefore(DateTime.now())) {
+        if (mounted) {
+          StandardSnackBar.showError(
+            context,
+            'Please select a future time.',
+          );
+        }
+        return;
+      }
+      setState(() {
+        _meetpointTime = candidate;
+        // Auto-deselect reminder if now disabled by the new time
+        final minutesUntil = _meetpointTime!.difference(DateTime.now()).inMinutes;
+        if (_reminderMinutes > 0 && _reminderMinutes >= minutesUntil) {
+          _reminderMinutes = 0;
+        }
+      });
     }
   }
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty || _pickedPoint == null) return;
+
+    // Validate meetpoint time is not in the past
+    if (widget.areaType == 'meetpoint' && _meetpointTime != null && _meetpointTime!.isBefore(DateTime.now())) {
+      StandardSnackBar.showError(context, 'Please select a future date and time.');
+      return;
+    }
+
     setState(() => _submitting = true);
     
     bool success;
@@ -1164,27 +1188,37 @@ class _AreaPickerScreenState extends ConsumerState<AreaPickerScreen> {
   }
 
   Widget _buildReminderOptions(bool isDark, Color accentColor) {
+    // Calculate minutes until meetpoint to decide which reminder chips are valid.
+    final minutesUntil = _meetpointTime != null
+        ? _meetpointTime!.difference(DateTime.now()).inMinutes
+        : null;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [0, 5, 15, 30, 60].map((mins) {
           final isSelected = _reminderMinutes == mins;
+          // Disable the chip if the meetpoint is sooner than this reminder interval.
+          final isDisabled = mins > 0 && minutesUntil != null && minutesUntil <= mins;
           return Padding(
             padding: EdgeInsets.only(right: 8.w),
-            child: ChoiceChip(
-              label: Text(
-                mins == 0 ? 'area_reminder_none'.tr() : '${mins}m',
-                style: TextStyle(fontFamily: 'Lexend', fontSize: 12.sp, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400, color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textDark)),
+            child: Opacity(
+              opacity: isDisabled ? 0.38 : 1.0,
+              child: ChoiceChip(
+                label: Text(
+                  mins == 0 ? 'area_reminder_none'.tr() : '${mins}m',
+                  style: TextStyle(fontFamily: 'Lexend', fontSize: 12.sp, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400, color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textDark)),
+                ),
+                selected: isSelected,
+                onSelected: isDisabled ? null : (val) {
+                  if (val) setState(() => _reminderMinutes = mins);
+                },
+                selectedColor: accentColor,
+                backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+                side: BorderSide.none,
+                showCheckmark: false,
               ),
-              selected: isSelected,
-              onSelected: (val) {
-                if (val) setState(() => _reminderMinutes = mins);
-              },
-              selectedColor: accentColor,
-              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-              side: BorderSide.none,
-              showCheckmark: false,
             ),
           );
         }).toList(),

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
+import '../../../core/utils/app_logger.dart';
 import '../models/suggested_area_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,13 +186,21 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   Future<bool> deleteArea(String groupId, String areaId) async {
+    final area = state.areas.where((a) => a.id == areaId).firstOrNull;
+    final wasMeetpoint = area?.isMeetpoint ?? false;
+
     try {
       await ApiService.dio.delete('/groups/$groupId/suggested-areas/$areaId');
       state = state.copyWith(
         areas: state.areas.where((a) => a.id != areaId).toList(),
       );
+
+      if (wasMeetpoint) {
+        AppLogger.i('[SuggestedAreaProvider] Meetpoint deleted — backend FCM push will notify pilgrims.');
+      }
       return true;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.e('[SuggestedAreaProvider] deleteArea failed: $e');
       return false;
     }
   }

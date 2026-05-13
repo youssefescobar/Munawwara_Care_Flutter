@@ -25,6 +25,8 @@ import 'features/calling/calling_scope.dart';
 import 'features/calling/native_call_coordinator.dart';
 import 'core/utils/app_logger.dart';
 import 'core/widgets/reminder_popup.dart';
+import 'core/services/incoming_chat_sfx.dart';
+import 'core/theme/app_colors.dart';
 
 // Global FCM token
 String? _globalFcmToken;
@@ -106,6 +108,7 @@ void main() async {
               body: data['body']?.toString() ?? '',
               scheduledTime: schedTime,
             );
+            IncomingChatSfx.playNormalPop();
           } else {
             AppLogger.w('⚠️ No navigator context — cannot show reminder popup');
           }
@@ -193,6 +196,7 @@ void main() async {
                 );
               }
               ReminderPopup.show(ctx, body: text, scheduledTime: schedTime);
+              IncomingChatSfx.playNormalPop();
             } else {
               AppLogger.w(
                 '⚠️ No navigator context — cannot show reminder popup',
@@ -228,6 +232,28 @@ void main() async {
               lang: msg.data['lang']?.toString() ?? 'en',
               messageKey: messageKey.isEmpty ? null : messageKey,
             );
+          }
+          return;
+        }
+
+        // Meetpoint deleted: show in-app alert and suppress tray notification
+        if (notifType == 'meetpoint_deleted') {
+          final body =
+              msg.data['content']?.toString() ??
+              msg.data['body']?.toString() ??
+              '';
+          if (body.isNotEmpty) {
+            final ctx = AppRouter.navigatorKey.currentContext;
+            if (ctx != null && ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(body),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 6),
+                ),
+              );
+            }
           }
           return;
         }

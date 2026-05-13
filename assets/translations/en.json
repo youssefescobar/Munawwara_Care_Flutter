@@ -758,6 +758,7 @@
   "area_date_label": "Date",
   "area_time_label": "Time",
   "area_deleted_success": "Location deleted successfully",
+  "msg_meetpoint_deleted": "Meeting Point has been removed by the moderator.",
   "my_location": "My Location",
   "filter_sort_title": "Sort Groups",
   "sort_pilgrim_count": "Pilgrim Count",
