@@ -198,8 +198,6 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen>
       return;
     }
 
-    setState(() => _isCreating = true);
-
     final sched = DateTime(
       _startDate.year,
       _startDate.month,
@@ -207,6 +205,13 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen>
       _startTime.hour,
       _startTime.minute,
     );
+    final minSched = DateTime.now().add(const Duration(minutes: 1));
+    if (!sched.isAfter(minSched)) {
+      StandardSnackBar.showWarning(context, 'reminder_date_future'.tr());
+      return;
+    }
+
+    setState(() => _isCreating = true);
 
     int intervalMin = _isCustomInterval ? 15 : (_selectedIntervalMin ?? 15);
     int count = _repeatCount;
@@ -248,7 +253,11 @@ class _SystemRemindersScreenState extends ConsumerState<SystemRemindersScreen>
         _audienceTabController.index = 0;
       }
     } else {
-      StandardSnackBar.showError(context, 'reminder_create_partial_fail'.tr());
+      final err = ref.read(reminderProvider).error;
+      StandardSnackBar.showError(
+        context,
+        err ?? 'reminder_create_partial_fail'.tr(),
+      );
     }
   }
 

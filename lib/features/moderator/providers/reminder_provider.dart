@@ -78,6 +78,19 @@ class ReminderNotifier extends Notifier<ReminderState> {
   }
 
   // ── Create reminder ───────────────────────────────────────────────────────
+  String? _messageFromDio(DioException e) {
+    final data = e.response?.data;
+    if (data is! Map) return null;
+    final errors = data['errors'];
+    if (errors is Map && errors.isNotEmpty) {
+      final first = errors.values.first;
+      if (first != null) return first.toString();
+    }
+    final message = data['message'];
+    if (message is String && message.isNotEmpty) return message;
+    return null;
+  }
+
   Future<bool> create({
     required List<String> groupIds,
     required String targetType,
@@ -97,7 +110,7 @@ class ReminderNotifier extends Notifier<ReminderState> {
         data: {
           'group_ids': groupIds,
           'target_type': targetType,
-          'pilgrim_id': pilgrimId,
+          if (pilgrimId != null) 'pilgrim_id': pilgrimId,
           'text': text,
           'scheduled_at': scheduledAt.toUtc().toIso8601String(),
           'repeat_count': repeatCount,
@@ -109,9 +122,19 @@ class ReminderNotifier extends Notifier<ReminderState> {
       final created = ReminderModel.fromJson(
         response.data['reminder'] as Map<String, dynamic>,
       );
-      state = state.copyWith(reminders: [created, ...state.reminders]);
+      state = state.copyWith(reminders: [created, ...state.reminders], clearError: true);
       AppLogger.i('[ReminderProvider] Created reminder ${created.id}');
       return true;
+    } on DioException catch (e) {
+      final serverMsg = _messageFromDio(e);
+      AppLogger.e(
+        '[ReminderProvider] create error: ${serverMsg ?? e.message} '
+        '(status ${e.response?.statusCode})',
+      );
+      state = state.copyWith(
+        error: serverMsg ?? 'Failed to create reminder',
+      );
+      return false;
     } catch (e) {
       AppLogger.e('[ReminderProvider] create error: $e');
       state = state.copyWith(error: 'Failed to create reminder');
