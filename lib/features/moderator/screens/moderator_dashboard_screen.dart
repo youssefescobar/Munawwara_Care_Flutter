@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/services/location_permission_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/services/socket_service.dart';
@@ -71,6 +72,9 @@ class _ModeratorDashboardScreenState
     // (e.g. GroupManagementScreen) cleared our socket room memberships.
     _joinAllGroupRooms();
     unawaited(_globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value());
+    if (NotificationService.hasPendingSosAlert) {
+      NotificationService.showPendingSosAlertIfAny();
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -206,6 +210,8 @@ class _ModeratorDashboardScreenState
     await ref.read(moderatorSosEngagementProvider.notifier).refresh();
     if (!mounted) return;
     _connectModeratorRealtime();
+    if (!mounted) return;
+    NotificationService.markModeratorDashboardReady();
   }
 
   void _connectModeratorRealtime() {
@@ -408,6 +414,7 @@ class _ModeratorDashboardScreenState
 
   @override
   void dispose() {
+    NotificationService.markModeratorDashboardNotReady();
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _alertTts.stop();

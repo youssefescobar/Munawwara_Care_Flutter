@@ -701,17 +701,7 @@ class NotificationService {
     }
 
     if (notificationType == 'sos_alert') {
-      final nav = AppRouter.navigatorKey.currentState;
-      final ctx = AppRouter.navigatorKey.currentContext;
-      if (nav == null || ctx == null) {
-        AppLogger.w('📱 Navigator not ready — storing pending SOS deep-link');
-        _pendingNotificationData = Map<String, dynamic>.from(data);
-        _pendingNotificationData!['notification_type'] = 'sos_alert';
-        return;
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        SosAlertCoordinator.showOnceFromMap(data);
-      });
+      queuePendingSosAlert(data);
       return;
     }
 
@@ -729,6 +719,50 @@ class NotificationService {
 
   /// Pending notification data when navigator isn't ready yet (cold start).
   static Map<String, dynamic>? _pendingNotificationData;
+
+  /// SOS from notification tap — shown only after moderator dashboard load.
+  static Map<String, dynamic>? _pendingSosAlertData;
+  static bool _moderatorDashboardReady = false;
+
+  static bool get hasPendingSosAlert => _pendingSosAlertData != null;
+
+  /// Queue SOS until [markModeratorDashboardReady] / dashboard bootstrap completes.
+  static void queuePendingSosAlert(Map<String, dynamic> data) {
+    _pendingSosAlertData = Map<String, dynamic>.from(data);
+    _pendingSosAlertData!['notification_type'] = 'sos_alert';
+    AppLogger.w(
+      '[NotificationService] SOS alert queued '
+      '(dashboardReady=$_moderatorDashboardReady)',
+    );
+    _tryShowPendingSos();
+  }
+
+  static void markModeratorDashboardReady() {
+    _moderatorDashboardReady = true;
+    AppLogger.w('[NotificationService] Moderator dashboard ready');
+    _tryShowPendingSos();
+  }
+
+  static void markModeratorDashboardNotReady() {
+    _moderatorDashboardReady = false;
+  }
+
+  /// Try to display a queued SOS dialog (no-op until dashboard is ready).
+  static void showPendingSosAlertIfAny() {
+    _tryShowPendingSos();
+  }
+
+  static void _tryShowPendingSos() {
+    if (!_moderatorDashboardReady || _pendingSosAlertData == null) {
+      return;
+    }
+    final data = _pendingSosAlertData!;
+    _pendingSosAlertData = null;
+    AppLogger.w('[NotificationService] Showing queued SOS alert dialog');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(SosAlertCoordinator.showOnceFromMap(data));
+    });
+  }
 
   /// Consume and clear any pending notification data.
   static Map<String, dynamic>? consumePendingNotificationData() {

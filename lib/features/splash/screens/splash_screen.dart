@@ -63,14 +63,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         AppLogger.i('SplashScreen nav to authenticated $route');
         context.go(route);
 
-        // Check for pending notification deep-link (cold-start scenario)
+        // Pending deep-link (cold-start). SOS waits for dashboard load — not here.
         final pending = NotificationService.consumePendingNotificationData();
         if (pending != null && pending.isNotEmpty) {
-          AppLogger.i('SplashScreen: processing pending notification deep-link');
-          // Small delay so the dashboard is mounted before we push the chat
-          Future.delayed(const Duration(milliseconds: 600), () {
-            NotificationService.navigateFromNotificationData(pending);
-          });
+          final type =
+              pending['notification_type']?.toString() ??
+              pending['type']?.toString() ??
+              '';
+          if (type == 'sos_alert') {
+            NotificationService.queuePendingSosAlert(pending);
+          } else {
+            AppLogger.i(
+              'SplashScreen: processing pending notification deep-link',
+            );
+            Future.delayed(const Duration(milliseconds: 600), () {
+              NotificationService.navigateFromNotificationData(pending);
+            });
+          }
         }
       }
     } else {
