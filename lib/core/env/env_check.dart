@@ -1,4 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+import '../services/api_service.dart';
 import '../utils/app_logger.dart';
 
 /// Verify required and optional environment variables and
@@ -26,5 +28,13 @@ Future<void> verifyEnv() async {
   if (missingOptional.isNotEmpty) {
     // Log a friendly warning to remind developers to fill optional integrations.
     AppLogger.w('Missing optional .env keys: ${missingOptional.join(', ')}');
+  }
+
+  final socketExplicit = dotenv.env['SOCKET_BASE_URL']?.trim();
+  if (socketExplicit == null || socketExplicit.isEmpty) {
+    AppLogger.w(
+      '[Env] SOCKET_BASE_URL unset — using socketOrigin=${ApiService.socketOrigin} '
+      '(must support Socket.IO for call-offer signaling)',
+    );
   }
 }

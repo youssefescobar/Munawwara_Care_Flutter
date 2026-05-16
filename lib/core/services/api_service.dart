@@ -4,11 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/backend_config.dart';
 import 'app_data_cache.dart';
 
 class ApiService {
-  static const _prodBaseUrl =
-      'https://mcbackendapp-199324116788.europe-west8.run.app/api';
+  static const _prodBaseUrl = kDefaultProductionApiBaseUrl;
 
   // ─── Backend URL ─────────────────────────────────────────────────────────────
   // `API_BASE_URL` in .env (see comments there). Falls back to production.
@@ -193,7 +193,7 @@ class ApiService {
   /// Native decline/answer HTTP uses SharedPreferences, not Dart [dio].
   static Future<void> cacheNativeCallPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('api_base_url', baseUrl);
+    await prefs.setString(kNativeApiBaseUrlPrefsKey, baseUrl);
   }
 
   // ── Parse human-readable error from DioException response ────────────────────

@@ -53,8 +53,7 @@ class IncomingCallService : Service() {
         private const val KEY_API_BASE_URL = "flutter.api_base_url"
         private const val KEY_DECLINER_ID = "flutter.user_id"
         private const val KEY_CALL_RECORD_ID = "flutter.pending_call_record_id"
-        private const val FALLBACK_URL =
-            "https://mcbackendapp-199324116788.europe-west8.run.app/api"
+        private val FALLBACK_URL = BackendConfig.API_BASE_URL_FALLBACK
     }
 
     // Each call gets a fresh scope — never reuse a cancelled scope

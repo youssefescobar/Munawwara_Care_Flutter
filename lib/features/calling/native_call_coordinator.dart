@@ -6,6 +6,7 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/config/backend_config.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/callkit_service.dart';
 import '../../core/utils/app_logger.dart';
@@ -345,10 +346,8 @@ Future<void> _sendBackgroundDecline(
   bool noAnswer = false,
 }) async {
   if (callerId.isEmpty) return;
-  const fallbackUrl =
-      'https://mcbackendapp-199324116788.europe-west8.run.app/api';
   try {
-    String baseUrl = fallbackUrl;
+    String baseUrl = kDefaultProductionApiBaseUrl;
     String declinerId = '';
     String callRecordId = '';
     try {
@@ -373,7 +372,9 @@ Future<void> _sendBackgroundDecline(
       if (callRecordId.isNotEmpty) 'callRecordId': callRecordId,
       if (noAnswer) 'noAnswer': true,
     });
-    AppLogger.i('❌ Background HTTP decline sent to $callerId (url=$baseUrl)');
+    AppLogger.w(
+      '[NativeCall] Background HTTP decline sent to $callerId url=$baseUrl',
+    );
   } catch (e) {
     AppLogger.e('Failed to send background decline: $e');
   }

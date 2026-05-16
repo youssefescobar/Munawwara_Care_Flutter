@@ -23,8 +23,7 @@ class CallDeclineApplication : Application() {
         private const val TAG = "CallDecline"
         private const val TAG_ACTION = "NATIVE_CALL_ACTION"
         private const val FLUTTER_PREFS = "FlutterSharedPreferences"
-        private const val FALLBACK_BASE_URL =
-            "https://mcbackendapp-199324116788.europe-west8.run.app/api"
+        private val FALLBACK_BASE_URL = BackendConfig.API_BASE_URL_FALLBACK
     }
 
     private val nativeCallEventCallback = object : CallkitEventCallback {

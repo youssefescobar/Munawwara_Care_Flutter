@@ -405,7 +405,8 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                 val baseUrl = apiBaseUrl.takeIf { it.isNotBlank() }
                     ?: prefs.getString("flutter.api_base_url", null)
                         ?.takeIf { it.isNotBlank() }
-                    ?: "https://mcbackendapp-199324116788.europe-west8.run.app/api"
+                    // Sync with Flutter_Munawwara BackendConfig / .env API_BASE_URL
+                    ?: "https://mc-backend-44890250266.europe-west3.run.app/api"
 
                 Log.i(
                     TAG,

@@ -59,7 +59,9 @@ class SocketService {
         ? serverUrl.substring(0, serverUrl.length - 1) 
         : serverUrl;
 
-    AppLogger.d('[SocketService] Connecting to $cleanUrl as $userId ($role)');
+    AppLogger.w(
+      '[SocketService] Connecting to $cleanUrl as $userId ($role)',
+    );
 
     _socket = io.io(
       cleanUrl,
@@ -76,8 +78,9 @@ class SocketService {
     //    pending listeners so that off() in _apply never removes these). ──
 
     _socket!.onConnect((_) {
-      AppLogger.d(
-        '[SocketService] ✓ Connected (${_socket?.id}) – registering as $userId',
+      AppLogger.w(
+        '[SocketService] Connected socketId=${_socket?.id} url=$cleanUrl '
+        'userId=$userId role=$role',
       );
       _socket!.emit('register-user', {'userId': userId, 'role': role});
       // Fire external connect callbacks (iterate a copy so callbacks can
@@ -96,11 +99,11 @@ class SocketService {
     });
 
     _socket!.onConnectError((err) {
-      AppLogger.d('[SocketService] Connection error: $err');
+      AppLogger.w('[SocketService] Connection error ($cleanUrl): $err');
     });
 
     _socket!.onError((err) {
-      AppLogger.d('[SocketService] Socket error: $err');
+      AppLogger.w('[SocketService] Socket error ($cleanUrl): $err');
     });
 
     // Apply custom-event listeners that were registered before connect().

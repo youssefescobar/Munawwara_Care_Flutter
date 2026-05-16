@@ -6,6 +6,7 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../config/backend_config.dart';
 import '../utils/app_logger.dart';
 
 /// Shown on CallKit / prefs when a pilgrim receives a moderator call (native asset path).
@@ -15,9 +16,7 @@ const String kSupportDisplayNamePrefsKey = 'support_display_name';
 const String _kSupportDisplayNameTranslationKey = 'call_support_display_name';
 const String _kTranslationsAssetPath = 'assets/translations';
 const String kPendingCallRecordIdKey = 'pending_call_record_id';
-const String kNativeApiBaseUrlPrefsKey = 'api_base_url';
-const String kNativeApiBaseUrlFallback =
-    'https://mcbackendapp-199324116788.europe-west8.run.app/api';
+const String kNativeApiBaseUrlFallback = kDefaultProductionApiBaseUrl;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CallKitService — Shows native incoming call screen (like WhatsApp)

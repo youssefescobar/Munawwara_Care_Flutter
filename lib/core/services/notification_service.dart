@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../config/backend_config.dart';
 import 'callkit_service.dart';
 import 'speech_service.dart';
 import '../../core/utils/app_logger.dart';
@@ -102,10 +103,8 @@ Future<void> _sendDeclineHttp(
   String callerId, {
   bool noAnswer = false,
 }) async {
-  const fallbackUrl =
-      'https://mcbackendapp-199324116788.europe-west8.run.app/api';
   try {
-    String baseUrl = fallbackUrl;
+    String baseUrl = kDefaultProductionApiBaseUrl;
     String declinerId = '';
     String callRecordId = '';
     try {

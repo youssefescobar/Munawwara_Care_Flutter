@@ -10,10 +10,16 @@ class CallSignaling {
   static void emitWhenConnected(String event, Map<String, dynamic> payload) {
     if (SocketService.isConnected) {
       SocketService.emit(event, payload);
+      AppLogger.w(
+        '[CallSignaling] Emitted "$event" (connected) payload=$payload',
+      );
       return;
     }
 
-    AppLogger.w('[CallSignaling] Socket not connected, queueing "$event" emit');
+    AppLogger.w(
+      '[CallSignaling] Socket not connected, queueing "$event" '
+      'payload=$payload',
+    );
     void sendOnce() {
       SocketService.emit(event, payload);
       SocketService.offConnected(sendOnce);
