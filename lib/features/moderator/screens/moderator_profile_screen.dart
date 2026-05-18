@@ -288,7 +288,7 @@ class _ModeratorProfileScreenState
                       textPrimary: textPrimary,
                       textMuted: textMuted,
                       dividerColor: dividerColor,
-                      showModeratorDeletionNote: true,
+                      showAccountDeletion: true,
                     ),
 
                     SizedBox(height: 32.h),

@@ -158,10 +158,8 @@ class IncomingCallService : Service() {
         // Cancel pending linger so the service stays alive for the new call
         lingerJob?.cancel()
         lingerJob = null
-        // Cancel any previous call that wasn't cleaned up
-        callJob?.cancel()
-        callScope?.cancel()
-        callControlScope = null
+        // Tear down any previous Core-Telecom session before starting a new one.
+        tearDownCoreTelecomSession(cancelScopeAfterDisconnect = true)
         callWasAnswered = false
 
         val resolvedCallerId = intent.getStringExtra(EXTRA_CALLER_ID) ?: ""
@@ -266,17 +264,16 @@ class IncomingCallService : Service() {
 
                 // addCall returned — call is over
                 Log.i(TAG, "📞 Core-Telecom addCall completed")
-                resetCallState()
+                finishCallSession()
             } catch (e: Exception) {
                 Log.e(TAG, "📞 Core-Telecom error: ${e.message}", e)
-                // Core-Telecom failed — service still stays alive for HTTP decline
+                finishCallSession()
             }
         }
     }
 
     private fun handleDecline(intent: Intent?, noAnswer: Boolean = false) {
         Log.i(TAG, "📞 handleDecline called noAnswer=$noAnswer")
-        callJob?.cancel()
         suppressDeclineHttpOnDisconnect = true
         var cid = currentCallerId
         if (cid.isNullOrBlank()) {
@@ -291,13 +288,9 @@ class IncomingCallService : Service() {
             scope.launch {
                 sendDeclineHttp(cid, noAnswer = noAnswer)
             }
-            scope.launch {
-                try {
-                    callControlScope?.disconnect(DisconnectCause(DisconnectCause.REJECTED))
-                } catch (e: Exception) {
-                    Log.w(TAG, "📞 Core-Telecom disconnect failed: ${e.message}")
-                }
-            }
+            tearDownCoreTelecomSession(
+                disconnectCause = DisconnectCause(DisconnectCause.REJECTED),
+            )
         } else {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             val callRecordId = prefs.getString(KEY_CALL_RECORD_ID, null).orEmpty()
@@ -310,14 +303,7 @@ class IncomingCallService : Service() {
                 Log.w(TAG, "📞 handleDecline skipped — no callerId/callRecordId")
             }
         }
-        resetCallState()
-        // Linger so the next call doesn't hit Android's cold-wake throttle.
-        lingerJob?.cancel()
-        lingerJob = CoroutineScope(Dispatchers.IO).launch {
-            delay(LINGER_MS)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-        }
+        scheduleLingerStop()
     }
 
     private fun handleAccept() {
@@ -349,27 +335,65 @@ class IncomingCallService : Service() {
         suppressDeclineHttpOnDisconnect = true
         activePollJob?.cancel()
         activePollJob = null
-        callJob?.cancel()
+        // Never cancel [callScope] before disconnect — that leaves
+        // CallSessionLegacy's MuteStateReceiver registered (IntentReceiverLeaked).
+        tearDownCoreTelecomSession(
+            disconnectCause = DisconnectCause(DisconnectCause.REMOTE),
+            onFinished = {
+                isTearingDown = false
+                scheduleLingerStop()
+            },
+        )
+    }
+
+    /**
+     * End the active Core-Telecom call so [CallsManager.addCall] can finish and
+     * unregister internal receivers. Cancelling [callScope] first causes leaks.
+     */
+    private fun tearDownCoreTelecomSession(
+        disconnectCause: DisconnectCause = DisconnectCause(DisconnectCause.REMOTE),
+        cancelScopeAfterDisconnect: Boolean = false,
+        onFinished: (() -> Unit)? = null,
+    ) {
         val control = callControlScope
+        val scope = callScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        if (control == null) {
+            finishCallSession()
+            onFinished?.invoke()
+            return
+        }
+        scope.launch {
+            try {
+                control.disconnect(disconnectCause)
+            } catch (e: Exception) {
+                Log.w(TAG, "📞 Core-Telecom disconnect failed: ${e.message}")
+            }
+            // onDisconnect → resetCallState; finish if the session stalls.
+            delay(500)
+            if (callControlScope != null) {
+                Log.w(TAG, "📞 Core-Telecom onDisconnect slow — forcing finish")
+                finishCallSession()
+            } else if (cancelScopeAfterDisconnect) {
+                cancelCallCoroutines()
+            }
+            onFinished?.invoke()
+        }
+    }
+
+    private fun cancelCallCoroutines() {
+        callJob?.cancel()
+        callJob = null
         callScope?.cancel()
         callScope = null
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                control?.disconnect(DisconnectCause(DisconnectCause.REMOTE))
-            } catch (e: Exception) {
-                Log.w(TAG, "📞 Core-Telecom remote cancel disconnect: ${e.message}")
-            }
-            resetCallState()
-            isTearingDown = false
-            // Keep the process alive for 30s so the next FCM/socket arrives
-            // instantly instead of being throttled by Android's cold-wake limiter.
-            Log.i(TAG, "📞 Delaying stopSelf by ${LINGER_MS}ms to prevent FCM throttle")
-            lingerJob?.cancel()
-            lingerJob = CoroutineScope(Dispatchers.IO).launch {
-                delay(LINGER_MS)
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-            }
+    }
+
+    private fun scheduleLingerStop() {
+        Log.i(TAG, "📞 Delaying stopSelf by ${LINGER_MS}ms to prevent FCM throttle")
+        lingerJob?.cancel()
+        lingerJob = CoroutineScope(Dispatchers.IO).launch {
+            delay(LINGER_MS)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
     }
 
@@ -432,16 +456,20 @@ class IncomingCallService : Service() {
         }
     }
 
+    /** Clears per-call fields only — safe from [onDisconnect] inside [addCall]. */
     private fun resetCallState() {
         Log.i(TAG, "📞 Resetting call state (service stays alive)")
         activePollJob?.cancel()
         activePollJob = null
-        callJob?.cancel()
-        callJob = null
         callControlScope = null
         currentCallerId = null
         callWasAnswered = false
-        // Removed stopForeground here. FGS stays alive until 30s linger completes.
+    }
+
+    /** Full teardown after [addCall] returns or when no session is active. */
+    private fun finishCallSession() {
+        resetCallState()
+        cancelCallCoroutines()
     }
 
     private fun sendDeclineHttp(callerId: String, noAnswer: Boolean = false) {
@@ -525,9 +553,21 @@ class IncomingCallService : Service() {
     }
 
     override fun onDestroy() {
+        activePollJob?.cancel()
+        activePollJob = null
+        lingerJob?.cancel()
+        lingerJob = null
+        val control = callControlScope
+        if (control != null) {
+            try {
+                control.disconnect(DisconnectCause(DisconnectCause.LOCAL))
+            } catch (e: Exception) {
+                Log.w(TAG, "📞 onDestroy disconnect: ${e.message}")
+            }
+            callControlScope = null
+        }
+        cancelCallCoroutines()
         super.onDestroy()
-        callScope?.cancel()
-        callScope = null
         Log.i(TAG, "📞 IncomingCallService destroyed")
     }
 }

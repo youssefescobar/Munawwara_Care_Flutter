@@ -136,9 +136,16 @@ class CallNotifier extends Notifier<CallState> {
   Timer? _ringPollTimer; // polls backend while outgoing call is ringing
   Timer? _sessionWatchdogTimer;
   Timer? _connectingTimeoutTimer;
+  DateTime? _outgoingCallStartedAt;
 
   static const int _sessionWatchdogSeconds = 40;
   static const int _connectingTimeoutSeconds = 30;
+
+  /// Resume reconcile must not tear down a call-offer still being registered.
+  static const int _ghostReconcileOutgoingGraceSeconds = 20;
+  static const int _ghostReconcileActiveRetries = 3;
+  static const Duration _ghostReconcileRetryDelay =
+      Duration(milliseconds: 400);
 
   @override
   CallState build() {
@@ -228,6 +235,7 @@ class CallNotifier extends Notifier<CallState> {
       isGroupRingingOut: true,
       displayPeerAsSupportBranding: true,
     );
+    _outgoingCallStartedAt = DateTime.now();
     _syncPreConnectRingback(CallStatus.calling);
     unawaited(_persistOutgoingCall(remoteUserId: ids.first, isGroup: true));
 
@@ -269,6 +277,7 @@ class CallNotifier extends Notifier<CallState> {
       displayPeerAsSupportBranding: isPilgrimCaller,
       remotePeerGender: isPilgrimCaller ? null : remotePeerGender,
     );
+    _outgoingCallStartedAt = DateTime.now();
     _syncPreConnectRingback(CallStatus.calling);
     unawaited(_persistOutgoingCall(remoteUserId: remoteUserId, isGroup: false));
 
@@ -390,6 +399,7 @@ class CallNotifier extends Notifier<CallState> {
     _pendingChannelName = null;
     _pendingFromId = null;
     _outgoingChannelName = null;
+    _outgoingCallStartedAt = null;
     _activeIncomingCallRecordId = null;
     CallSignaling.clearPendingOutgoingEmits();
     unawaited(_clearOutgoingCallPersistence());
@@ -835,14 +845,24 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   Future<void> _reconcileGhostInCallState() async {
-    if (state.status != CallStatus.calling &&
-        state.status != CallStatus.ringing) {
+    if (state.status == CallStatus.calling) {
+      // Outgoing ring is owned by [_startRingPoll]. App resume / focus churn
+      // can run reconcile before check-active sees the new call-offer row.
+      final started = _outgoingCallStartedAt;
+      if (started != null &&
+          DateTime.now().difference(started) <
+              const Duration(seconds: _ghostReconcileOutgoingGraceSeconds)) {
+        AppLogger.d(
+          '[CallProvider] Skip ghost reconcile — outgoing grace window',
+        );
+      }
       return;
     }
-    final myId = await _getMyUserId() ?? '';
-    final checkCallerId = state.status == CallStatus.calling
-        ? myId
-        : (state.remoteUserId ?? _pendingFromId ?? '');
+    if (state.status != CallStatus.ringing) {
+      return;
+    }
+    final checkCallerId =
+        state.remoteUserId ?? _pendingFromId ?? '';
     if (checkCallerId.isEmpty) {
       await forceIdleCallSession(
         endReason: 'cancelled',
@@ -850,7 +870,14 @@ class CallNotifier extends Notifier<CallState> {
       );
       return;
     }
-    final active = await _isCallActiveOnServer(checkCallerId);
+    var active = false;
+    for (var i = 0; i < _ghostReconcileActiveRetries; i++) {
+      active = await _isCallActiveOnServer(checkCallerId);
+      if (active) break;
+      if (i < _ghostReconcileActiveRetries - 1) {
+        await Future<void>.delayed(_ghostReconcileRetryDelay);
+      }
+    }
     if (!active) {
       AppLogger.w(
         '[CallProvider] Resume reconcile — ghost ${state.status}, forceIdle',

@@ -15,8 +15,7 @@ class LegalSupportSection extends ConsumerWidget {
     required this.textPrimary,
     required this.textMuted,
     required this.dividerColor,
-    this.showPilgrimDeletion = false,
-    this.showModeratorDeletionNote = false,
+    this.showAccountDeletion = false,
   });
 
   final bool isDark;
@@ -24,8 +23,7 @@ class LegalSupportSection extends ConsumerWidget {
   final Color textPrimary;
   final Color textMuted;
   final Color dividerColor;
-  final bool showPilgrimDeletion;
-  final bool showModeratorDeletionNote;
+  final bool showAccountDeletion;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,7 +61,7 @@ class LegalSupportSection extends ConsumerWidget {
                 textMuted: textMuted,
                 onTap: () => context.push('/contact-support'),
               ),
-              if (showPilgrimDeletion) ...[
+              if (showAccountDeletion) ...[
                 _DividerLine(color: dividerColor),
                 _LegalRow(
                   icon: Icons.delete_outline_rounded,
@@ -71,27 +69,12 @@ class LegalSupportSection extends ConsumerWidget {
                   textPrimary: textPrimary,
                   textMuted: textMuted,
                   isDestructive: true,
-                  onTap: () => _requestPilgrimDeletion(context),
+                  onTap: () => _requestAccountDeletion(context),
                 ),
               ],
             ],
           ),
         ),
-        if (showModeratorDeletionNote) ...[
-          SizedBox(height: 8.h),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4.w),
-            child: Text(
-              'legal_moderator_deletion_note'.tr(),
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 12.sp,
-                color: textMuted,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
         SizedBox(height: 8.h),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 4.w),
@@ -109,7 +92,7 @@ class LegalSupportSection extends ConsumerWidget {
     );
   }
 
-  Future<void> _requestPilgrimDeletion(BuildContext context) async {
+  Future<void> _requestAccountDeletion(BuildContext context) async {
     final confirmed = await StandardDialog.show<bool>(
       context: context,
       title: 'legal_deletion_confirm_title',

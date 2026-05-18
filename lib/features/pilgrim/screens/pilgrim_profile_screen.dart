@@ -350,7 +350,7 @@ class _PilgrimProfileScreenState extends ConsumerState<PilgrimProfileScreen> {
                       textPrimary: textPrimary,
                       textMuted: textMuted,
                       dividerColor: dividerColor,
-                      showPilgrimDeletion: true,
+                      showAccountDeletion: true,
                     ),
 
                     SizedBox(height: 28.h),
