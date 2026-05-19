@@ -14,6 +14,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../config/backend_config.dart';
 import 'api_service.dart';
 import 'callkit_service.dart';
+import 'secure_session_store.dart';
 import 'speech_service.dart';
 import 'locale_prefs.dart';
 import 'tts_cloud_api.dart';
@@ -126,7 +127,10 @@ Future<void> _sendDeclineHttp(
       if (callerId.isEmpty) {
         callerId = prefs.getString('pending_call_caller_id') ?? '';
       }
-      declinerId = prefs.getString('user_id') ?? '';
+      declinerId =
+          (await SecureSessionStore.getUserId()) ??
+          prefs.getString('user_id') ??
+          '';
       callRecordId = prefs.getString('pending_call_record_id') ?? '';
     } catch (_) {}
     if (callerId.isEmpty && callRecordId.isEmpty) return;
@@ -223,8 +227,7 @@ String _sosSpokenBackupText(RemoteMessage message) {
 @pragma('vm:entry-point')
 Future<void> _playSosAlertTtsInBackground(RemoteMessage message) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final role = prefs.getString('user_role');
+    final role = await SecureSessionStore.getRole();
     if (role != 'moderator') {
       AppLogger.i('🔊 SOS TTS [background]: skipped (role=$role)');
       return;
@@ -1339,13 +1342,7 @@ class _ChatRouteResolverState extends State<_ChatRouteResolver> {
     );
   }
 
-  Future<String?> _getRole() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_role');
-  }
+  Future<String?> _getRole() => SecureSessionStore.getRole();
 
-  Future<String?> _getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
-  }
+  Future<String?> _getUserId() => SecureSessionStore.getUserId();
 }

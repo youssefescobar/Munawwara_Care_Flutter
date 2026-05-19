@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/backend_config.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/callkit_service.dart';
+import '../../core/services/secure_session_store.dart';
 import '../../core/utils/app_logger.dart';
 import 'calling_scope.dart';
 import 'providers/call_provider.dart';
@@ -460,7 +461,10 @@ Future<void> _sendBackgroundDecline(
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('api_base_url');
       if (cached != null && cached.isNotEmpty) baseUrl = cached;
-      declinerId = prefs.getString('user_id') ?? '';
+      declinerId =
+          (await SecureSessionStore.getUserId()) ??
+          prefs.getString('user_id') ??
+          '';
       callRecordId = prefs.getString('pending_call_record_id') ?? '';
     } catch (_) {}
 

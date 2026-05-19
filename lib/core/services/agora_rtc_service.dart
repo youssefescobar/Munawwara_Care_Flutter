@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../utils/app_logger.dart';
 import 'api_service.dart';
+import 'secure_session_store.dart';
 
 /// Agora voice RTC lifecycle per
 /// https://docs.agora.io/en/voice-calling/get-started/get-started-sdk?platform=flutter
@@ -255,8 +254,7 @@ class AgoraRtcService {
 
   Future<String?> _readUserId() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('user_id');
+      return await SecureSessionStore.getUserId();
     } catch (_) {
       return null;
     }

@@ -23,7 +23,9 @@ Future<void> verifyEnv() async {
       .toList();
 
   if (missingRequired.isNotEmpty) {
-    final msg = 'Missing required .env keys: ${missingRequired.join(', ')}';
+    final msg =
+        'Missing API_BASE_URL: set it in .env or pass '
+        '--dart-define=API_BASE_URL=https://your-api.example.com/api';
     // Fail-fast so developers notice immediately when a critical value is missing.
     throw Exception(msg);
   }

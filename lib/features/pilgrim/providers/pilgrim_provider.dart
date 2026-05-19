@@ -1,9 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
+import '../../../core/services/secure_session_store.dart';
 
 // ── Pilgrim Profile Model ─────────────────────────────────────────────────────
 
@@ -237,10 +236,7 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
     return const PilgrimState();
   }
 
-  Future<String?> _userId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
-  }
+  Future<String?> _userId() => SecureSessionStore.getUserId();
 
   /// Load last-known dashboard from disk (call before network refresh).
   Future<void> hydrateFromCache() async {

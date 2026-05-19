@@ -1,5 +1,27 @@
 import java.io.FileInputStream
+import java.util.Base64
 import java.util.Properties
+
+// Parses `--dart-define=KEY=value` entries passed by the Flutter Gradle plugin.
+fun loadDartDefines(): Map<String, String> {
+    val result = mutableMapOf<String, String>()
+    if (!project.hasProperty("dart-defines")) {
+        return result
+    }
+    val raw = project.property("dart-defines") as String
+    raw.split(",").filter { it.isNotEmpty() }.forEach { encoded ->
+        val decoded = String(Base64.getDecoder().decode(encoded))
+        val separator = decoded.indexOf('=')
+        if (separator > 0) {
+            result[decoded.substring(0, separator)] =
+                decoded.substring(separator + 1)
+        }
+    }
+    return result
+}
+
+val dartDefines = loadDartDefines()
+val apiBaseUrlFromDartDefine = dartDefines["API_BASE_URL"] ?: ""
 
 plugins {
     id("com.android.application")
@@ -24,6 +46,10 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -41,6 +67,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["usesCleartextTraffic"] = "false"
+        buildConfigField(
+            "String",
+            "API_BASE_URL",
+            "\"${apiBaseUrlFromDartDefine.replace("\"", "\\\"")}\"",
+        )
     }
 
     signingConfigs {

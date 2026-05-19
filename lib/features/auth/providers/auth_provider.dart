@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/utils/app_logger.dart';
 
@@ -126,8 +127,6 @@ class AuthState {
 // Uses Riverpod 3.x Notifier API (StateNotifier was removed in v3)
 
 class AuthNotifier extends Notifier<AuthState> {
-  static const _deviceBindingIdKey = 'device_binding_id';
-
   Completer<void>? _remoteValidationCompleter;
 
   /// Called once from main.dart after the FCM token is obtained.
@@ -144,11 +143,10 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _restoreSession() async {
     try {
       AppLogger.d('AuthNotifier: restoring session (cached)');
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      final role = prefs.getString('user_role');
-      final userId = prefs.getString('user_id');
-      final fullName = prefs.getString('user_full_name');
+      final token = await SecureSessionStore.getToken();
+      final role = await SecureSessionStore.getRole();
+      final userId = await SecureSessionStore.getUserId();
+      final fullName = await SecureSessionStore.getFullName();
 
       if (token == null || token.isEmpty) {
         state = const AuthState(isRestoringSession: false);
@@ -165,6 +163,7 @@ class AuthNotifier extends Notifier<AuthState> {
         fullName: fullName,
       );
       await _mergeAuthMeFromCache(userId);
+      await SecureSessionStore.syncNativeMirrorPrefs();
       AppLogger.d('AuthNotifier: cached session ready — validating in background');
       _remoteValidationCompleter = Completer<void>();
       unawaited(
@@ -250,16 +249,16 @@ class AuthNotifier extends Notifier<AuthState> {
         ethnicity: data['ethnicity']?.toString(),
       );
 
-      final prefs = await SharedPreferences.getInstance();
       if (data['full_name'] != null) {
-        await prefs.setString('user_full_name', data['full_name'] as String);
+        await SecureSessionStore.setFullName(data['full_name'] as String);
       }
       if (resolvedId != null && resolvedId.isNotEmpty) {
-        await prefs.setString('user_id', resolvedId);
+        await SecureSessionStore.setUserId(resolvedId);
       }
       if (resolvedRole != null && resolvedRole.isNotEmpty) {
-        await prefs.setString('user_role', resolvedRole);
+        await SecureSessionStore.setRole(resolvedRole);
       }
+      await SecureSessionStore.syncNativeMirrorPrefs();
 
       final cacheId = resolvedId ?? userId;
       if (cacheId != null && cacheId.isNotEmpty) {
@@ -270,8 +269,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final code = e.response?.statusCode;
       if (code == 401) {
         AppLogger.w('AuthNotifier: /auth/me 401 during background validate');
-        final prefsAfter = await SharedPreferences.getInstance();
-        if (prefsAfter.getString('auth_token') != null) {
+        if (await ApiService.hasStoredAuthToken()) {
           await _invalidateSessionLocally();
         }
         return;
@@ -322,9 +320,8 @@ class AuthNotifier extends Notifier<AuthState> {
 
   /// Merge `/auth/me` fields from disk when token exists (e.g. offline cold start).
   Future<void> hydrateFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getString('auth_token') == null) return;
-    final uid = state.userId ?? prefs.getString('user_id');
+    if (!await ApiService.hasStoredAuthToken()) return;
+    final uid = state.userId ?? await SecureSessionStore.getUserId();
     await _mergeAuthMeFromCache(uid);
   }
 
@@ -369,21 +366,23 @@ class AuthNotifier extends Notifier<AuthState> {
     String fullName,
   ) async {
     await ApiService.setAuthToken(token);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_role', role);
-    await prefs.setString('user_id', userId);
-    await prefs.setString('user_full_name', fullName);
+    await SecureSessionStore.setSessionProfile(
+      role: role,
+      userId: userId,
+      fullName: fullName,
+    );
+    await SecureSessionStore.syncNativeMirrorPrefs();
+    await ApiService.cacheNativeBridgePrefs();
   }
 
   Future<String> _getOrCreateDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_deviceBindingIdKey);
+    final existing = await SecureSessionStore.getDeviceBindingId();
     if (existing != null && existing.isNotEmpty) {
       return existing;
     }
 
     final generated = const Uuid().v4();
-    await prefs.setString(_deviceBindingIdKey, generated);
+    await SecureSessionStore.setDeviceBindingId(generated);
     return generated;
   }
 
@@ -521,32 +520,30 @@ class AuthNotifier extends Notifier<AuthState> {
         language: data['language']?.toString(),
         ethnicity: data['ethnicity']?.toString(),
       );
-      final prefs = await SharedPreferences.getInstance();
       if (data['full_name'] != null) {
-        await prefs.setString('user_full_name', data['full_name'] as String);
+        await SecureSessionStore.setFullName(data['full_name'] as String);
       }
       final uid = data['_id']?.toString() ?? data['id']?.toString();
       if (uid != null && uid.isNotEmpty) {
-        await prefs.setString('user_id', uid);
+        await SecureSessionStore.setUserId(uid);
         await AppDataCache.write(uid, AppDataCache.authMeFile, data);
       }
       final r = data['role']?.toString() ?? data['user_type']?.toString();
       if (r != null && r.isNotEmpty) {
-        await prefs.setString('user_role', r);
+        await SecureSessionStore.setRole(r);
       }
+      await SecureSessionStore.syncNativeMirrorPrefs();
       return true;
     } on DioException catch (e) {
       final code = e.response?.statusCode;
       if (code == 401 || code == 404) {
         AppLogger.w('fetchProfile: invalid session (HTTP $code)');
-        final prefs = await SharedPreferences.getInstance();
-        if (prefs.getString('auth_token') != null) {
+        if (await ApiService.hasStoredAuthToken()) {
           await logout();
         }
         return false;
       }
-      final prefs = await SharedPreferences.getInstance();
-      final uid = state.userId ?? prefs.getString('user_id');
+      final uid = state.userId ?? await SecureSessionStore.getUserId();
       await _mergeAuthMeFromCache(uid);
       return true;
     }
@@ -585,8 +582,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final newGender = userData['gender'] as String?;
       final newMedical = userData['medical_history'] as String?;
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_full_name', newName);
+      await SecureSessionStore.setFullName(newName);
 
       state = state.copyWith(
         isLoading: false,

@@ -1,12 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../features/pilgrim/models/explore_place.dart';
 import '../utils/app_logger.dart';
 import 'api_service.dart';
 import 'app_data_cache.dart';
 import 'explore_geo.dart';
+import 'secure_session_store.dart';
 
 /// Explore POIs near a map center via backend cache and Nominatim.
 class ExplorePlacesService {
@@ -79,8 +78,7 @@ class ExplorePlacesService {
   }) async {
     Future<List<ExplorePlace>> fromCache() async {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final uid = prefs.getString('user_id');
+        final uid = await SecureSessionStore.getUserId();
         if (uid == null) return [];
         final cached = AppDataCache.jsonMap(
           await AppDataCache.readData(uid, AppDataCache.exploreNearbyPoisFile),
@@ -133,8 +131,7 @@ class ExplorePlacesService {
 
       // Cache last good result for offline Explore.
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final uid = prefs.getString('user_id');
+        final uid = await SecureSessionStore.getUserId();
         if (uid != null) {
           await AppDataCache.write(uid, AppDataCache.exploreNearbyPoisFile, data);
         }

@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../config/backend_config.dart';
 import 'api_service.dart';
+import 'secure_session_store.dart';
 import '../utils/app_logger.dart';
 
 /// Shown on CallKit / prefs when a pilgrim receives a moderator call (native asset path).
@@ -46,7 +47,6 @@ class CallKitService {
   static const _pendingCreatedAtMsKey = 'pending_call_created_at_ms';
   static const _pendingCallUuidKey = 'pending_call_uuid';
   static const _pendingCallRecordIdKey = kPendingCallRecordIdKey;
-  static const _prefsUserRoleKey = 'user_role';
   static const _pendingOutgoingStopReasonKey = 'pending_outgoing_stop_reason';
 
   /// FCM may send call control under [type] or [notification_type].
@@ -202,7 +202,7 @@ class CallKitService {
     _lastShownChannelName = channelName.isEmpty ? null : channelName;
 
     final prefs = await SharedPreferences.getInstance();
-    final role = prefs.getString(_prefsUserRoleKey) ?? '';
+    final role = (await SecureSessionStore.getRole()) ?? '';
     final useSupportBranding = role == 'pilgrim';
     final nativeCallerLine = useSupportBranding
         ? await _resolveSupportDisplayName(displayName)

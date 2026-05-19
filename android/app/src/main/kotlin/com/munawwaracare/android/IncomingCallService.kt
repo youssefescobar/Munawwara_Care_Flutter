@@ -61,23 +61,27 @@ class IncomingCallService : Service() {
         /** Keep the process alive for 30s after a call ends so the next
          *  FCM/socket arrives instantly instead of hitting Android's cold-wake throttle. */
         private const val LINGER_MS = 30_000L
-        private val FALLBACK_URL = BackendConfig.API_BASE_URL_FALLBACK
-
         fun resolveBaseUrl(context: Context): String {
             return try {
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .getString(KEY_API_BASE_URL, null)
-                    ?.takeIf { it.isNotBlank() } ?: FALLBACK_URL
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.getString(KEY_API_BASE_URL, null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: BackendConfig.API_BASE_URL_FALLBACK.takeIf { it.isNotBlank() }
+                    .orEmpty()
             } catch (_: Exception) {
-                FALLBACK_URL
+                BackendConfig.API_BASE_URL_FALLBACK
             }
         }
 
         /** @return true=ringing/in-progress, false=ended, null=network/parse error */
         fun isCallerStillActiveOnServer(context: Context, callerId: String): Boolean? {
             if (callerId.isBlank()) return null
+            val base = resolveBaseUrl(context).trimEnd('/')
+            if (base.isBlank()) {
+                Log.w(TAG, "📞 check-active skipped — API base URL not configured")
+                return null
+            }
             return try {
-                val base = resolveBaseUrl(context).trimEnd('/')
                 val url = URL("$base/call-history/check-active?callerId=$callerId")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
@@ -477,6 +481,10 @@ class IncomingCallService : Service() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val declinerId = prefs.getString(KEY_DECLINER_ID, null).orEmpty()
         val callRecordId = prefs.getString(KEY_CALL_RECORD_ID, null).orEmpty()
+        if (baseUrl.isBlank()) {
+            Log.w(TAG, "📞 Decline HTTP skipped — API base URL not configured")
+            return
+        }
         if (callerId.isBlank() && callRecordId.isBlank()) {
             Log.w(TAG, "📞 Decline HTTP skipped — no callerId/callRecordId")
             return
@@ -557,16 +565,10 @@ class IncomingCallService : Service() {
         activePollJob = null
         lingerJob?.cancel()
         lingerJob = null
-        val control = callControlScope
-        if (control != null) {
-            try {
-                control.disconnect(DisconnectCause(DisconnectCause.LOCAL))
-            } catch (e: Exception) {
-                Log.w(TAG, "📞 onDestroy disconnect: ${e.message}")
-            }
-            callControlScope = null
-        }
-        cancelCallCoroutines()
+        tearDownCoreTelecomSession(
+            disconnectCause = DisconnectCause(DisconnectCause.LOCAL),
+            cancelScopeAfterDisconnect = true,
+        )
         super.onDestroy()
         Log.i(TAG, "📞 IncomingCallService destroyed")
     }

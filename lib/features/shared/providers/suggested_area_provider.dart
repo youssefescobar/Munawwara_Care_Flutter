@@ -1,9 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../../../core/utils/app_logger.dart';
 import '../models/suggested_area_model.dart';
 
@@ -77,8 +76,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   SuggestedAreaState build() => const SuggestedAreaState();
 
   Future<void> _hydrateFromCache(String groupId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     final data = AppDataCache.jsonMap(
       await AppDataCache.readData(
@@ -99,8 +97,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   }
 
   Future<void> _persist(String groupId, Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     await AppDataCache.write(
       uid,
@@ -119,8 +116,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
       final data = res.data is Map
           ? Map<String, dynamic>.from(res.data as Map)
           : <String, dynamic>{};
-      final prefs = await SharedPreferences.getInstance();
-      final uid = prefs.getString('user_id');
+      final uid = await SecureSessionStore.getUserId();
       if (uid != null) {
         await _persist(groupId, data);
       }

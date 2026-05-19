@@ -21,6 +21,7 @@ import '../../../core/services/socket_service.dart';
 import '../../../core/services/caller_gender_cache.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../../core/services/call_ringback_service.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -362,8 +363,7 @@ class CallNotifier extends Notifier<CallState> {
 
   Future<String?> _getMyUserId() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('user_id');
+      return await SecureSessionStore.getUserId();
     } catch (_) {
       return null;
     }
@@ -744,8 +744,8 @@ class CallNotifier extends Notifier<CallState> {
   }) async {
     if (state.isInCall) return;
 
-    final prefsEarly = await SharedPreferences.getInstance();
-    final isPilgrimCallee = prefsEarly.getString('user_role') == 'pilgrim';
+    final role = await SecureSessionStore.getRole();
+    final isPilgrimCallee = role == 'pilgrim';
     final calleeDisplayName = isPilgrimCallee
         ? 'call_support_display_name'.tr()
         : callerName;
@@ -1357,7 +1357,7 @@ class CallNotifier extends Notifier<CallState> {
       final isGroup = prefs.getBool(_outgoingIsGroupKey) ?? false;
       if (receiverId.isEmpty && !isGroup) return;
 
-      final myId = prefs.getString('user_id');
+      final myId = await SecureSessionStore.getUserId();
       if (myId == null || myId.isEmpty) {
         await _clearOutgoingCallPersistence();
         return;

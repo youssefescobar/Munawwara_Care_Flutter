@@ -84,7 +84,7 @@ Update https://saifisvibinn.github.io/munawwara-privacy/ :
 2. Pilgrim: fresh one-time code or QR (not bound to another device).  
 3. Grant **location (Always)** and **notifications**; complete device-care onboarding if shown.  
 4. Test VoIP call and SOS from pilgrim.  
-5. API: `https://mc-backend-44890250266.europe-west3.run.app/api`
+5. API: production `API_BASE_URL` (see `docs/backend-config.md`)
 
 ---
 
@@ -145,7 +145,7 @@ Record of work already done in the codebase. Re-verify in Play Console / product
 - No ads, no IAP, no Play Billing  
 - No AccessibilityService  
 - Firebase client: FCM only (no Analytics/Crashlytics in repo)  
-- HTTPS production API: `mc-backend-44890250266.europe-west3.run.app`
+- HTTPS production API: configured via `API_BASE_URL` / `dart-define`
 
 ---
 

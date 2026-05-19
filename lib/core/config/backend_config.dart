@@ -1,8 +1,8 @@
-/// Single source of truth for backend URLs used when [.env] is unavailable
-/// (native killed-state HTTP, cold start before prefs are cached).
+/// Compile-time backend URL when [.env] is unavailable (native killed-state
+/// HTTP, cold start before prefs are cached).
 ///
-/// Keep in sync with [Flutter_Munawwara/.env] `API_BASE_URL` and
-/// [BackendConfig.kt] on Android.
+/// Set via `--dart-define=API_BASE_URL=...` (mirrored in Android
+/// [BuildConfig.API_BASE_URL]). Keep in sync with `.env` at dev time.
 const String kDefaultProductionApiBaseUrl =
     String.fromEnvironment('API_BASE_URL');
 

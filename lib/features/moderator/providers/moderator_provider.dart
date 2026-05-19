@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_munawwara/core/utils/app_logger.dart';
 
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
 import '../../../core/services/caller_gender_cache.dart';
+import '../../../core/services/secure_session_store.dart';
 
 // ── Pilgrim-in-group model ────────────────────────────────────────────────────
 class PilgrimInGroup {
@@ -334,10 +334,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
   @override
   ModeratorState build() => const ModeratorState();
 
-  Future<String?> _userId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
-  }
+  Future<String?> _userId() => SecureSessionStore.getUserId();
 
   Future<void> hydrateFromCache() async {
     final uid = await _userId();

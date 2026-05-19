@@ -1,9 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/route_id_utils.dart';
 import '../helpers/chat_popup_dedup.dart';
@@ -104,8 +103,7 @@ class MessageNotifier extends Notifier<MessageState> {
   }
 
   Future<void> _hydrateMessagesFromCache(String groupId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     final blob = AppDataCache.jsonMap(
       await AppDataCache.readData(
@@ -138,8 +136,7 @@ class MessageNotifier extends Notifier<MessageState> {
     String groupId,
     Map<String, dynamic> body,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     await AppDataCache.write(
       uid,

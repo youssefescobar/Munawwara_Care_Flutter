@@ -51,7 +51,6 @@ class CallDeclineReceiver : BroadcastReceiver() {
         private const val KEY_DECLINER_ID = "flutter.user_id"
         private const val KEY_API_BASE_URL = "flutter.api_base_url"
 
-        private val FALLBACK_URL = BackendConfig.API_BASE_URL_FALLBACK
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -68,6 +67,14 @@ class CallDeclineReceiver : BroadcastReceiver() {
         }
 
         val baseUrl = resolveBaseUrl(context)
+        if (baseUrl.isBlank()) {
+            Log.w(
+                TAG,
+                "📵 API base URL missing — set API_BASE_URL in .env or " +
+                    "--dart-define=API_BASE_URL=... and open the app once",
+            )
+            return
+        }
         val declinerId = resolveDeclinerId(context)
         Log.i(TAG, "📵 Declining callerId=$callerId callRecordId=$callRecordId via $baseUrl")
 
@@ -128,9 +135,11 @@ class CallDeclineReceiver : BroadcastReceiver() {
         return try {
             val prefs: SharedPreferences =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.getString(KEY_API_BASE_URL, null)?.takeIf { it.isNotBlank() } ?: FALLBACK_URL
+            prefs.getString(KEY_API_BASE_URL, null)?.takeIf { it.isNotBlank() }
+                ?: BackendConfig.API_BASE_URL_FALLBACK.takeIf { it.isNotBlank() }
+                .orEmpty()
         } catch (e: Exception) {
-            FALLBACK_URL
+            BackendConfig.API_BASE_URL_FALLBACK
         }
     }
 

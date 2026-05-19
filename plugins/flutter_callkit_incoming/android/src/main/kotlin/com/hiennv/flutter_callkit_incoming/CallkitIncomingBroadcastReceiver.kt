@@ -405,8 +405,16 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
                 val baseUrl = apiBaseUrl.takeIf { it.isNotBlank() }
                     ?: prefs.getString("flutter.api_base_url", null)
                         ?.takeIf { it.isNotBlank() }
-                    // Sync with Flutter_Munawwara BackendConfig / .env API_BASE_URL
-                    ?: "https://mc-backend-44890250266.europe-west3.run.app/api"
+                    .orEmpty()
+
+                if (baseUrl.isBlank()) {
+                    Log.w(
+                        TAG,
+                        "📵 sendDeclineToBackend: API base URL missing " +
+                            "(flutter.api_base_url prefs or call extra apiBaseUrl)",
+                    )
+                    return@thread
+                }
 
                 Log.i(
                     TAG,

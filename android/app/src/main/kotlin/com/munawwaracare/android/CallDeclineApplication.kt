@@ -23,7 +23,6 @@ class CallDeclineApplication : Application() {
         private const val TAG = "CallDecline"
         private const val TAG_ACTION = "NATIVE_CALL_ACTION"
         private const val FLUTTER_PREFS = "FlutterSharedPreferences"
-        private val FALLBACK_BASE_URL = BackendConfig.API_BASE_URL_FALLBACK
     }
 
     private val nativeCallEventCallback = object : CallkitEventCallback {
@@ -92,11 +91,11 @@ class CallDeclineApplication : Application() {
         val currentUserId = prefs.getString("flutter.user_id", "")
             .orEmpty()
 
-        val apiBaseUrl = ((extraMap?.get("apiBaseUrl") as? String)
+        val apiBaseUrl = (extraMap?.get("apiBaseUrl") as? String)
             ?.takeIf { it.isNotBlank() }
-            ?: prefs.getString("flutter.api_base_url", "")
-            .orEmpty())
-            .ifBlank { FALLBACK_BASE_URL }
+            ?: prefs.getString("flutter.api_base_url", null)?.takeIf { it.isNotBlank() }
+            ?: BackendConfig.API_BASE_URL_FALLBACK.takeIf { it.isNotBlank() }
+            .orEmpty()
 
         return NativePayload(
             callerId = callerId,
@@ -109,6 +108,10 @@ class CallDeclineApplication : Application() {
     private fun postDecline(payload: NativePayload) {
         if (payload.callerId.isBlank() && payload.callRecordId.isBlank()) {
             Log.w(TAG, "Decline skipped: no callerId/callRecordId")
+            return
+        }
+        if (payload.apiBaseUrl.isBlank()) {
+            Log.w(TAG, "Decline skipped: API base URL not configured")
             return
         }
 
@@ -132,6 +135,10 @@ class CallDeclineApplication : Application() {
     private fun postAnswer(payload: NativePayload) {
         if (payload.callerId.isBlank() && payload.callRecordId.isBlank()) {
             Log.w(TAG, "Answer skipped: no callerId/callRecordId")
+            return
+        }
+        if (payload.apiBaseUrl.isBlank()) {
+            Log.w(TAG, "Answer skipped: API base URL not configured")
             return
         }
 

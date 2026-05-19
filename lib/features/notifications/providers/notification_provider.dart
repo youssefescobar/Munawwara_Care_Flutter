@@ -1,9 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../../core/services/api_service.dart';
 import '../../../core/services/app_data_cache.dart';
+import '../../../core/services/secure_session_store.dart';
 import '../models/notification_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,8 +46,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
   NotificationState build() => const NotificationState();
 
   Future<void> _hydrateFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     final data = AppDataCache.jsonMap(
       await AppDataCache.readData(uid, AppDataCache.notificationsFile),
@@ -71,8 +69,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
   }
 
   Future<void> _persistNotifications(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     if (uid == null) return;
     await AppDataCache.write(uid, AppDataCache.notificationsFile, data);
   }

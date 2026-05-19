@@ -6,12 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/backend_config.dart';
 import 'app_data_cache.dart';
+import 'secure_session_store.dart';
 
 class ApiService {
   static const _prodBaseUrl = kDefaultProductionApiBaseUrl;
 
   // ─── Backend URL ─────────────────────────────────────────────────────────────
-  // `API_BASE_URL` in .env (see comments there). Falls back to production.
+  // `API_BASE_URL` in .env, else `--dart-define=API_BASE_URL=...`.
   // Optional: `API_ANDROID_HOST=10.0.2.2` replaces the hostname on Android only
   // (emulator → host machine); port and path stay the same.
   static String get baseUrl {
@@ -93,19 +94,17 @@ class ApiService {
 
   /// True when a stored session token exists (for guarded FCM upload).
   static Future<bool> hasStoredAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await SecureSessionStore.getToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// Ensures [dio] carries the Bearer token from prefs when missing.
+  /// Ensures [dio] carries the Bearer token from secure storage when missing.
   static Future<void> ensureAuthHeaderFromPrefs() async {
     final existing = dio.options.headers['Authorization'];
     if (existing is String && existing.startsWith('Bearer ')) {
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await SecureSessionStore.getToken();
     if (token != null && token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
     }
@@ -154,19 +153,14 @@ class ApiService {
 
   static Future<void> setAuthToken(String token) async {
     dio.options.headers['Authorization'] = 'Bearer $token';
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
+    await SecureSessionStore.setToken(token);
   }
 
   static Future<void> clearAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString('user_id');
+    final uid = await SecureSessionStore.getUserId();
     await AppDataCache.clearForUser(uid);
     dio.options.headers.remove('Authorization');
-    await prefs.remove('auth_token');
-    await prefs.remove('user_role');
-    await prefs.remove('user_id');
-    await prefs.remove('user_full_name');
+    await SecureSessionStore.clearSession();
   }
 
   /// True when the failure is likely due to no network (not 401/404 auth).
@@ -201,11 +195,10 @@ class ApiService {
     return false;
   }
 
-  /// Restore session token from SharedPreferences on app start.
+  /// Restore session token from secure storage on app start.
   static Future<String?> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    if (token != null) {
+    final token = await SecureSessionStore.getToken();
+    if (token != null && token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
     }
     return token;
@@ -219,17 +212,21 @@ class ApiService {
     if (cached != null && cached.isNotEmpty) {
       dio.options.baseUrl = cached;
     }
-    final token = prefs.getString('auth_token');
+    final token = await SecureSessionStore.getToken();
     if (token != null && token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
     }
   }
 
-  /// Native decline/answer HTTP uses SharedPreferences, not Dart [dio].
-  static Future<void> cacheNativeCallPrefs() async {
+  /// Caches API URL and mirrors [user_id] for native killed-state HTTP.
+  static Future<void> cacheNativeBridgePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(kNativeApiBaseUrlPrefsKey, baseUrl);
+    await SecureSessionStore.syncNativeMirrorPrefs();
   }
+
+  /// @deprecated Use [cacheNativeBridgePrefs].
+  static Future<void> cacheNativeCallPrefs() => cacheNativeBridgePrefs();
 
   // ── Parse human-readable error from DioException response ────────────────────
   static String parseError(DioException e) {

@@ -1,10 +1,14 @@
 package com.munawwaracare.android
 
 /**
- * Must match [Flutter_Munawwara/.env] `API_BASE_URL` and
- * [lib/core/config/backend_config.dart] `kDefaultProductionApiBaseUrl`.
+ * Backend URL for native code paths when Flutter SharedPreferences are empty
+ * (cold start / killed app before prefs are cached from Dart).
+ *
+ * Value comes from `--dart-define=API_BASE_URL=...` at build time
+ * ([BuildConfig.API_BASE_URL]). Keep in sync with `.env` and
+ * `lib/core/config/backend_config.dart`.
  */
 object BackendConfig {
-    const val API_BASE_URL_FALLBACK =
-        "https://mc-backend-44890250266.europe-west3.run.app/api"
+    val API_BASE_URL_FALLBACK: String
+        get() = BuildConfig.API_BASE_URL
 }
