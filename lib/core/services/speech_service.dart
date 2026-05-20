@@ -93,6 +93,36 @@ class SpeechService {
     await _speakLocal(backupText, lang, playEpoch);
   }
 
+  /// Plays a bundled Flutter asset (no cloud URL, no TTS fallback).
+  @pragma('vm:entry-point')
+  static Future<void> playAsset({
+    required String assetPath,
+    bool isUrgent = false,
+    String? messageKey,
+    Duration dedupeWindow = const Duration(seconds: 20),
+  }) async {
+    if (messageKey != null && messageKey.isNotEmpty) {
+      final shouldSpeak = await _claimMessageSpeakOnce(
+        messageKey,
+        window: dedupeWindow,
+      );
+      if (!shouldSpeak) {
+        AppLogger.i('[Speech] Deduped messageKey=$messageKey — skipping');
+        return;
+      }
+    }
+
+    await stop();
+    final playEpoch = _playbackEpoch;
+    await _configureAudioSession(isUrgent: isUrgent);
+    if (_playbackEpoch != playEpoch) return;
+
+    final result = await _tryAssetPlay(assetPath, playEpoch);
+    if (result == _CloudPlayResult.success) return;
+    if (result == _CloudPlayResult.cancelled) return;
+    AppLogger.w('[Speech] Bundled asset failed: $assetPath');
+  }
+
   // ── Public: urgent repetition loop (background handler) ──────────────────
 
   /// Plays the TTS 3 times, 2 minutes apart, while holding a CPU WakeLock.
@@ -181,6 +211,59 @@ class SpeechService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_dismissedKey, true);
     } catch (_) {}
+  }
+
+  // ── Internal: bundled asset playback ───────────────────────────────────────
+
+  static Future<_CloudPlayResult> _tryAssetPlay(
+    String assetPath,
+    int playEpoch,
+  ) async {
+    final player = AudioPlayer();
+    _activePlayer = player;
+
+    try {
+      AppLogger.i('[Speech] Loading asset: $assetPath');
+      await player.setAsset(assetPath);
+      if (_playbackEpoch != playEpoch) {
+        return _CloudPlayResult.cancelled;
+      }
+      await player.play();
+      await player.playingStream
+          .firstWhere((isPlaying) => isPlaying == true)
+          .timeout(const Duration(seconds: 4));
+      if (_playbackEpoch != playEpoch) {
+        return _CloudPlayResult.cancelled;
+      }
+      await player.processingStateStream
+          .firstWhere((s) => s == ProcessingState.completed)
+          .timeout(const Duration(seconds: 120));
+      AppLogger.i('[Speech] ✓ Asset playback complete');
+      return _CloudPlayResult.success;
+    } on TimeoutException {
+      if (_playbackEpoch != playEpoch) {
+        return _CloudPlayResult.cancelled;
+      }
+      return _CloudPlayResult.failed;
+    } on PlayerException catch (e) {
+      if (_playbackEpoch != playEpoch) {
+        return _CloudPlayResult.cancelled;
+      }
+      AppLogger.w('[Speech] Asset PlayerException: ${e.message}');
+      return _CloudPlayResult.failed;
+    } catch (e) {
+      if (_playbackEpoch != playEpoch) {
+        return _CloudPlayResult.cancelled;
+      }
+      AppLogger.w('[Speech] Asset playback error: $e');
+      return _CloudPlayResult.failed;
+    } finally {
+      try {
+        await player.stop();
+        player.dispose();
+      } catch (_) {}
+      if (_activePlayer == player) _activePlayer = null;
+    }
   }
 
   // ── Internal: cloud playback ──────────────────────────────────────────────
@@ -378,6 +461,14 @@ class SpeechService {
       return false;
     }
   }
+
+  /// Returns false if the same [messageKey] was claimed recently (used before
+  /// a delay so parallel SOS paths do not both play).
+  static Future<bool> tryClaimSpeakOnce(
+    String messageKey, {
+    Duration window = const Duration(seconds: 30),
+  }) =>
+      _claimMessageSpeakOnce(messageKey, window: window);
 
   static Future<bool> _claimMessageSpeakOnce(
     String messageKey, {

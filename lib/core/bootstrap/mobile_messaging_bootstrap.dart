@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/calling/calling_scope.dart';
 import '../../features/calling/native_call_coordinator.dart';
+import '../../features/moderator/models/sos_moderator_payload.dart';
 import '../../features/moderator/services/sos_alert_coordinator.dart';
 import '../router/app_router.dart';
 import '../services/callkit_service.dart';
@@ -47,6 +48,12 @@ Future<void> bindMobileMessagingServices() async {
     AppLogger.d('FCM token: $globalFcmToken');
 
     AuthNotifier.setFcmTokenGetter(() => globalFcmToken);
+
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: true,
+      sound: false,
+    );
     SosAlertCoordinator.bindCancelListeners();
 
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
@@ -148,12 +155,22 @@ Future<void> bindMobileMessagingServices() async {
         return;
       }
       if (notifType == 'sos_alert') {
+        final sosData = Map<String, dynamic>.from(msg.data);
         AppLogger.i(
-          'FCM onMessage: SOS — in-app dialog (no duplicate local notif)',
+          'FCM onMessage: SOS — in-app only (no tray; dismiss if posted)',
         );
-        await SosAlertCoordinator.showOnceFromMap(
-          Map<String, dynamic>.from(msg.data),
-        );
+        if (WidgetsBinding.instance.lifecycleState ==
+            AppLifecycleState.resumed) {
+          final payload = SosModeratorPayload.fromMap(sosData);
+          unawaited(
+            NotificationService.dismissSosTrayFor(
+              pilgrimId: payload.pilgrimId?.trim() ?? '',
+              groupId: payload.groupId,
+              sosId: payload.sosId,
+            ),
+          );
+        }
+        await SosAlertCoordinator.showOnceFromMap(sosData);
         return;
       }
       if (isReminderTts) {
@@ -299,3 +316,4 @@ Future<void> bindMobileMessagingServices() async {
 
   _mobileMessagingBound = true;
 }
+

@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/services/notification_service.dart';
-import '../../../core/services/speech_service.dart';
+import '../../../core/services/sos_alert_audio.dart';
 import '../../../core/services/socket_service.dart';
-import '../../../core/services/tts_cloud_api.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -28,9 +27,11 @@ class SosAlertCoordinator {
 
   static String? _lastShownSosId;
   static DateTime? _lastShownAt;
-  static const _dedupeWindow = Duration(seconds: 4);
+  static const _dedupeWindow = Duration(seconds: 30);
   static String? _openDialogStorageKey;
   static bool _cancelListenersBound = false;
+  static final Map<String, DateTime> _presentationClaimedAt = {};
+  static final Set<String> _presentationInFlight = {};
 
   /// Set after IDE hot reload so a replayed socket/FCM SOS or reset dedupe
   /// state does not immediately show the full-screen moderator dialog again.
@@ -94,35 +95,9 @@ class SosAlertCoordinator {
     return c.read(authProvider).fullName ?? '';
   }
 
-  /// Cloud TTS (GCS MP3) with local fallback — same pipeline as urgent messages.
-  static Future<void> speakAlertForPayload(SosModeratorPayload payload) async {
-    final ctx = AppRouter.navigatorKey.currentContext;
-    final lang = ctx != null
-        ? TtsCloudApi.normalizeLang(ctx.locale.languageCode)
-        : 'en';
-    final group = payload.groupName.isEmpty ? '—' : payload.groupName;
-    final text = 'sos_mod_spoken_alert'.tr(
-      namedArgs: {'name': payload.pilgrimName, 'group': group},
-    );
-    if (text.trim().isEmpty) return;
-
-    AppLogger.i('[SosAlertCoordinator] Speaking SOS alert (lang=$lang)');
-    final audioUrl = await TtsCloudApi.fetchAudioUrl(text: text, lang: lang);
-
-    await Future.delayed(kUrgentAlertToTtsDelay);
-    await SpeechService.playRobust(
-      audioUrl: audioUrl,
-      backupText: text,
-      lang: lang,
-      isUrgent: true,
-      messageKey: 'sos_speak_${payload.storageKey}',
-      dedupeWindow: _dedupeWindow,
-    );
-  }
-
   /// Stops in-progress SOS speech (e.g. pilgrim cancelled).
   static Future<void> stopAlertSpeech() async {
-    await SpeechService.stop();
+    await SosAlertAudio.stopAndReset();
   }
 
   /// Global socket listener so cancel is handled even off the dashboard route.
@@ -243,6 +218,22 @@ class SosAlertCoordinator {
     _openDialogStorageKey = null;
   }
 
+  /// One in-app SOS presentation per [storageKey] (socket + FCM).
+  static bool _tryClaimSosPresentation(String storageKey) {
+    if (storageKey.isEmpty) return true;
+    if (_presentationInFlight.contains(storageKey)) {
+      return false;
+    }
+    final now = DateTime.now();
+    final last = _presentationClaimedAt[storageKey];
+    if (last != null && now.difference(last) < _dedupeWindow) {
+      return false;
+    }
+    _presentationInFlight.add(storageKey);
+    _presentationClaimedAt[storageKey] = now;
+    return true;
+  }
+
   /// Unified entry for socket payload, FCM `data`, or pending deep-link map.
   static Future<void> showOnceFromMap(Map<String, dynamic> raw) async {
     final until = _suppressDialogsUntil;
@@ -255,6 +246,26 @@ class SosAlertCoordinator {
     }
 
     final payload = SosModeratorPayload.fromMap(raw);
+    final storageKey = payload.storageKey;
+    if (!_tryClaimSosPresentation(storageKey)) {
+      AppLogger.i(
+        '[SosAlertCoordinator] Deduped SOS (socket+FCM) key=$storageKey',
+      );
+      return;
+    }
+
+    try {
+      await _showOnceFromMapBody(raw, payload, storageKey);
+    } finally {
+      _presentationInFlight.remove(storageKey);
+    }
+  }
+
+  static Future<void> _showOnceFromMapBody(
+    Map<String, dynamic> raw,
+    SosModeratorPayload payload,
+    String storageKey,
+  ) async {
     final pid = payload.pilgrimId?.trim() ?? '';
     if (pid.isNotEmpty) {
       final stillActive = await isPilgrimSosStillActive(pid);
@@ -273,8 +284,6 @@ class SosAlertCoordinator {
     }
     await ModeratorSosEngagementStore.upsertActiveFromPayload(payload);
     await _refreshEngagementUi();
-
-    final storageKey = payload.storageKey;
 
     // If another moderator already claimed this SOS on this device, do not show
     // the blocking popup again.
@@ -335,7 +344,18 @@ class SosAlertCoordinator {
       return;
     }
 
-    unawaited(speakAlertForPayload(payload));
+    if (SosAlertAudio.isAppInForeground) {
+      unawaited(
+        NotificationService.dismissSosTrayFor(
+          pilgrimId: pid,
+          groupId: payload.groupId,
+          sosId: payload.sosId,
+        ),
+      );
+      unawaited(
+        SosAlertAudio.playForegroundUrgentOnly(storageKey: storageKey),
+      );
+    }
 
     final groupLabel = payload.groupName.isEmpty ? '—' : payload.groupName;
 

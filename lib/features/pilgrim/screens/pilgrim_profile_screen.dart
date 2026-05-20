@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/legal_support_section.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/locale_prefs.dart';
+import '../../../core/services/sos_alert_audio.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/pilgrim_gender_avatar.dart';
@@ -322,7 +323,8 @@ class _PilgrimProfileScreenState extends ConsumerState<PilgrimProfileScreen> {
                               final code = lang['code']!;
                               setState(() => _selectedLocale = code);
                               context.setLocale(Locale(code));
-                              unawaited(LocalePrefs.saveLanguageCode(code));
+                              await LocalePrefs.saveLanguageCode(code);
+                              await SosAlertAudio.stopAndReset();
                               unawaited(
                                 CallKitService.refreshCachedSupportDisplayName(
                                   languageCode: code,

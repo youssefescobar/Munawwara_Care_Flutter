@@ -16,8 +16,10 @@ class LocalePrefs {
   /// Language for cloud TTS when FCM does not include [lang].
   static Future<String> readLanguageCode({String fallback = 'en'}) async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final stored = prefs.getString(key)?.trim();
     if (stored != null && stored.isNotEmpty) return stored;
     return fallback;
   }
 }
+

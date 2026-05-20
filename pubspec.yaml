@@ -128,6 +128,12 @@ flutter:
     - assets/static/pilgrim_male.png
     - assets/static/pilgrim_female.png
     - assets/static/ringbacktone.m4a
+    - assets/audio/sos/en.mp3
+    - assets/audio/sos/ar.mp3
+    - assets/audio/sos/ur.mp3
+    - assets/audio/sos/fr.mp3
+    - assets/audio/sos/id.mp3
+    - assets/audio/sos/tr.mp3
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see

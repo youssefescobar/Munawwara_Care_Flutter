@@ -17,6 +17,8 @@ import 'callkit_service.dart';
 import 'secure_session_store.dart';
 import 'speech_service.dart';
 import 'locale_prefs.dart';
+import 'sos_alert_audio.dart';
+import '../../features/moderator/models/sos_moderator_payload.dart';
 import 'tts_cloud_api.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/router/app_router.dart';
@@ -210,45 +212,20 @@ void _sendReminderPopupToMainIsolate(RemoteMessage message) {
   });
 }
 
-/// Spoken SOS copy for cloud/local TTS (background has no EasyLocalization).
-String _sosSpokenBackupText(RemoteMessage message) {
-  final body = message.notification?.body?.trim() ?? '';
-  if (body.isNotEmpty) return body;
-  final data = message.data;
-  final name = data['pilgrim_name']?.toString() ?? 'A pilgrim';
-  final group = data['group_name']?.toString() ?? '';
-  if (group.isEmpty) {
-    return 'SOS Alert! $name needs immediate help.';
-  }
-  return 'SOS Alert! $name needs immediate help in $group.';
-}
-
-/// Cloud TTS when the app is killed, backgrounded, or the screen is off.
+/// Bundled SOS MP3 when the app is killed, backgrounded, or the screen is off.
 @pragma('vm:entry-point')
-Future<void> _playSosAlertTtsInBackground(RemoteMessage message) async {
+Future<void> _playSosAlertAudioInBackground(RemoteMessage message) async {
   try {
     final role = await SecureSessionStore.getRole();
     if (role != 'moderator') {
-      AppLogger.i('🔊 SOS TTS [background]: skipped (role=$role)');
+      AppLogger.i('🔊 SOS audio [background]: skipped (role=$role)');
       return;
     }
 
-    final text = _sosSpokenBackupText(message);
-    if (text.isEmpty) return;
-
-    final lang = TtsCloudApi.normalizeLang(
-      await LocalePrefs.readLanguageCode(),
+    final payload = SosModeratorPayload.fromMap(
+      Map<String, dynamic>.from(message.data),
     );
-    final sosId = message.data['sos_id']?.toString() ?? '';
-    final pilgrimId = message.data['pilgrim_id']?.toString() ?? '';
-
-    AppLogger.i(
-      '🔊 SOS TTS [background]: "$text" (lang=$lang, '
-      'audioUrl=pending)',
-    );
-
-    await ApiService.restoreForBackgroundIsolate();
-    final audioFuture = TtsCloudApi.fetchAudioUrl(text: text, lang: lang);
+    final storageKey = payload.storageKey;
 
     var wakelockOn = false;
     if (Platform.isAndroid || Platform.isIOS) {
@@ -256,22 +233,18 @@ Future<void> _playSosAlertTtsInBackground(RemoteMessage message) async {
         await WakelockPlus.enable();
         wakelockOn = true;
       } catch (e) {
-        AppLogger.w('[SOS TTS] WakeLock failed (non-fatal): $e');
+        AppLogger.w('[SOS audio] WakeLock failed (non-fatal): $e');
       }
     }
 
     try {
-      await Future.delayed(kUrgentAlertToTtsDelay);
-      final audioUrl = await audioFuture;
-      await SpeechService.playRobust(
-        audioUrl: audioUrl,
-        backupText: text,
-        lang: lang,
-        isUrgent: true,
-        messageKey: sosId.isNotEmpty
-            ? 'sos_speak_$sosId'
-            : (pilgrimId.isNotEmpty ? 'sos_speak_$pilgrimId' : null),
-      );
+      if (await SosAlertAudio.wasHandledByMainIsolate(storageKey)) {
+        AppLogger.i(
+          '🔊 SOS audio [background]: skipped (main isolate handled)',
+        );
+        return;
+      }
+      await SosAlertAudio.playBackgroundSequence(storageKey: storageKey);
     } finally {
       if (wakelockOn) {
         try {
@@ -280,7 +253,7 @@ Future<void> _playSosAlertTtsInBackground(RemoteMessage message) async {
       }
     }
   } catch (e, st) {
-    AppLogger.e('🔊 SOS TTS [background] failed: $e\n$st');
+    AppLogger.e('🔊 SOS audio [background] failed: $e\n$st');
   }
 }
 
@@ -433,9 +406,21 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     return;
   }
 
-  // SOS: tray is shown by FCM; speak aloud here (killed / locked / background).
+  // SOS: silent visual tray (data-only) + asset urgent + language in handler.
   if (_isSosAlertFcm(message)) {
-    await _playSosAlertTtsInBackground(message);
+    await NotificationService.instance.initialize();
+    if (message.notification == null) {
+      final data = message.data;
+      final title =
+          data['title']?.toString() ?? 'Munawwara Care';
+      final body = data['body']?.toString() ?? '';
+      await NotificationService.instance.showSosAlertTraySilent(
+        title: title,
+        body: body,
+        data: Map<String, dynamic>.from(data),
+      );
+    }
+    await _playSosAlertAudioInBackground(message);
     return;
   }
 
@@ -723,9 +708,22 @@ class NotificationService {
       ledColor: const Color(0xFF10B981),
     );
 
+    // SOS tray: visual only — audio from background handler assets.
+    final sosChannel = AndroidNotificationChannel(
+      'mc_sos_v2',
+      'SOS Alerts',
+      description: 'Pilgrim SOS alerts (sound played in-app)',
+      importance: Importance.max,
+      playSound: false,
+      enableVibration: true,
+      enableLights: true,
+      ledColor: const Color(0xFFF97316),
+    );
+
     await androidPlugin.createNotificationChannel(defaultChannel);
     await androidPlugin.createNotificationChannel(urgentChannel);
     await androidPlugin.createNotificationChannel(callChannel);
+    await androidPlugin.createNotificationChannel(sosChannel);
 
     AppLogger.i('✅ Notification channels created (v2)');
   }
@@ -749,6 +747,23 @@ class NotificationService {
     AppLogger.d('   Body: $body');
     AppLogger.d('   Has notification block: ${notification != null}');
     AppLogger.d('   Data keys: ${data.keys.toList()}');
+
+    // Foreground SOS: in-app chime + dialog only (no tray).
+    if (notificationType == 'sos_alert') {
+      if (WidgetsBinding.instance.lifecycleState ==
+          AppLifecycleState.resumed) {
+        AppLogger.i(
+          '[NotificationService] Skip SOS tray (foreground in-app handling)',
+        );
+        return;
+      }
+      await showSosAlertTraySilent(
+        title: title,
+        body: body,
+        data: data,
+      );
+      return;
+    }
 
     // Skip notifications with no meaningful content
     if (body.isEmpty && (title == 'Munawwara Care' || title.isEmpty)) {
@@ -822,6 +837,51 @@ class NotificationService {
   }
 
   // (Incoming call notifications are now handled by CallKitService)
+
+  // ── SOS tray (silent — handler plays urgent + language assets) ───────────
+
+  Future<void> showSosAlertTraySilent({
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    AppLogger.i('[NotificationService] SOS tray (silent, visual only)');
+
+    final androidDetails = AndroidNotificationDetails(
+      'mc_sos_v2',
+      'SOS Alerts',
+      channelDescription: 'Pilgrim SOS alerts (sound played in-app)',
+      importance: Importance.max,
+      priority: Priority.max,
+      playSound: false,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 500, 250, 500]),
+      enableLights: true,
+      color: const Color(0xFFF97316),
+      icon: '@mipmap/ic_launcher',
+      styleInformation: BigTextStyleInformation(body),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: false,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title,
+      body,
+      details,
+      payload: _encodePayload(data),
+    );
+  }
 
   // ── Show Urgent Notification ──────────────────────────────────────────────
 
