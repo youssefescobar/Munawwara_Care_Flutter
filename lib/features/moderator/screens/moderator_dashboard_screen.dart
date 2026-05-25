@@ -1392,7 +1392,7 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                   delegate: SliverChildBuilderDelegate((ctx, i) {
                     return Padding(
                       padding: EdgeInsets.only(
-                        bottom: i == groups.length - 1 ? 24.h : 16.h,
+                        bottom: i == groups.length - 1 ? 20.h : 12.h,
                       ),
                       child: _GroupCard(group: groups[i]),
                     );
@@ -1509,7 +1509,7 @@ class _GroupCard extends ConsumerWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
-          borderRadius: BorderRadius.circular(24.r),
+          borderRadius: BorderRadius.circular(20.r),
           border: Border.all(
             color: isDark ? AppColors.backgroundDark : const Color(0xFFE2E2F0),
             width: 1.2,
@@ -1517,105 +1517,103 @@ class _GroupCard extends ConsumerWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Padding(
-          padding: EdgeInsets.all(18.w),
+          padding: EdgeInsets.all(14.w),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  // Status + SOS badge + menu row
-                  Row(
-                    children: [
-                      _StatusBadge(),
-                      const Spacer(),
-                      if (group.sosCount > 0) ...[
-                        _SosBadge(count: group.sosCount),
-                        SizedBox(width: 6.w),
-                      ],
-                      // Delete button
-                      GestureDetector(
-                        onTap: () => _confirmDelete(context, ref),
-                        child: Container(
-                          width: 38.w,
-                          height: 38.w,
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF3D1515)
-                                : const Color(0xFFFEE2E2),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFFEF4444).withValues(
-                                alpha: 0.35,
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: Icon(
-                            Symbols.delete,
-                            size: 20.w,
-                            color: const Color(0xFFDC2626),
-                            fill: 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 14.h),
-
-                  // Group name
-                  Text(
-                    group.groupName,
-                    style: TextStyle(
-                      fontFamily: 'Lexend',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20.sp,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A4E),
-                    ),
-                  ),
-
-                  SizedBox(height: 4.h),
-
-                  // Group code
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.tag,
-                        size: 14.w,
-                        color: AppColors.textMutedLight,
-                      ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        group.groupCode,
-                        style: TextStyle(
-                          fontFamily: 'Lexend',
-                          fontSize: 12.sp,
-                          color: AppColors.textMutedLight,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 18.h),
-
-                  // Stats grid
-                  Container(
-                    padding: EdgeInsets.only(top: 14.h),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF383018)
-                              : const Color(0xFFEEEEF8),
-                        ),
-                      ),
-                    ),
-                    child: Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          group.groupName,
+                          style: TextStyle(
+                            fontFamily: 'Lexend',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 17.sp,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A1A4E),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 2.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Symbols.tag,
+                              size: 12.w,
+                              color: AppColors.textMutedLight,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              group.groupCode,
+                              style: TextStyle(
+                                fontFamily: 'Lexend',
+                                fontSize: 11.sp,
+                                color: AppColors.textMutedLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (group.sosCount > 0) ...[
+                    _SosBadge(count: group.sosCount),
+                    SizedBox(width: 6.w),
+                  ],
+                  GestureDetector(
+                    onTap: () => _confirmDelete(context, ref),
+                    child: Container(
+                      width: 32.w,
+                      height: 32.w,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF3D1515)
+                            : const Color(0xFFFEE2E2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFEF4444).withValues(
+                            alpha: 0.35,
+                          ),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Symbols.delete,
+                        size: 18.w,
+                        color: const Color(0xFFDC2626),
+                        fill: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12.h),
+              Container(
+                padding: EdgeInsets.only(top: 10.h),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF383018)
+                          : const Color(0xFFEEEEF8),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
                         Expanded(
                           child: _StatCell(
                             label: 'dashboard_stat_pilgrims'.tr(),
@@ -1651,15 +1649,11 @@ class _GroupCard extends ConsumerWidget {
                                 : AppColors.textMutedLight,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 18.h),
-
-                  // Actions Row: View on Map & Chat
-                  // IntrinsicHeight: stretch needs bounded cross-axis; Column in sliver gives unbounded height.
-                  IntrinsicHeight(
+                  ],
+                ),
+              ),
+              SizedBox(height: 12.h),
+              IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -1682,8 +1676,8 @@ class _GroupCard extends ConsumerWidget {
                             child: Container(
                               alignment: Alignment.center,
                               padding: EdgeInsets.symmetric(
-                                vertical: 11.h,
-                                horizontal: 12.w,
+                                vertical: 8.h,
+                                horizontal: 10.w,
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
@@ -1691,7 +1685,7 @@ class _GroupCard extends ConsumerWidget {
                                         0xFF6B7BAE,
                                       ).withValues(alpha: 0.1)
                                     : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(12.r),
+                                borderRadius: BorderRadius.circular(10.r),
                                 border: Border.all(
                                   color: isDark
                                       ? const Color(
@@ -1717,13 +1711,13 @@ class _GroupCard extends ConsumerWidget {
                                       style: TextStyle(
                                         fontFamily: 'Lexend',
                                         fontWeight: FontWeight.w600,
-                                        fontSize: 13.sp,
+                                        fontSize: 12.sp,
                                         height: 1.2,
                                         color: const Color(0xFF6B7BAE),
                                       ),
                                     ),
                                   ),
-                                  SizedBox(width: 6.w),
+                                  SizedBox(width: 4.w),
                                   Transform.scale(
                                     scaleX:
                                         Directionality.of(context) ==
@@ -1732,7 +1726,7 @@ class _GroupCard extends ConsumerWidget {
                                         : 1,
                                     child: Icon(
                                       Symbols.arrow_forward,
-                                      size: 14.w,
+                                      size: 13.w,
                                       color: const Color(0xFF6B7BAE),
                                     ),
                                   ),
@@ -1741,10 +1735,7 @@ class _GroupCard extends ConsumerWidget {
                             ),
                           ),
                         ),
-
-                        SizedBox(width: 12.w),
-
-                        // Chat Button
+                        SizedBox(width: 10.w),
                         Expanded(
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
@@ -1768,8 +1759,8 @@ class _GroupCard extends ConsumerWidget {
                             child: Container(
                               alignment: Alignment.center,
                               padding: EdgeInsets.symmetric(
-                                vertical: 11.h,
-                                horizontal: 12.w,
+                                vertical: 8.h,
+                                horizontal: 10.w,
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
@@ -1777,7 +1768,7 @@ class _GroupCard extends ConsumerWidget {
                                         0xFF6B7BAE,
                                       ).withValues(alpha: 0.1)
                                     : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(12.r),
+                                borderRadius: BorderRadius.circular(10.r),
                                 border: Border.all(
                                   color: isDark
                                       ? const Color(
@@ -1808,12 +1799,12 @@ class _GroupCard extends ConsumerWidget {
                                           style: TextStyle(
                                             fontFamily: 'Lexend',
                                             fontWeight: FontWeight.w600,
-                                            fontSize: 13.sp,
+                                            fontSize: 12.sp,
                                             color: const Color(0xFF6B7BAE),
                                           ),
                                         ),
                                       ),
-                                      SizedBox(width: 6.w),
+                                      SizedBox(width: 4.w),
                                       Transform.scale(
                                         scaleX:
                                             Directionality.of(context) ==
@@ -1822,7 +1813,7 @@ class _GroupCard extends ConsumerWidget {
                                             : 1,
                                         child: Icon(
                                           Symbols.arrow_forward,
-                                          size: 14.w,
+                                          size: 13.w,
                                           color: const Color(0xFF6B7BAE),
                                         ),
                                       ),
@@ -1844,10 +1835,10 @@ class _GroupCard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                  ),
-                ],
               ),
-            ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1877,37 +1868,6 @@ class _CountBadge extends StatelessWidget {
           fontFamily: 'Lexend',
           fontSize: 9.sp,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF97316),
-        borderRadius: BorderRadius.circular(100.r),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFF97316).withValues(alpha: 0.30),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Text(
-        'dashboard_active'.tr(),
-        style: TextStyle(
-          fontFamily: 'Lexend',
-          fontWeight: FontWeight.w700,
-          fontSize: 12.sp,
           color: Colors.white,
         ),
       ),
@@ -1977,13 +1937,13 @@ class _StatCell extends StatelessWidget {
             letterSpacing: 0.4,
           ),
         ),
-        SizedBox(height: 4.h),
+        SizedBox(height: 2.h),
         Text(
           value,
           style: TextStyle(
             fontFamily: 'Lexend',
             fontWeight: FontWeight.w700,
-            fontSize: 20.sp,
+            fontSize: 16.sp,
             color: valueColor,
           ),
         ),
@@ -2000,7 +1960,7 @@ class _VertDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 40.h,
+      height: 32.h,
       color: isDark ? const Color(0xFF383018) : const Color(0xFFEEEEF8),
     );
   }
