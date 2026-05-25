@@ -32,8 +32,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/providers/missed_calls_unread_provider.dart';
-import '../../calling/screens/voice_call_screen.dart';
-import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
+import '../../calling/call_navigation.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../shared/providers/message_provider.dart';
 import '../../shared/providers/suggested_area_provider.dart';
@@ -329,21 +328,13 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
       if (next.status == CallStatus.connected &&
           prev?.status == CallStatus.ringing &&
-          mounted &&
-          !isNavigatingToCall &&
-          !VoiceCallScreen.isActive) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const VoiceCallScreen()),
-        );
+          mounted) {
+        openVoiceCallScreen(context: context);
       }
       if (next.status == CallStatus.calling &&
           prev?.status != CallStatus.calling &&
-          mounted &&
-          !isNavigatingToCall &&
-          !VoiceCallScreen.isActive) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const VoiceCallScreen()),
-        );
+          mounted) {
+        openVoiceCallScreen(context: context);
       }
       if (next.status == CallStatus.ended && prev != null) {
         final wasInVoice =

@@ -7,7 +7,6 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -26,6 +25,7 @@ import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../call_signaling.dart';
+import '../call_navigation.dart';
 import '../native_call_coordinator.dart';
 import '../screens/voice_call_screen.dart';
 
@@ -814,13 +814,7 @@ class CallNotifier extends Notifier<CallState> {
       // be retrying, but if it gave up this is the reliable fallback).
       if (!isNavigatingToCall && !VoiceCallScreen.isActive) {
         Future.delayed(const Duration(milliseconds: 200), () {
-          if (VoiceCallScreen.isActive) return;
-          final nav = AppRouter.navigatorKey.currentState;
-          if (nav != null) {
-            nav.push(
-              MaterialPageRoute(builder: (_) => const VoiceCallScreen()),
-            );
-          }
+          openVoiceCallScreen();
         });
       }
     }

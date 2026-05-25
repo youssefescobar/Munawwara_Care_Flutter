@@ -23,8 +23,7 @@ import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../calling/providers/call_provider.dart';
-import '../../calling/screens/voice_call_screen.dart';
-import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
+import '../../calling/call_navigation.dart';
 import '../../../core/router/app_router.dart' show AppRouter;
 import '../../invitations/providers/invitation_provider.dart';
 import '../../invitations/widgets/pending_invitations_section.dart';
@@ -197,12 +196,8 @@ class _ModeratorDashboardScreenState
     ref.listenManual(callProvider, (prev, next) {
       if (next.status == CallStatus.connected &&
           prev?.status == CallStatus.ringing &&
-          mounted &&
-          !isNavigatingToCall &&
-          !VoiceCallScreen.isActive) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const VoiceCallScreen()),
-        );
+          mounted) {
+        openVoiceCallScreen(context: context);
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {

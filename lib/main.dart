@@ -22,6 +22,7 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/calling/calling_scope.dart';
 import 'features/calling/providers/call_provider.dart';
 import 'features/calling/native_call_coordinator.dart';
+import 'features/calling/widgets/active_call_banner.dart';
 import 'features/moderator/services/sos_alert_coordinator.dart';
 
 void main() async {
@@ -167,7 +168,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                 onTap: () {
                   FocusManager.instance.primaryFocus?.unfocus();
                 },
-                child: _HotReloadSosAlertSuppressor(child: child!),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _HotReloadSosAlertSuppressor(child: child!),
+                    const ActiveCallBanner(),
+                  ],
+                ),
               ),
             );
           },

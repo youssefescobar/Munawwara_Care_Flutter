@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/backend_config.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/callkit_service.dart';
+import 'call_navigation.dart';
 import '../../core/services/secure_session_store.dart';
 import '../../core/utils/app_logger.dart';
 import 'calling_scope.dart';
@@ -428,19 +428,24 @@ void _tryPushVoiceCall({required int attemptsLeft}) {
     );
     return;
   }
-  final nav = AppRouter.navigatorKey.currentState;
-  if (nav != null) {
-    if (VoiceCallScreen.isActive) {
-      _navigatingToCall = false;
-      AppLogger.d('📞 VoiceCallScreen already active — skipping push');
-      return;
-    }
-    nav
-        .push(MaterialPageRoute(builder: (_) => const VoiceCallScreen()))
-        .then((_) => _navigatingToCall = false);
+  if (VoiceCallScreen.isActive) {
+    _navigatingToCall = false;
+    AppLogger.d('📞 VoiceCallScreen already active — skipping push');
+    return;
+  }
+  final pushed = openVoiceCallScreen();
+  if (pushed != null) {
+    unawaited(
+      pushed.then((_) {
+        _navigatingToCall = false;
+      }),
+    );
     AppLogger.i(
       '📞 Navigated to VoiceCallScreen (attempt ${16 - attemptsLeft})',
     );
+  } else if (AppRouter.navigatorKey.currentState != null) {
+    _navigatingToCall = false;
+    AppLogger.d('📞 VoiceCallScreen push skipped (navigator ready)');
   } else {
     Future.delayed(const Duration(milliseconds: 400), () {
       _tryPushVoiceCall(attemptsLeft: attemptsLeft - 1);

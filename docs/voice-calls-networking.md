@@ -76,6 +76,17 @@ Backend fix (May 2026): on ACK timeout, evict sockets in `user_<id>` and retry F
 
 App fix: `CallKitService.recoverStaleIncomingCallGuards()` on dashboard load clears stuck ring dedup state.
 
+## In-app call UI (return after leaving the screen)
+
+`VoiceCallScreen` is pushed on top of the dashboard stack. **Swiping back does not end the call** — Agora and `callProvider` stay active.
+
+If you leave the call screen while audio is still connected, a **Return to call** bar appears at the bottom of the app (pilgrim and moderator). Tap it to reopen `VoiceCallScreen`.
+
+| File | Role |
+|------|------|
+| `lib/features/calling/widgets/active_call_banner.dart` | Global banner when `isInCall` and call UI is not visible |
+| `lib/features/calling/call_navigation.dart` | `openVoiceCallScreen()` — single entry for navigation |
+
 ## Related code
 
 | File | Role |
@@ -83,4 +94,5 @@ App fix: `CallKitService.recoverStaleIncomingCallGuards()` on dashboard load cle
 | `lib/core/services/api_service.dart` | `API_BASE_URL`, `SOCKET_BASE_URL`, `socketOrigin` |
 | `lib/features/calling/call_signaling.dart` | Socket emit + HTTP fallbacks |
 | `lib/core/services/agora_rtc_service.dart` | Agora join + `/call-history/agora-token` |
+| `lib/features/calling/providers/call_provider.dart` | Call session state (`isInCall`) |
 | `mc_backend_app/sockets/socket_manager.js` | `call-offer`, FCM parallel delivery |
