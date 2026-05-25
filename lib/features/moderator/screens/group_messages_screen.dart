@@ -19,6 +19,7 @@ import '../../../core/widgets/custom_dialog.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../shared/models/message_model.dart';
 import '../../shared/providers/message_provider.dart';
+import '../../shared/services/message_realtime_binder.dart';
 import '../providers/moderator_provider.dart';
 import '../../shared/widgets/group_chat_theme.dart';
 import '../../shared/widgets/message_widgets.dart';
@@ -96,6 +97,8 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
         });
       }
     });
+
+    MessageRealtimeBinder.bindDeleteListener();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -533,10 +536,6 @@ class _GroupMessagesScreenState extends ConsumerState<GroupMessagesScreen> {
               onRefresh: _refreshMessages,
               onBack: () => Navigator.of(context).maybePop(),
               showBrandAvatar: true,
-            ),
-            Container(
-              height: 46.h,
-              color: GroupChatTheme.filterStripBackground(isDark),
             ),
             Expanded(
               child: showLoading

@@ -42,6 +42,7 @@ import '../widgets/moderator_groups_speed_dial.dart';
 import '../services/moderator_global_nav_beacon_controller.dart';
 import '../services/moderator_sos_engagement_store.dart';
 import '../services/sos_alert_coordinator.dart';
+import '../../shared/services/message_realtime_binder.dart';
 import '../providers/moderator_sos_engagement_provider.dart';
 import '../../shared/providers/message_provider.dart';
 
@@ -293,8 +294,15 @@ class _ModeratorDashboardScreenState
         unawaited(
           _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
         );
-        // Listen for real-time SOS alerts (cancel handled globally in bootstrap).
+        SosAlertCoordinator.bindCancelListeners();
         SocketService.on('sos-alert-received', _onSosAlertArrived);
+        SocketService.on('sos-alert-cancelled', (data) async {
+          if (!mounted) return;
+          final map = data is Map
+              ? Map<String, dynamic>.from(data)
+              : <String, dynamic>{};
+          await SosAlertCoordinator.handleCancelledFromMap(map);
+        });
         // Cross-moderator status updates (reviewing / in-call)
         SocketService.on('sos-moderator-responding', (data) async {
           if (!mounted || data is! Map) return;
@@ -439,6 +447,8 @@ class _ModeratorDashboardScreenState
             AppLogger.e('[ModeratorDashboard] new_message handler error: $e');
           }
         });
+
+        MessageRealtimeBinder.bindDeleteListener();
     }
   }
 

@@ -148,18 +148,29 @@ class NotificationNotifier extends Notifier<NotificationState> {
   }
 
   /// Removes SOS rows for [pilgrimId] (and optional [sosId]) from bell/badge state.
+  static String? _normalizeId(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) {
+      final nested = value['_id'] ?? value['id'];
+      return nested?.toString().trim();
+    }
+    final s = value.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   void removeSosAlertsForPilgrim(String pilgrimId, {String? sosId}) {
     if (pilgrimId.isEmpty && (sosId == null || sosId.isEmpty)) return;
+    final targetPid = pilgrimId.trim();
+    final targetSid = sosId?.trim() ?? '';
     var removedUnread = 0;
     final kept = state.notifications.where((n) {
       if (n.type != 'sos_alert') return true;
-      final pid = n.data?['pilgrim_id'] ?? n.data?['pilgrimId'];
-      final sid = n.data?['sos_id'] ?? n.data?['sosId'];
+      final pid = _normalizeId(n.data?['pilgrim_id'] ?? n.data?['pilgrimId']);
+      final sid = _normalizeId(n.data?['sos_id'] ?? n.data?['sosId']);
       final matchPilgrim =
-          pilgrimId.isNotEmpty && pid?.toString() == pilgrimId;
-      final matchSos = sosId != null &&
-          sosId.isNotEmpty &&
-          sid?.toString() == sosId;
+          targetPid.isNotEmpty && pid != null && pid == targetPid;
+      final matchSos =
+          targetSid.isNotEmpty && sid != null && sid == targetSid;
       final match = matchPilgrim || matchSos;
       if (match && !n.read) removedUnread++;
       return !match;

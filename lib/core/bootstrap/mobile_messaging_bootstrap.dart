@@ -12,7 +12,10 @@ import '../../features/calling/calling_scope.dart';
 import '../../features/calling/native_call_coordinator.dart';
 import '../../features/moderator/models/sos_moderator_payload.dart';
 import '../../features/moderator/services/sos_alert_coordinator.dart';
+import '../../features/shared/providers/message_provider.dart';
+import '../../features/shared/services/message_realtime_binder.dart';
 import '../router/app_router.dart';
+import '../utils/route_id_utils.dart';
 import '../services/callkit_service.dart';
 import '../services/incoming_chat_sfx.dart';
 import '../services/notification_service.dart';
@@ -24,11 +27,34 @@ import '../widgets/reminder_popup.dart';
 String? globalFcmToken;
 bool _mobileMessagingBound = false;
 
+/// When chat FCM is suppressed in the foreground, still refresh chat if the
+/// socket missed [new_message] (common after ghost-socket eviction).
+Future<void> refreshChatFromFcmData(Map<String, dynamic> data) async {
+  final notifType =
+      data['notification_type']?.toString() ?? data['type']?.toString() ?? '';
+  if (notifType != 'new_message' && notifType != 'meetpoint') return;
+
+  final groupId = normalizeRouteId(data['group_id']?.toString() ?? '');
+  if (groupId.isEmpty) return;
+
+  final c = CallingScope.riverpod;
+  if (c == null) return;
+
+  AppLogger.i(
+    '[FCM] Foreground chat refresh for group=$groupId (socket fallback)',
+  );
+  await c.read(messageProvider.notifier).loadMessages(groupId, force: true);
+}
+
 Future<void> bindMobileMessagingServices() async {
   if (_mobileMessagingBound) return;
 
   await NotificationService.instance.ensureInitialized();
   AppLogger.i('Notification service initialized');
+
+  // Socket cancel must bind even when FCM setup fails (e.g. no Play Services).
+  SosAlertCoordinator.bindCancelListeners();
+  MessageRealtimeBinder.bindDeleteListener();
 
   final riverpod = CallingScope.riverpod;
   if (riverpod != null) {
@@ -54,7 +80,6 @@ Future<void> bindMobileMessagingServices() async {
       badge: true,
       sound: false,
     );
-    SosAlertCoordinator.bindCancelListeners();
 
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
       globalFcmToken = newToken;
@@ -143,8 +168,9 @@ Future<void> bindMobileMessagingServices() async {
           (notifType.isEmpty || notifType == 'urgent');
       if (isChatNotif || urgentChatNoNotifType) {
         AppLogger.i(
-          'FCM onMessage: suppressed (socket + in-app chat for urgent)',
+          'FCM onMessage: suppressed tray (socket primary; refresh fallback)',
         );
+        unawaited(refreshChatFromFcmData(msg.data));
         return;
       }
       final fcmType = msg.data['type']?.toString() ?? '';

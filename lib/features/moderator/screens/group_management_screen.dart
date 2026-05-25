@@ -3447,6 +3447,86 @@ class _PilgrimManageTile extends StatelessWidget {
                   ),
                 ),
               ),
+            ] else ...[
+              SizedBox(width: 4.w),
+              PopupMenuButton<String>(
+                tooltip: '',
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  Symbols.more_vert,
+                  size: 18.w,
+                  color: isDark ? AppColors.primary : AppColors.textMutedLight,
+                ),
+                iconSize: 18.w,
+                offset: AppPopupMenu.offsetRowTrailingMore,
+                shape: AppPopupMenu.panelShape(),
+                constraints: AppPopupMenu.panelConstraints(),
+                color: AppPopupMenu.panelColor(isDark),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'profile':
+                      onViewProfile?.call();
+                    case 'navigate':
+                      onNavigate();
+                    case 'chat':
+                      onChat();
+                    case 'call':
+                      onCall?.call();
+                    case 'remove':
+                      onRemove?.call();
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (onViewProfile != null)
+                    PopupMenuItem(
+                      value: 'profile',
+                      child: AppPopupMenu.actionRow(
+                        icon: Symbols.person,
+                        label: 'manage_view_full_profile'.tr(),
+                        isDark: isDark,
+                        iconColor: AppColors.primary,
+                      ),
+                    ),
+                  PopupMenuItem(
+                    value: 'navigate',
+                    child: AppPopupMenu.actionRow(
+                      icon: Symbols.near_me,
+                      label: 'area_navigate'.tr(),
+                      isDark: isDark,
+                      iconColor: AppColors.primary,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'chat',
+                    child: AppPopupMenu.actionRow(
+                      icon: Symbols.chat,
+                      label: 'tab_chat'.tr(),
+                      isDark: isDark,
+                      iconColor: AppColors.primary,
+                    ),
+                  ),
+                  if (onCall != null)
+                    PopupMenuItem(
+                      value: 'call',
+                      child: AppPopupMenu.actionRow(
+                        icon: Symbols.call,
+                        label: 'group_call_prefix'.tr(),
+                        isDark: isDark,
+                        iconColor: const Color(0xFF16A34A),
+                      ),
+                    ),
+                  if (onRemove != null)
+                    PopupMenuItem(
+                      value: 'remove',
+                      child: AppPopupMenu.actionRow(
+                        icon: Symbols.person_remove,
+                        label: 'group_remove_confirm'.tr(),
+                        isDark: isDark,
+                        destructive: true,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ],
         ),

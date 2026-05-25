@@ -475,6 +475,23 @@ class PilgrimNotifier extends Notifier<PilgrimState> {
     state = state.copyWith(sosActive: false, clearSosId: true);
   }
 
+  /// Notifies the server that the active SOS was cancelled (socket or HTTP).
+  Future<bool> cancelSosRemote({String? sosId}) async {
+    final payload = <String, dynamic>{};
+    if (sosId != null && sosId.isNotEmpty) {
+      payload['sos_id'] = sosId;
+    }
+    try {
+      await ApiService.dio.post('/pilgrim/sos/cancel', data: payload);
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(error: ApiService.parseError(e));
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Clear all group-related state when pilgrim is removed from group
   void clearGroupState() {
     state = state.copyWith(

@@ -144,10 +144,9 @@ class SosAlertCoordinator {
         pid,
         sosId: payload.sosId,
       );
-      // Sync badge + Active SOS tab from server; do not refetch() immediately
-      // or stale SOS rows can reappear before DB delete completes.
-      unawaited(mod?.loadDashboard(silently: true) ?? Future.value());
-      unawaited(notif?.fetchUnreadCount() ?? Future.value());
+      // Force dashboard sync so has_sos clears even if a recent load was throttled.
+      await mod?.loadDashboard(silently: true, force: true);
+      await notif?.fetchUnreadCount();
     }
 
     _lastShownSosId = null;

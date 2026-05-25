@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/helpers/chat_notification_helper.dart';
+import '../../shared/services/message_realtime_binder.dart';
 import '../../shared/helpers/deferred_urgent_chat_popup.dart';
 import '../../../core/bootstrap/app_startup_coordinator.dart';
 import '../../../core/services/api_service.dart';
@@ -494,6 +495,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         SocketService.onConnected(_onSocketConnected);
 
         final socketUrl = ApiService.socketOrigin;
+        MessageRealtimeBinder.bindDeleteListener();
         SocketService.connect(
           serverUrl: socketUrl,
           userId: auth.userId!,
@@ -591,9 +593,13 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
               return;
             }
             // Append the single message without a full reload (no spinner)
-            final appended =
-                ref.read(messageProvider.notifier).appendMessage(map);
+            final msgNotifier = ref.read(messageProvider.notifier);
+            final appended = msgNotifier.appendMessage(map);
             if (!appended) {
+              AppLogger.w(
+                '[PilgrimDashboard] appendMessage failed — refetching chat',
+              );
+              unawaited(msgNotifier.loadMessages(groupId, force: true));
               return;
             }
 
@@ -634,19 +640,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           }
         });
 
-        // Listen for deleted messages — remove silently to avoid flicker
-        SocketService.on('message_deleted', (data) {
-          if (!mounted) return;
-          try {
-            final map = Map<String, dynamic>.from(data as Map);
-            final messageId = map['message_id'] as String?;
-            if (messageId != null) {
-              ref.read(messageProvider.notifier).removeMessage(messageId);
-            }
-          } catch (e) {
-            AppLogger.e('[PilgrimDashboard] message_deleted handler error: $e');
-          }
-        });
+        // message_deleted: global [MessageRealtimeBinder] (bootstrap + below)
 
         // Listen for suggested area / meetpoint additions
         SocketService.on('area_added', (data) {
@@ -851,7 +845,6 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     SocketService.off('mod_nav_beacon');
     SocketService.off('removed-from-group');
     SocketService.off('new_message');
-    SocketService.off('message_deleted');
     SocketService.off('area_added');
     SocketService.off('area_deleted');
     SocketService.off('notification_refresh');
@@ -1474,10 +1467,10 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       ),
     );
     if (confirmed != true || !mounted) return;
-    _performCancelSOS();
+    await _performCancelSOS();
   }
 
-  void _performCancelSOS() {
+  Future<void> _performCancelSOS() async {
     _stopSosHelpTimers();
     _sosResolvedUiTimer?.cancel();
     _sosResolvedUiTimer = null;
@@ -1505,12 +1498,27 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     ref.read(pilgrimProvider.notifier).cancelSOS();
 
     if (groupId != null) {
+      final pilgrimId = ref.read(authProvider).userId;
       final payload = <String, dynamic>{
         'groupId': groupId,
-        'pilgrimId': ref.read(authProvider).userId,
+        'pilgrimId': pilgrimId,
       };
       if (sosId != null) payload['sos_id'] = sosId;
-      SocketService.emit('sos_cancel', payload);
+
+      if (SocketService.isConnected) {
+        SocketService.emit('sos_cancel', payload);
+      } else {
+        final ok = await ref
+            .read(pilgrimProvider.notifier)
+            .cancelSosRemote(sosId: sosId);
+        if (!ok && mounted) {
+          StandardSnackBar.showError(
+            context,
+            ref.read(pilgrimProvider).error ?? 'error_generic'.tr(),
+          );
+          return;
+        }
+      }
     }
     if (!mounted) return;
     StandardSnackBar.showSuccess(context, 'sos_cancelled'.tr());

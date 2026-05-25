@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/api_service.dart';
@@ -329,10 +331,91 @@ class MessageNotifier extends Notifier<MessageState> {
     }
   }
 
-  /// Silently removes a message received via socket (no loading state).
-  void removeMessage(String messageId) {
-    state = state.copyWith(
-      messages: state.messages.where((m) => m.id != messageId).toList(),
+  /// Silently removes a message (socket or local delete). Updates disk cache.
+  void removeMessage(String messageId, {String? groupId}) {
+    final normalizedId = mongoIdString(messageId);
+    if (normalizedId.isEmpty) return;
+
+    String? resolvedGroupId;
+    if (groupId != null && groupId.trim().isNotEmpty) {
+      resolvedGroupId = normalizeRouteId(groupId);
+    } else {
+      for (final m in state.messages) {
+        if (m.id == normalizedId) {
+          resolvedGroupId = m.groupId;
+          break;
+        }
+      }
+    }
+
+    final nextMessages =
+        state.messages.where((m) => m.id != normalizedId).toList();
+    if (nextMessages.length != state.messages.length) {
+      state = state.copyWith(messages: nextMessages);
+    }
+
+    if (resolvedGroupId != null && resolvedGroupId.isNotEmpty) {
+      unawaited(_removeMessageFromCache(resolvedGroupId, normalizedId));
+    }
+  }
+
+  /// Handles `message_deleted` from socket.io (moderator + pilgrim).
+  void onMessageDeleted(Map<String, dynamic> data) {
+    final messageId = mongoIdString(
+      data['message_id'] ?? data['messageId'],
+    );
+    if (messageId.isEmpty) return;
+
+    final payloadGroupId = mongoIdString(
+      data['group_id'] ?? data['groupId'],
+    );
+    if (payloadGroupId.isNotEmpty) {
+      final active = state.activeGroupId;
+      if (active != null &&
+          active.isNotEmpty &&
+          normalizeRouteId(active) != normalizeRouteId(payloadGroupId)) {
+        return;
+      }
+    }
+
+    removeMessage(
+      messageId,
+      groupId: payloadGroupId.isEmpty ? null : payloadGroupId,
+    );
+  }
+
+  Future<void> _removeMessageFromCache(
+    String groupId,
+    String messageId,
+  ) async {
+    final normalizedGroupId = normalizeRouteId(groupId);
+    final normalizedId = messageId.toString().trim();
+    if (normalizedGroupId.isEmpty || normalizedId.isEmpty) return;
+    final uid = await SecureSessionStore.getUserId();
+    if (uid == null) return;
+    final blob = AppDataCache.jsonMap(
+      await AppDataCache.readData(
+        uid,
+        AppDataCache.messagesFile(normalizedGroupId),
+      ),
+    );
+    if (blob == null) return;
+    final listRaw = blob['data'];
+    if (listRaw is! List<dynamic>) return;
+    final filtered = <dynamic>[];
+    for (final item in listRaw) {
+      final jm = AppDataCache.jsonMap(item);
+      if (jm == null) {
+        filtered.add(item);
+        continue;
+      }
+      final id = mongoIdString(jm['_id'] ?? jm['id']);
+      if (id != normalizedId) filtered.add(item);
+    }
+    await AppDataCache.write(
+      uid,
+      AppDataCache.messagesFile(normalizedGroupId),
+      _trimMessagesBody({'data': filtered}),
     );
   }
 
@@ -517,11 +600,11 @@ class MessageNotifier extends Notifier<MessageState> {
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   Future<bool> deleteMessage(String messageId) async {
+    final normalizedId = messageId.toString().trim();
+    if (normalizedId.isEmpty) return false;
     try {
-      await ApiService.dio.delete('/messages/$messageId');
-      state = state.copyWith(
-        messages: state.messages.where((m) => m.id != messageId).toList(),
-      );
+      await ApiService.dio.delete('/messages/$normalizedId');
+      removeMessage(normalizedId);
       return true;
     } catch (_) {
       return false;

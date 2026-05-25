@@ -4,7 +4,8 @@
 
 import '../../../core/utils/app_logger.dart';
 
-String _mongoIdString(dynamic raw) {
+/// Normalizes Mongo/API/socket id fields to a plain hex string.
+String mongoIdString(dynamic raw) {
   if (raw == null) return '';
   if (raw is String && raw.trim().isNotEmpty) return raw.trim();
   if (raw is Map) {
@@ -52,7 +53,7 @@ class MessageReplySnapshot {
   factory MessageReplySnapshot.fromJson(Map<String, dynamic> j) {
     final mid = j['message_id'];
     return MessageReplySnapshot(
-      messageId: mid == null ? '' : _mongoIdString(mid),
+      messageId: mid == null ? '' : mongoIdString(mid),
       senderName: j['sender_name']?.toString() ?? '',
       previewText: j['preview_text']?.toString() ?? '',
       messageType: j['message_type']?.toString() ?? 'text',
@@ -149,9 +150,11 @@ class GroupMessage {
       }
 
       return GroupMessage(
-        id: _mongoIdString(j['_id']),
-        groupId: j['group_id']?.toString() ?? '',
-        recipientId: j['recipient_id']?.toString(),
+        id: mongoIdString(j['_id']),
+        groupId: mongoIdString(j['group_id']),
+        recipientId: mongoIdString(j['recipient_id']).isEmpty
+            ? null
+            : mongoIdString(j['recipient_id']),
         sender: sender,
         senderModel: j['sender_model']?.toString() ?? 'User',
         type: j['type']?.toString() ?? 'text',
