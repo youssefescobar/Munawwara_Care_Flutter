@@ -21,6 +21,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/keep_alive_tab.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/services/callkit_service.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
@@ -98,6 +99,7 @@ class _ModeratorDashboardScreenState
 
   void _reconcileCallsAfterSocketReady() {
     if (!mounted) return;
+    unawaited(CallKitService.instance.recoverStaleIncomingCallGuards());
     unawaited(
       ref.read(callProvider.notifier).reconcileCallStateAfterProcessDeath(),
     );

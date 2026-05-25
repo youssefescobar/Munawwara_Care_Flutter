@@ -29,6 +29,7 @@ import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/keep_alive_tab.dart';
 import '../../../core/widgets/standard_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/services/callkit_service.dart';
 import '../../calling/providers/call_provider.dart';
 import '../../calling/providers/missed_calls_unread_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
@@ -189,6 +190,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
 
   void _reconcileCallsAfterSocketReady() {
     if (!mounted) return;
+    unawaited(CallKitService.instance.recoverStaleIncomingCallGuards());
     unawaited(
       ref.read(callProvider.notifier).reconcileCallStateAfterProcessDeath(),
     );

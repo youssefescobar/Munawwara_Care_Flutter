@@ -85,6 +85,8 @@
   "settings_sign_out_confirm_body": "Çıkış yapmak istediğinizden emin misiniz?",
   "settings_cancel": "İptal",
   "legal_section_title": "GİZLİLİK VE DESTEK",
+  "about_title": "Hakkında",
+  "about_version_value": "Sürüm {version} (yapı {build})",
   "legal_privacy_policy": "Gizlilik Politikası",
   "legal_contact_support": "Destekle iletişim",
   "legal_request_deletion": "Hesap silme talebi",

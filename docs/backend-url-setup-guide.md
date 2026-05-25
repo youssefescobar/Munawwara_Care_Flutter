@@ -158,6 +158,7 @@ This sets both Dart (`String.fromEnvironment`) and Android native
 | Emulator can’t reach local backend | Use `10.0.2.2` or `API_ANDROID_HOST=10.0.2.2` |
 | Calls work in app but decline fails when killed | Open app once, or use `--dart-define` on release build |
 | Changed `.env` but app still uses old URL | Full restart (`flutter run` again), not just hot reload |
+| Calls only on same Wi‑Fi, not on 4G | LAN `API_BASE_URL` in build or cached prefs — see [voice-calls-networking.md](./voice-calls-networking.md) |
 
 ---
 

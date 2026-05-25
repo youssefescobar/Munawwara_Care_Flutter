@@ -85,6 +85,8 @@
   "settings_sign_out_confirm_body": "Êtes-vous sûr de vouloir vous déconnecter ?",
   "settings_cancel": "Annuler",
   "legal_section_title": "CONFIDENTIALITÉ ET ASSISTANCE",
+  "about_title": "À propos",
+  "about_version_value": "Version {version} (build {build})",
   "legal_privacy_policy": "Politique de confidentialité",
   "legal_contact_support": "Contacter l'assistance",
   "legal_request_deletion": "Demander la suppression du compte",

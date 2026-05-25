@@ -85,6 +85,8 @@
   "settings_sign_out_confirm_body": "Apakah Anda yakin ingin keluar?",
   "settings_cancel": "Batal",
   "legal_section_title": "PRIVASI & DUKUNGAN",
+  "about_title": "Tentang",
+  "about_version_value": "Versi {version} (build {build})",
   "legal_privacy_policy": "Kebijakan Privasi",
   "legal_contact_support": "Hubungi dukungan",
   "legal_request_deletion": "Minta penghapusan akun",

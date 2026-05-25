@@ -106,6 +106,8 @@
   "settings_sign_out_confirm_body": "Are you sure you want to sign out?",
   "settings_cancel": "Cancel",
   "legal_section_title": "PRIVACY & SUPPORT",
+  "about_title": "About",
+  "about_version_value": "Version {version} (build {build})",
   "legal_privacy_policy": "Privacy Policy",
   "legal_contact_support": "Contact support",
   "legal_request_deletion": "Request account deletion",

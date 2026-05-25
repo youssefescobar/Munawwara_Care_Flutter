@@ -498,6 +498,24 @@ class CallKitService {
     await clearPendingIncomingCall();
   }
 
+  /// Drops stale dedup guards when native UI shows no active call (fixes
+  /// "no ring" after a crashed or stuck CallKit session).
+  Future<void> recoverStaleIncomingCallGuards() async {
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls();
+      final hasActive =
+          activeCalls is List && activeCalls.isNotEmpty;
+      if (!hasActive) {
+        await clearLocalCallTracking();
+        AppLogger.i(
+          '📞 [CallKit] Cleared stale incoming-call guards (no native call)',
+        );
+      }
+    } catch (e) {
+      AppLogger.w('📞 [CallKit] recoverStaleIncomingCallGuards failed: $e');
+    }
+  }
+
   /// Server says this exact call attempt is still ringing (fail-closed on error).
   static Future<bool> verifyIncomingCallActive({
     required String callerId,

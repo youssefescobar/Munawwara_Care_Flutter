@@ -4,6 +4,8 @@
 
 Pilgrims and moderators can contact support or request account deletion **without leaving the app** or using `mailto:` links. The mobile app posts to the backend; the backend emails `munawwaracare@gmail.com` via Gmail SMTP.
 
+Both flows are opened from **Settings → About** (`AboutScreen`, route `/about`). See `docs/app-version-and-about.md`.
+
 ## API
 
 - `POST /api/support/request` (authenticated)

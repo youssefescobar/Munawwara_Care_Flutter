@@ -9,6 +9,7 @@ import '../../features/pilgrim/screens/pilgrim_dashboard_screen.dart';
 import '../../features/moderator/screens/moderator_dashboard_screen.dart';
 import '../../features/legal/screens/privacy_policy_screen.dart';
 import '../../features/legal/data/support_api.dart';
+import '../../features/legal/screens/about_screen.dart';
 import '../../features/legal/screens/contact_support_screen.dart';
 
 class AppRouter {
@@ -59,6 +60,14 @@ class AppRouter {
         path: '/privacy-policy',
         name: 'privacy-policy',
         builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        name: 'about',
+        builder: (context, state) {
+          final showDeletion = state.extra as bool? ?? true;
+          return AboutScreen(showAccountDeletion: showDeletion);
+        },
       ),
       GoRoute(
         path: '/contact-support',

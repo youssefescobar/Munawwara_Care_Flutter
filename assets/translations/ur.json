@@ -85,6 +85,8 @@
   "settings_sign_out_confirm_body": "کیا آپ واقعی سائن آؤٹ کرنا چاہتے ہیں؟",
   "settings_cancel": "منسوخ",
   "legal_section_title": "رازداری اور سپورٹ",
+  "about_title": "ایپ کے بارے میں",
+  "about_version_value": "ورژن {version} (بلڈ {build})",
   "legal_privacy_policy": "رازداری کی پالیسی",
   "legal_contact_support": "سپورٹ سے رابطہ",
   "legal_request_deletion": "اکاؤنٹ حذف کی درخواست",

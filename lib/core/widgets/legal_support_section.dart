@@ -5,8 +5,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_colors.dart';
-import '../widgets/custom_dialog.dart';
-/// Privacy, support, and account-deletion links for profile settings.
+
+/// Privacy policy and About entry for profile settings.
 class LegalSupportSection extends ConsumerWidget {
   const LegalSupportSection({
     super.key,
@@ -55,54 +55,20 @@ class LegalSupportSection extends ConsumerWidget {
               ),
               _DividerLine(color: dividerColor),
               _LegalRow(
-                icon: Icons.mail_outline_rounded,
-                label: 'legal_contact_support'.tr(),
+                icon: Icons.info_outline_rounded,
+                label: 'about_title'.tr(),
                 textPrimary: textPrimary,
                 textMuted: textMuted,
-                onTap: () => context.push('/contact-support'),
-              ),
-              if (showAccountDeletion) ...[
-                _DividerLine(color: dividerColor),
-                _LegalRow(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'legal_request_deletion'.tr(),
-                  textPrimary: textPrimary,
-                  textMuted: textMuted,
-                  isDestructive: true,
-                  onTap: () => _requestAccountDeletion(context),
+                onTap: () => context.push(
+                  '/about',
+                  extra: showAccountDeletion,
                 ),
-              ],
+              ),
             ],
-          ),
-        ),
-        SizedBox(height: 8.h),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4.w),
-          child: Text(
-            'legal_agora_disclosure'.tr(),
-            style: TextStyle(
-              fontFamily: 'Lexend',
-              fontSize: 11.sp,
-              color: textMuted,
-              height: 1.4,
-            ),
           ),
         ),
       ],
     );
-  }
-
-  Future<void> _requestAccountDeletion(BuildContext context) async {
-    final confirmed = await StandardDialog.show<bool>(
-      context: context,
-      title: 'legal_deletion_confirm_title',
-      content: 'legal_deletion_confirm_body',
-      confirmText: 'legal_deletion_confirm_action',
-      cancelText: 'settings_cancel',
-      isDestructive: true,
-    );
-    if (confirmed != true || !context.mounted) return;
-    context.push('/request-account-deletion');
   }
 }
 
@@ -137,7 +103,6 @@ class _LegalRow extends StatelessWidget {
     required this.textPrimary,
     required this.textMuted,
     required this.onTap,
-    this.isDestructive = false,
   });
 
   final IconData icon;
@@ -145,11 +110,10 @@ class _LegalRow extends StatelessWidget {
   final Color textPrimary;
   final Color textMuted;
   final VoidCallback onTap;
-  final bool isDestructive;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red.shade600 : AppColors.primary;
+    final color = AppColors.primary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16.r),
@@ -174,7 +138,7 @@ class _LegalRow extends StatelessWidget {
                   fontFamily: 'Lexend',
                   fontWeight: FontWeight.w600,
                   fontSize: 14.sp,
-                  color: isDestructive ? Colors.red.shade600 : textPrimary,
+                  color: textPrimary,
                 ),
               ),
             ),

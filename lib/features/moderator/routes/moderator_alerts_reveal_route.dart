@@ -38,7 +38,7 @@ Route<void> buildModeratorAlertsRevealRoute(BuildContext context) {
   return PageRouteBuilder<void>(
     transitionDuration: const Duration(milliseconds: 500),
     reverseTransitionDuration: const Duration(milliseconds: 400),
-    pageBuilder: (ctx, _, __) {
+    pageBuilder: (ctx, _, _) {
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
       return Scaffold(
         backgroundColor: isDark

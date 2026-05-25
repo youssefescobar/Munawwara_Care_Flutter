@@ -99,6 +99,8 @@
   "settings_sign_out_confirm_body": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
   "settings_cancel": "إلغاء",
   "legal_section_title": "الخصوصية والدعم",
+  "about_title": "حول التطبيق",
+  "about_version_value": "الإصدار {version} (البناء {build})",
   "legal_privacy_policy": "سياسة الخصوصية",
   "legal_contact_support": "تواصل مع الدعم",
   "legal_request_deletion": "طلب حذف الحساب",

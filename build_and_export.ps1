@@ -32,7 +32,7 @@ if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
 Good "Flutter found"
 
 # 3. Clean
-Step "Cleaning previous build files & caches..."
+Step "Cleaning previous build files and caches..."
 $gradlew = Join-Path $FLUTTER_DIR "android\gradlew.bat"
 if (Test-Path $gradlew) {
     Step "Stopping Gradle daemons to release file locks..."
@@ -65,6 +65,25 @@ Step "Fetching dependencies..."
 flutter pub get
 if ($LASTEXITCODE -ne 0) { Fail "flutter pub get failed" }
 Good "Dependencies synced successfully"
+
+# 4b. Warn if .env uses a LAN backend (calls/API fail off Wi-Fi)
+$envFile = Join-Path $FLUTTER_DIR ".env"
+if (Test-Path $envFile) {
+    $apiLine = Get-Content $envFile | Where-Object {
+        $_ -match '^\s*API_BASE_URL\s*=' -and $_ -notmatch '^\s*#'
+    } | Select-Object -First 1
+    if ($apiLine -match '192\.168\.|10\.0\.2\.2|localhost|127\.0\.0\.1|http://10\.') {
+        Warn "API_BASE_URL in .env looks like LAN/dev - release builds will NOT work on mobile data."
+        Warn "Use production HTTPS before Play upload. See docs/voice-calls-networking.md"
+    }
+}
+$pubspecPath = Join-Path $FLUTTER_DIR "pubspec.yaml"
+if (Test-Path $pubspecPath) {
+    $verLine = Get-Content $pubspecPath | Where-Object { $_ -match '^\s*version:\s*' } | Select-Object -First 1
+    if ($verLine) {
+        Good "Building app version: $($verLine.Trim())"
+    }
+}
 
 # 5. Build AAB (App Bundle)
 Step "Building release App Bundle (AAB)..."
@@ -107,7 +126,7 @@ if (Test-Path $APK_DEST) {
 }
 
 # 8. SHA-1 Fingerprint & File Hash Extraction
-Step "Extracting SHA-1 Keys & File Hashes..."
+Step "Extracting SHA-1 keys and file hashes..."
 
 # Compute File Hashing
 $apkFileHash = (Get-FileHash -Path $APK_DEST -Algorithm SHA1).Hash.ToLower()
@@ -168,7 +187,7 @@ if (Test-Path $keystorePath) {
     $keytool = Find-KeyTool
     if ($keytool -and $storePassword) {
         $ktOutput = & $keytool -list -v -keystore $keystorePath -alias $keyAlias -storepass $storePassword 2>&1
-        $sha1Line = $ktOutput | Select-String -Pattern "SHA1:\s+([0-9A-Fa-f:]+)"
+        $sha1Line = $ktOutput | Select-String -Pattern 'SHA1:\s+([0-9A-Fa-f:]+)'
         if ($sha1Line) {
             $sha1Fingerprint = ($sha1Line -split "SHA1:")[1].Trim()
         }
@@ -177,13 +196,18 @@ if (Test-Path $keystorePath) {
     if (-not $sha1Fingerprint -and (Test-Path $gradlew)) {
         Step "Direct keytool extraction failed. Attempting Gradle signingReport..."
         $gradleReport = & $gradlew -p (Join-Path $FLUTTER_DIR "android") signingReport 2>&1 | Out-String
-        $matches = [regex]::Matches($gradleReport, "(?ms)Variant:\s*release.*?SHA1:\s*([0-9A-Fa-f:]+)")
-        if ($matches.Count -gt 0) {
-            $sha1Fingerprint = $matches[0].Groups[1].Value.Trim()
+        $gradleShaMatches = [regex]::Matches(
+            $gradleReport,
+            '(?ms)Variant:\s*release.*?SHA1:\s*([0-9A-Fa-f:]+)'
+        )
+        if ($gradleShaMatches.Count -gt 0) {
+            $sha1Fingerprint = $gradleShaMatches[0].Groups[1].Value.Trim()
         } else {
-            $matches = [regex]::Matches($gradleReport, "(?ms)Alias:\s*$keyAlias.*?SHA1:\s*([0-9A-Fa-f:]+)")
-            if ($matches.Count -gt 0) {
-                $sha1Fingerprint = $matches[0].Groups[1].Value.Trim()
+            $aliasPattern = '(?ms)Alias:\s*' + [regex]::Escape($keyAlias) +
+                '.*?SHA1:\s*([0-9A-Fa-f:]+)'
+            $gradleShaMatches = [regex]::Matches($gradleReport, $aliasPattern)
+            if ($gradleShaMatches.Count -gt 0) {
+                $sha1Fingerprint = $gradleShaMatches[0].Groups[1].Value.Trim()
             }
         }
     }
@@ -191,7 +215,7 @@ if (Test-Path $keystorePath) {
 
 # 9. Final Summary
 Write-Host "`n================================================================" -ForegroundColor Green
-Write-Host " BUILD & EXPORT SUMMARY" -ForegroundColor Green
+Write-Host " BUILD AND EXPORT SUMMARY" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "Artifacts copied to your Desktop:"
 Write-Host "  * Munawwara-Care.aab" -ForegroundColor White
