@@ -169,6 +169,9 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
   bool _pilgrimMapAwaitingFirstFix = false;
   WeatherAlert _weatherAlert = const WeatherAlert.loading();
   DateTime? _lastWeatherFetchAt;
+  LatLng? _lastWeatherFetchLatLng;
+  static const Duration _weatherMinRefreshInterval = Duration(minutes: 5);
+  static const double _weatherLocationRefreshMeters = 1500;
 
   // SFX player for incoming chat messages
   final AudioPlayer _sfxPlayer = AudioPlayer();
@@ -484,7 +487,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
       ref.read(messageProvider.notifier).fetchUnreadCount(groupId);
     }
     unawaited(_initLocationHealth());
-    unawaited(_initLocation());
+    await _initLocation();
     _connectPilgrimRealtime();
     await _finishDashboardWarmup();
   }
@@ -993,44 +996,98 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
     });
   }
 
+  /// Skips duplicate fetches unless [force] is set, the cache expired, or the
+  /// device moved far enough that local weather may differ.
+  bool _shouldSkipWeatherFetch({
+    required bool force,
+    required double latitude,
+    required double longitude,
+  }) {
+    if (force) return false;
+    if (_lastWeatherFetchAt == null || _lastWeatherFetchLatLng == null) {
+      return false;
+    }
+    final movedMeters = Geolocator.distanceBetween(
+      _lastWeatherFetchLatLng!.latitude,
+      _lastWeatherFetchLatLng!.longitude,
+      latitude,
+      longitude,
+    );
+    if (movedMeters >= _weatherLocationRefreshMeters) return false;
+    return DateTime.now().difference(_lastWeatherFetchAt!) <
+        _weatherMinRefreshInterval;
+  }
+
+  /// Resolves coordinates for Open-Meteo. Never falls back to a fixed city —
+  /// wrong-city weather is worse than a short loading state.
+  Future<LatLng?> _resolveWeatherCoordinates({
+    double? latitude,
+    double? longitude,
+  }) async {
+    if (latitude != null && longitude != null) {
+      return LatLng(latitude, longitude);
+    }
+    if (_myLatLng != null) return _myLatLng;
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      final ll = LatLng(pos.latitude, pos.longitude);
+      if (mounted) setState(() => _myLatLng = ll);
+      return ll;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadWeatherAlert({
     double? latitude,
     double? longitude,
     bool force = false,
   }) async {
-    if (!force &&
-        _lastWeatherFetchAt != null &&
-        DateTime.now().difference(_lastWeatherFetchAt!) <
-            const Duration(minutes: 5)) {
+    final coords = await _resolveWeatherCoordinates(
+      latitude: latitude,
+      longitude: longitude,
+    );
+    if (coords == null) {
+      if (!mounted) return;
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() {
+          _weatherAlert = WeatherAlert(
+            temperatureC: 0,
+            condition: 'weather_unavailable'.tr(),
+            cardTip: 'weather_card_error_short'.tr(),
+            detailTip: 'weather_detail_error_body'.tr(),
+            icon: Icons.location_off,
+            iconColor: AppColors.textMutedLight,
+            isLoading: false,
+            isError: true,
+          );
+        });
+      }
       return;
     }
-    double lat;
-    double lng;
 
-    if (latitude != null && longitude != null) {
-      lat = latitude;
-      lng = longitude;
-    } else if (_myLatLng != null) {
-      lat = _myLatLng!.latitude;
-      lng = _myLatLng!.longitude;
-    } else {
-      // No location yet — grab current position from GPS
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-        lat = pos.latitude;
-        lng = pos.longitude;
-        _myLatLng = LatLng(lat, lng);
-      } catch (_) {
-        // GPS unavailable — fall back to Mecca
-        lat = AppMapTiles.fallbackMapCenter.latitude;
-        lng = AppMapTiles.fallbackMapCenter.longitude;
-      }
+    if (_shouldSkipWeatherFetch(
+      force: force,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    )) {
+      return;
     }
+
+    final lat = coords.latitude;
+    final lng = coords.longitude;
 
     try {
       final response = await Dio().get(
@@ -1060,6 +1117,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
           isDaytime: isDaytime,
         );
         _lastWeatherFetchAt = DateTime.now();
+        _lastWeatherFetchLatLng = coords;
       });
     } catch (_) {
       if (!mounted) return;

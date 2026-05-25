@@ -16,6 +16,7 @@ import '../../moderator/widgets/moderator_active_sos_panel.dart';
 import '../../moderator/widgets/moderator_resolved_sos_list.dart';
 import '../../../core/services/notification_service.dart';
 import '../providers/notification_provider.dart';
+import '../widgets/moderator_updates_tab.dart';
 
 /// Alerts Tab
 ///
@@ -30,10 +31,14 @@ class AlertsTab extends ConsumerStatefulWidget {
   /// Pilgrim only: show only missed calls (e.g. home badge). Moderators ignore.
   final bool pilgrimMissedCallsOnly;
 
+  /// Moderator only: open a specific alerts sub-tab (0–3).
+  final int? initialModeratorTabIndex;
+
   const AlertsTab({
     super.key,
     this.onBack,
     this.pilgrimMissedCallsOnly = false,
+    this.initialModeratorTabIndex,
   });
 
   @override
@@ -70,7 +75,13 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
   void _ensureModeratorTabController() {
     if (_moderatorTabController != null) return;
     if (ref.read(authProvider).role != 'moderator') return;
-    _moderatorTabController = TabController(length: 3, vsync: this);
+    final initial = widget.initialModeratorTabIndex?.clamp(0, 3) ?? 0;
+    _moderatorTabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: initial,
+    );
+    _moderatorTabIndex = initial;
     _moderatorTabController!.addListener(() {
       if (!mounted) return;
       final next = _moderatorTabController!.index;
@@ -83,6 +94,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
     if (ref.read(authProvider).role == 'moderator') {
       await ref.read(moderatorSosEngagementProvider.notifier).refresh();
       await ref.read(moderatorResolvedSosProvider.notifier).refresh();
+      await ref.read(notificationProvider.notifier).refetch();
     }
   }
 
@@ -274,6 +286,7 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
                 Tab(text: 'moderator_alerts_tab_active_sos'.tr()),
                 Tab(text: 'moderator_alerts_tab_resolved'.tr()),
                 Tab(text: 'call_history_title'.tr()),
+                Tab(text: 'alerts_tab_updates'.tr()),
               ],
             ),
             Expanded(
@@ -283,6 +296,11 @@ class _AlertsTabState extends ConsumerState<AlertsTab>
                   _moderatorActiveSosTab(groups: groups),
                   _moderatorResolvedSosTab(isDark: isDark),
                   _callHistoryTab(missedOnly: false, isModerator: true),
+                  RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: _refresh,
+                    child: const ModeratorUpdatesTab(),
+                  ),
                 ],
               ),
             ),

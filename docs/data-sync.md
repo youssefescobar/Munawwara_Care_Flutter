@@ -46,5 +46,6 @@ Backend emits `group_updated` (see `mc_backend_app/utils/group_socket_events.js`
 1. Create group → open Provisioning tab → new group appears in dropdown without pull-to-refresh.
 2. Provision pilgrim → Groups tab shows new member immediately.
 3. Manage Pilgrims: assign, remove, bulk move → Groups tab and group map update without refresh.
-4. Invite moderator → co-moderator list updates after success.
+4. Invite moderator → invitee sees pending card (Accept/Decline); after accept,
+   co-moderator list updates; inviter sees outcome in Alerts → Updates.
 5. Second device: same actions propagate within a few seconds via `group_updated`.

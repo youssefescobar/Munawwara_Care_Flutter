@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -1122,6 +1123,17 @@ class NotificationService {
       return;
     }
 
+    if (notificationType == 'group_invitation') {
+      _navigateToModeratorDashboard();
+      return;
+    }
+
+    if (notificationType == 'invitation_accepted' ||
+        notificationType == 'invitation_declined') {
+      _navigateToModeratorUpdates();
+      return;
+    }
+
     if (notificationType == 'new_message' && groupId.isNotEmpty) {
       unawaited(dismissChatTrayForGroup(groupId));
       _navigateToChat(groupId: groupId, groupName: groupName);
@@ -1129,6 +1141,43 @@ class NotificationService {
       unawaited(dismissChatTrayForGroup(groupId));
       _navigateToChat(groupId: groupId, groupName: groupName);
     }
+  }
+
+  static void _navigateToModeratorDashboard() {
+    final ctx = AppRouter.navigatorKey.currentContext;
+    if (ctx == null) {
+      _pendingNotificationData = {'notification_type': 'group_invitation'};
+      return;
+    }
+    ctx.go('/moderator-dashboard');
+  }
+
+  static void _navigateToModeratorUpdates() {
+    final nav = AppRouter.navigatorKey.currentState;
+    if (nav == null) {
+      _pendingNotificationData = {
+        'notification_type': 'invitation_accepted',
+      };
+      return;
+    }
+    nav.push(
+      MaterialPageRoute<void>(
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return Scaffold(
+            backgroundColor: isDark
+                ? AppColors.backgroundDark
+                : const Color(0xfff1f5f3),
+            body: SafeArea(
+              child: AlertsTab(
+                onBack: () => Navigator.of(ctx).pop(),
+                initialModeratorTabIndex: 3,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   /// Pending notification data when navigator isn't ready yet (cold start).

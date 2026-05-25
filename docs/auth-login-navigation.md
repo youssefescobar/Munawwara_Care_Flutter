@@ -28,6 +28,14 @@ had no FCM fallback when the socket ACK timed out.
 `ensureFcmTokenRegistered()` runs after navigation, on dashboard open, and when auth
 becomes authenticated in `main.dart`.
 
+## Pilgrim login (one-time code)
+
+Pilgrims sign in with a **one-time login code** from their moderator (QR or text,
+format `MC` + 8 characters, e.g. `MC4K7H2NP`). This is not the moderator **group
+code** used to join a group.
+
+UI copy: `login_code_label` / `login_code_hint` on `LoginScreen` pilgrim form.
+
 ## Files
 
 - `lib/features/auth/providers/auth_provider.dart` — post-login setup scheduling

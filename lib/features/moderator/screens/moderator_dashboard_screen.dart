@@ -24,6 +24,8 @@ import '../../calling/providers/call_provider.dart';
 import '../../calling/screens/voice_call_screen.dart';
 import '../../calling/native_call_coordinator.dart' show isNavigatingToCall;
 import '../../../core/router/app_router.dart' show AppRouter;
+import '../../invitations/providers/invitation_provider.dart';
+import '../../invitations/widgets/pending_invitations_section.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/screens/alerts_tab_v2.dart';
 import '../providers/moderator_provider.dart';
@@ -106,6 +108,7 @@ class _ModeratorDashboardScreenState
     if (!mounted) return;
     unawaited(() async {
       ref.read(notificationProvider.notifier).refetch();
+      await ref.read(pendingInvitationsProvider.notifier).fetchPending();
       await ref.read(moderatorProvider.notifier).loadDashboard(
             silently: true,
             force: true,
@@ -141,6 +144,9 @@ class _ModeratorDashboardScreenState
       unawaited(() async {
         await _checkRequiredPermissions();
         if (mounted) {
+          unawaited(
+            ref.read(pendingInvitationsProvider.notifier).fetchPending(),
+          );
           unawaited(
             _globalNavBeacon?.sync(emitImmediateFix: true) ?? Future.value(),
           );
@@ -244,6 +250,7 @@ class _ModeratorDashboardScreenState
 
   Future<void> _finishModeratorWarmup() async {
     await ref.read(moderatorSosEngagementProvider.notifier).refresh();
+    unawaited(ref.read(pendingInvitationsProvider.notifier).fetchPending());
     if (!mounted) return;
     _connectModeratorRealtime();
     if (!mounted) return;
@@ -737,6 +744,13 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(
+          ref.read(pendingInvitationsProvider.notifier).fetchPending(),
+        );
+      }
+    });
     _loadSortPreferences();
     widget.searchController.addListener(() {
       if (mounted) {
@@ -1051,9 +1065,12 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
     return SafeArea(
       child: RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: () async => ref
-            .read(moderatorProvider.notifier)
-            .loadDashboard(force: true),
+        onRefresh: () async {
+          await ref.read(pendingInvitationsProvider.notifier).fetchPending();
+          await ref
+              .read(moderatorProvider.notifier)
+              .loadDashboard(force: true);
+        },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -1210,6 +1227,8 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                       ],
                     ),
 
+                    SizedBox(height: 16.h),
+                    const PendingInvitationsSection(),
                     SizedBox(height: 20.h),
 
                     // Search + Filter row

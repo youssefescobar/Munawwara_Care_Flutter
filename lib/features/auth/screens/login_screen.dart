@@ -42,6 +42,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool _scanHandled = false;
 
+  /// Drops keyboard focus so capitalization mode does not carry between forms.
+  void _switchLoginMode({required bool asModerator}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _isModeratorLogin = asModerator;
+      _loginError = null;
+      _isScanningQr = false;
+    });
+  }
+
   @override
   void dispose() {
     _identifierController.dispose();
@@ -288,11 +298,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           Center(
                             child: GestureDetector(
                               onTap: () {
-                                setState(() {
-                                  _isModeratorLogin = !_isModeratorLogin;
-                                  _loginError = null;
-                                  _isScanningQr = false;
-                                });
+                                _switchLoginMode(
+                                  asModerator: !_isModeratorLogin,
+                                );
                               },
                               child: Padding(
                                 padding: EdgeInsets.symmetric(vertical: 8.h),
@@ -384,18 +392,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFieldLabel('enter_6_digit_code'.tr(), isDark),
+        _buildFieldLabel('login_code_label'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
+          key: const ValueKey('pilgrim_login_code'),
           controller: _codeController,
           textCapitalization: TextCapitalization.characters,
+          autocorrect: false,
+          enableSuggestions: false,
           style: TextStyle(
             fontFamily: 'Lexend',
             fontSize: 14.sp,
             color: isDark ? Colors.white : AppColors.textDark,
           ),
           decoration: InputDecoration(
-            hintText: 'Code'.tr(),
+            hintText: 'login_code_hint'.tr(),
           ),
         ),
         _buildErrorUI(isDark),
@@ -429,7 +440,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _buildFieldLabel('Email'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
+          key: const ValueKey('moderator_login_email'),
           controller: _identifierController,
+          keyboardType: TextInputType.emailAddress,
+          textCapitalization: TextCapitalization.none,
+          autocorrect: false,
+          enableSuggestions: false,
           style: TextStyle(
             fontFamily: 'Lexend',
             fontSize: 14.sp,
@@ -444,8 +460,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _buildFieldLabel('label_password'.tr(), isDark),
         SizedBox(height: 6.h),
         TextField(
+          key: const ValueKey('moderator_login_password'),
           controller: _passwordController,
           obscureText: _obscurePassword,
+          keyboardType: TextInputType.visiblePassword,
+          textCapitalization: TextCapitalization.none,
+          autocorrect: false,
+          enableSuggestions: false,
           style: TextStyle(
             fontFamily: 'Lexend',
             fontSize: 14.sp,
