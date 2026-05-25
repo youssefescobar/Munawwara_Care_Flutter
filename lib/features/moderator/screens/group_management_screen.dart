@@ -40,7 +40,6 @@ import '../widgets/pilgrim_profile_sheet.dart';
 import '../widgets/area_picker_screen.dart';
 import '../widgets/moderator_map_widgets.dart';
 import '../widgets/pilgrim_marker_layout.dart';
-import '../widgets/active_meetpoint_card.dart';
 import '../../shared/models/suggested_area_model.dart';
 import '../../shared/widgets/pilgrim_gender_avatar.dart';
 
@@ -107,6 +106,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     // Real-time area sync
     SocketService.on('area_added', (data) {
       if (!mounted) return;
+      if (ref.read(suggestedAreaProvider.notifier).activeGroupId !=
+          widget.groupId) {
+        return;
+      }
       ref
           .read(suggestedAreaProvider.notifier)
           .appendArea(data as Map<String, dynamic>);
@@ -114,6 +117,10 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     });
     SocketService.on('area_deleted', (data) {
       if (!mounted) return;
+      if (ref.read(suggestedAreaProvider.notifier).activeGroupId !=
+          widget.groupId) {
+        return;
+      }
       final map = data as Map<String, dynamic>;
       final areaId = map['area_id'] as String?;
       if (areaId != null) {
@@ -195,8 +202,20 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
     super.dispose();
   }
 
+  /// Areas from the global provider, only when loaded for this screen's group.
+  SuggestedAreaState _scopedAreaState(SuggestedAreaState raw) {
+    final activeId = ref.read(suggestedAreaProvider.notifier).activeGroupId;
+    return activeId == widget.groupId
+        ? raw
+        : const SuggestedAreaState(isLoading: true);
+  }
+
   Future<void> _autoDeleteExpiredMeetpointIfNeeded() async {
     if (!mounted || _isAutoDeletingMeetpoint) return;
+    if (ref.read(suggestedAreaProvider.notifier).activeGroupId !=
+        widget.groupId) {
+      return;
+    }
     final expiredMeetpoints = ref.read(suggestedAreaProvider).expiredMeetpoints;
     if (expiredMeetpoints.isEmpty) return;
     // Delete only one expired meetpoint per tick to avoid bulk deletions/spam.
@@ -1078,7 +1097,9 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
       isScrollControlled: true,
       builder: (ctx) => Consumer(
         builder: (context, ref, _) {
-          final liveAreaState = ref.watch(suggestedAreaProvider);
+          final liveAreaState = _scopedAreaState(
+            ref.watch(suggestedAreaProvider),
+          );
           return Container(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(ctx).size.height * 0.65,
@@ -1530,7 +1551,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
 
     final locatedPilgrims = group.pilgrims.where((p) => p.hasLocation).toList();
     final filtered = _getFiltered(group);
-    final areaState = ref.watch(suggestedAreaProvider);
+    final areaState = _scopedAreaState(ref.watch(suggestedAreaProvider));
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -1889,33 +1910,39 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                                     ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 34.w,
-                                      height: 34.w,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 8.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF3EC),
+                                    borderRadius: BorderRadius.circular(20.r),
+                                    border: Border.all(
+                                      color: const Color(0xFFF5C4A0),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
                                         Symbols.chat_bubble,
                                         size: 16.w,
-                                        color: Colors.white,
+                                        color: const Color(0xFFC0450A),
                                       ),
-                                    ),
-                                    SizedBox(width: 6.w),
-                                    Text(
-                                      'group_menu_chat'.tr(),
-                                      style: TextStyle(
-                                        fontFamily: 'Lexend',
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13.sp,
-                                        color: AppColors.primary,
+                                      SizedBox(width: 6.w),
+                                      Text(
+                                        'group_menu_chat'.tr(),
+                                        style: TextStyle(
+                                          fontFamily: 'Lexend',
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13.sp,
+                                          color: const Color(0xFFC0450A),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                               SizedBox(width: 8.w),
@@ -1963,7 +1990,7 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: ActiveMeetpointCard(
+                            child: _GroupMapMeetpointCard(
                               activeMp: areaState.activeMeetpoint!,
                               isDark: isDark,
                               onDelete: () =>
@@ -1988,14 +2015,21 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                       // Search bar
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 10.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12.w,
+                            vertical: 10.h,
+                          ),
                           child: Container(
                             height: 40.h,
                             decoration: BoxDecoration(
                               color: isDark
                                   ? AppColors.backgroundDark
-                                  : const Color(0xFFF0F0F8),
-                              borderRadius: BorderRadius.circular(12.r),
+                                  : const Color(0xFFF7F8FC),
+                              borderRadius: BorderRadius.circular(10.r),
+                              border: Border.all(
+                                color: const Color(0x0D000000),
+                                width: 0.5,
+                              ),
                             ),
                             child: TextField(
                               controller: _searchController,
@@ -2059,56 +2093,64 @@ class _GroupManagementScreenState extends ConsumerState<GroupManagementScreen> {
                         )
                       else
                         SliverPadding(
-                          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 24.h),
+                          padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 24.h),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate((ctx, i) {
                               final p = filtered[i];
-                              return Dismissible(
-                                key: ValueKey(p.id),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss: (_) =>
-                                    _confirmRemovePilgrim(group, p),
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: EdgeInsets.only(right: 20.w),
-                                  margin: EdgeInsets.only(bottom: 8.h),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    borderRadius: BorderRadius.circular(16.r),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Symbols.person_remove,
-                                        color: Colors.white,
-                                        size: 22.w,
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (i > 0)
+                                    const Divider(
+                                      height: 0.5,
+                                      color: Color(0xFFF4F5F9),
+                                    ),
+                                  Dismissible(
+                                    key: ValueKey(p.id),
+                                    direction: DismissDirection.endToStart,
+                                    confirmDismiss: (_) =>
+                                        _confirmRemovePilgrim(group, p),
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: EdgeInsets.only(right: 20.w),
+                                      color: Colors.red,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Symbols.person_remove,
+                                            color: Colors.white,
+                                            size: 22.w,
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Text(
+                                            'group_remove_confirm'.tr(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10.sp,
+                                              fontFamily: 'Lexend',
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(height: 2.h),
-                                      Text(
-                                        'group_remove_confirm'.tr(),
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10.sp,
-                                          fontFamily: 'Lexend',
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
+                                    child: _PilgrimManageTile(
+                                      pilgrim: p,
+                                      isSelected: _focusedPilgrimId == p.id,
+                                      onTap: () => _focusPilgrim(p),
+                                      onNavigate: () => _navigateToPilgrim(p),
+                                      onChat: () => _openPrivateChat(p),
+                                      onCall: () => _showCallSheet(p),
+                                      onRemove: () =>
+                                          _confirmRemovePilgrim(group, p),
+                                      onViewProfile: () =>
+                                          _showPilgrimProfile(p),
+                                    ),
                                   ),
-                                ),
-                                child: _PilgrimManageTile(
-                                  pilgrim: p,
-                                  isSelected: _focusedPilgrimId == p.id,
-                                  onTap: () => _focusPilgrim(p),
-                                  onNavigate: () => _navigateToPilgrim(p),
-                                  onChat: () => _openPrivateChat(p),
-                                  onCall: () => _showCallSheet(p),
-                                  onRemove: () =>
-                                      _confirmRemovePilgrim(group, p),
-                                  onViewProfile: () => _showPilgrimProfile(p),
-                                ),
+                                ],
                               );
                             }, childCount: filtered.length),
                           ),
@@ -3102,6 +3144,125 @@ class _ModeratorInviteSheetState extends ConsumerState<_ModeratorInviteSheet> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Meetpoint card (group map sheet only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _GroupMapMeetpointCard extends StatelessWidget {
+  final SuggestedArea activeMp;
+  final bool isDark;
+  final VoidCallback onDelete;
+  final VoidCallback? onTap;
+
+  const _GroupMapMeetpointCard({
+    required this.activeMp,
+    required this.isDark,
+    required this.onDelete,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isExpired =
+        activeMp.meetpointTime != null &&
+        DateTime.now().isAfter(
+          activeMp.meetpointTime!.add(SuggestedArea.meetpointExpiryWindow),
+        );
+    final labelColor = isDark
+        ? const Color(0xFFE8580A)
+        : const Color(0xFFE8580A);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 16.h),
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF2A2220)
+              : const Color(0xFFFFF8F6),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF3D3530)
+                : const Color(0xFFF5ECE8),
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34.w,
+              height: 34.w,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0E8),
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(
+                  color: const Color(0xFFF5C4A0),
+                  width: 0.5,
+                ),
+              ),
+              child: Icon(
+                Symbols.radar,
+                color: labelColor,
+                size: 18.w,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (isExpired ? 'status_expired' : 'area_meetpoint').tr(),
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10.sp,
+                      letterSpacing: 0.5,
+                      color: labelColor,
+                    ),
+                  ),
+                  Text(
+                    activeMp.name,
+                    style: TextStyle(
+                      fontFamily: 'Lexend',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.sp,
+                      color: isDark ? Colors.white : AppColors.textDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (activeMp.meetpointTime != null)
+                    Text(
+                      '${DateFormat('MMM dd').format(activeMp.meetpointTime!)}'
+                      ' @ ${DateFormat('hh:mm a').format(activeMp.meetpointTime!)}',
+                      style: TextStyle(
+                        fontFamily: 'Lexend',
+                        fontSize: 11.sp,
+                        color: labelColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              icon: Icon(
+                Symbols.delete,
+                color: const Color(0xFFCCCCCC),
+                size: 22.w,
+              ),
+              tooltip: 'area_delete_meetpoint_confirm_title'.tr(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pilgrim tile in the bottom sheet (focus + navigate + remove)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3135,32 +3296,41 @@ class _PilgrimManageTile extends StatelessWidget {
       BatteryStatus.low => const Color(0xFFDC2626),
       BatteryStatus.unknown => AppColors.textMutedLight,
     };
+    final hasSos = pilgrim.hasSOS;
+    final status = pilgrim.isOnline
+        ? pilgrim.lastSeenText
+        : 'profile_offline'.tr();
+    final subtitle = hasSos ? 'SOS · $status' : pilgrim.lastSeenText;
+    final nameColor = hasSos
+        ? const Color(0xFFC0392B)
+        : (isDark ? Colors.white : AppColors.textDark);
+    final rowColor = hasSos
+        ? (isDark ? const Color(0xFF2D1515) : const Color(0xFFFEF5F5))
+        : (isSelected
+            ? AppColors.primary.withValues(alpha: 0.06)
+            : Colors.transparent);
+    final rowBorder = hasSos
+        ? Border(
+            bottom: BorderSide(
+              color: isDark
+                  ? const Color(0xFF5C2020)
+                  : const Color(0xFFFCE8E8),
+              width: 0.5,
+            ),
+          )
+        : null;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        margin: EdgeInsets.only(bottom: 8.h),
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : pilgrim.hasSOS
-              ? (isDark ? const Color(0xFF2D1515) : const Color(0xFFFFF1F2))
-              : (isDark ? AppColors.backgroundDark : const Color(0xFFF0F0F8)),
-          borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.4)
-                : pilgrim.hasSOS
-                ? (isDark ? const Color(0xFF5C2020) : const Color(0xFFFFE4E6))
-                : Colors.transparent,
-            width: 1.5,
-          ),
+          color: rowColor,
+          border: rowBorder,
         ),
         child: Row(
           children: [
-            // Avatar + online/location dot (tappable → profile sheet)
             GestureDetector(
               onTap: onViewProfile,
               child: Stack(
@@ -3168,17 +3338,17 @@ class _PilgrimManageTile extends StatelessWidget {
                   Container(
                     width: 40.w,
                     height: 40.w,
-                    padding: pilgrim.hasSOS
+                    padding: hasSos
                         ? EdgeInsets.zero
                         : EdgeInsets.all(1.5.w),
                     decoration: BoxDecoration(
-                      color: pilgrim.hasSOS
+                      color: hasSos
                           ? const Color(0xFFDC2626)
                           : AppColors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: pilgrim.hasSOS
+                    child: hasSos
                         ? Center(
                             child: Icon(
                               Symbols.warning,
@@ -3214,7 +3384,6 @@ class _PilgrimManageTile extends StatelessWidget {
               ),
             ),
             SizedBox(width: 10.w),
-            // Name + last seen
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3225,14 +3394,14 @@ class _PilgrimManageTile extends StatelessWidget {
                       fontFamily: 'Lexend',
                       fontWeight: FontWeight.w600,
                       fontSize: 13.sp,
-                      color: isDark ? Colors.white : AppColors.textDark,
+                      color: nameColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (pilgrim.lastSeenText.isNotEmpty)
+                  if (subtitle.isNotEmpty)
                     Text(
-                      pilgrim.lastSeenText,
+                      subtitle,
                       style: TextStyle(
                         fontFamily: 'Lexend',
                         fontSize: 11.sp,
@@ -3242,7 +3411,6 @@ class _PilgrimManageTile extends StatelessWidget {
                 ],
               ),
             ),
-            // Battery
             if (pilgrim.batteryPercent != null) ...[
               SizedBox(width: 6.w),
               Row(
@@ -3262,86 +3430,24 @@ class _PilgrimManageTile extends StatelessWidget {
                 ],
               ),
             ],
-            SizedBox(width: 4.w),
-            // 3-dot options menu
-            PopupMenuButton<String>(
-              tooltip: '',
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                Symbols.more_vert,
-                size: 18.w,
-                color: isDark ? AppColors.primary : AppColors.textMutedLight,
+            if (hasSos) ...[
+              SizedBox(width: 6.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC0392B),
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+                child: Text(
+                  'SOS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 7.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              iconSize: 18.w,
-              offset: AppPopupMenu.offsetRowTrailingMore,
-              shape: AppPopupMenu.panelShape(),
-              constraints: AppPopupMenu.panelConstraints(),
-              color: AppPopupMenu.panelColor(isDark),
-              onSelected: (value) {
-                switch (value) {
-                  case 'profile':
-                    onViewProfile?.call();
-                  case 'navigate':
-                    onNavigate();
-                  case 'chat':
-                    onChat();
-                  case 'call':
-                    onCall?.call();
-                  case 'remove':
-                    onRemove?.call();
-                }
-              },
-              itemBuilder: (_) => [
-                if (onViewProfile != null)
-                  PopupMenuItem(
-                    value: 'profile',
-                    child: AppPopupMenu.actionRow(
-                      icon: Symbols.person,
-                      label: 'manage_view_full_profile'.tr(),
-                      isDark: isDark,
-                      iconColor: AppColors.primary,
-                    ),
-                  ),
-                PopupMenuItem(
-                  value: 'navigate',
-                  child: AppPopupMenu.actionRow(
-                    icon: Symbols.near_me,
-                    label: 'area_navigate'.tr(),
-                    isDark: isDark,
-                    iconColor: AppColors.primary,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'chat',
-                  child: AppPopupMenu.actionRow(
-                    icon: Symbols.chat,
-                    label: 'tab_chat'.tr(),
-                    isDark: isDark,
-                    iconColor: AppColors.primary,
-                  ),
-                ),
-                if (onCall != null)
-                  PopupMenuItem(
-                    value: 'call',
-                    child: AppPopupMenu.actionRow(
-                      icon: Symbols.call,
-                      label: 'group_call_prefix'.tr(),
-                      isDark: isDark,
-                      iconColor: const Color(0xFF16A34A),
-                    ),
-                  ),
-                if (onRemove != null)
-                  PopupMenuItem(
-                    value: 'remove',
-                    child: AppPopupMenu.actionRow(
-                      icon: Symbols.person_remove,
-                      label: 'group_remove_confirm'.tr(),
-                      isDark: isDark,
-                      destructive: true,
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ],
         ),
       ),

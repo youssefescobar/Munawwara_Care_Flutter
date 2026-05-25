@@ -330,11 +330,35 @@ class ModeratorState {
 class ModeratorNotifier extends Notifier<ModeratorState> {
   DateTime? _lastDashboardLoad;
   Future<void>? _dashboardLoadInFlight;
+  int _dashboardLoadGeneration = 0;
 
   @override
   ModeratorState build() => const ModeratorState();
 
   Future<String?> _userId() => SecureSessionStore.getUserId();
+
+  /// Drops a group from the offline dashboard cache after delete/leave.
+  Future<void> _removeGroupFromDashboardCache(String groupId) async {
+    final uid = await _userId();
+    if (uid == null) return;
+    final cached = AppDataCache.jsonMap(
+      await AppDataCache.readData(uid, AppDataCache.moderatorDashboardFile),
+    );
+    if (cached == null) return;
+    final list = cached['data'] as List<dynamic>? ?? [];
+    final filtered = <dynamic>[];
+    for (final item in list) {
+      final gm = AppDataCache.jsonMap(item);
+      if (gm == null) continue;
+      final id = gm['_id']?.toString() ?? gm['id']?.toString();
+      if (id != groupId) filtered.add(item);
+    }
+    await AppDataCache.write(
+      uid,
+      AppDataCache.moderatorDashboardFile,
+      {'data': filtered},
+    );
+  }
 
   Future<void> hydrateFromCache() async {
     final uid = await _userId();
@@ -365,17 +389,23 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
         now.difference(_lastDashboardLoad!).inSeconds < 10) {
       return;
     }
-    if (_dashboardLoadInFlight != null) {
+
+    final generation = ++_dashboardLoadGeneration;
+
+    if (_dashboardLoadInFlight != null && !force) {
       await _dashboardLoadInFlight;
       return;
     }
 
     _lastDashboardLoad = now;
-    _dashboardLoadInFlight = _loadDashboardImpl(silently);
+    final loadFuture = _loadDashboardImpl(silently, generation);
+    _dashboardLoadInFlight = loadFuture;
     try {
-      await _dashboardLoadInFlight;
+      await loadFuture;
     } finally {
-      _dashboardLoadInFlight = null;
+      if (_dashboardLoadInFlight == loadFuture) {
+        _dashboardLoadInFlight = null;
+      }
     }
   }
 
@@ -389,10 +419,12 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
     }
   }
 
-  Future<void> _loadDashboardImpl(bool silently) async {
+  Future<void> _loadDashboardImpl(bool silently, int generation) async {
+    if (generation != _dashboardLoadGeneration) return;
     if (!silently) state = state.copyWith(isLoading: true, clearError: true);
     try {
       final resp = await ApiService.dio.get('/groups/dashboard');
+      if (generation != _dashboardLoadGeneration) return;
       final respBody = resp.data;
       final body = respBody is Map
           ? Map<String, dynamic>.from(respBody)
@@ -405,6 +437,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
           body,
         );
       }
+      if (generation != _dashboardLoadGeneration) return;
       final data = body['data'] as List<dynamic>? ?? [];
       final groups = data
           .map((g) => ModeratorGroup.fromJson(g as Map<String, dynamic>))
@@ -417,6 +450,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       );
       await CallerGenderCache.syncFromGroups(groups);
     } on DioException catch (e) {
+      if (generation != _dashboardLoadGeneration) return;
       final code = e.response?.statusCode;
       if (code == 401) {
         if (!silently) {
@@ -429,6 +463,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       }
       final uid = await _userId();
       if (uid != null) await hydrateFromCache();
+      if (generation != _dashboardLoadGeneration) return;
       final hasData = state.groups.isNotEmpty;
       if (!silently) {
         state = state.copyWith(
@@ -441,6 +476,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
         state = state.copyWith(usingOfflineSnapshot: true);
       }
     } catch (e) {
+      if (generation != _dashboardLoadGeneration) return;
       if (!silently) {
         state = state.copyWith(isLoading: false, error: e.toString());
       }
@@ -737,6 +773,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       await ApiService.dio.post('/groups/$groupId/leave', data: body);
       final updated = state.groups.where((g) => g.id != groupId).toList();
       state = state.copyWith(groups: updated, selectedGroupIndex: 0);
+      await _removeGroupFromDashboardCache(groupId);
       await loadDashboard(force: true, silently: true);
       return (true, null);
     } on DioException catch (e) {
@@ -752,6 +789,7 @@ class ModeratorNotifier extends Notifier<ModeratorState> {
       await ApiService.dio.delete('/groups/$groupId');
       final updated = state.groups.where((g) => g.id != groupId).toList();
       state = state.copyWith(groups: updated, selectedGroupIndex: 0);
+      await _removeGroupFromDashboardCache(groupId);
       await loadDashboard(force: true, silently: true);
       return (true, null);
     } on DioException catch (e) {

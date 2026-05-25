@@ -1187,29 +1187,9 @@ class _GroupsHomeTabState extends ConsumerState<_GroupsHomeTab> {
                                     Positioned(
                                       top: -2,
                                       right: -2,
-                                      child: Container(
-                                        padding: EdgeInsets.all(4.w),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isDark
-                                                ? AppColors.backgroundDark
-                                                : Colors.white,
-                                            width: 2.w,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          notifCount > 99
-                                              ? '99+'
-                                              : notifCount.toString(),
-                                          style: TextStyle(
-                                            fontFamily: 'Lexend',
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.white,
-                                          ),
-                                        ),
+                                      child: _CountBadge(
+                                        count: notifCount,
+                                        isDark: isDark,
                                       ),
                                     ),
                                 ],
@@ -1542,38 +1522,11 @@ class _GroupCard extends ConsumerWidget {
             ),
           ],
         ),
-        child: Stack(
-          children: [
-            // Decorative mosque illustration
-            Positioned(
-              right: context.locale.languageCode == 'ar' ? null : 54.w,
-              left: context.locale.languageCode == 'ar' ? 54.w : null,
-              top: 14.h,
-              child: Opacity(
-                opacity: isDark ? 0.18 : 1.0,
-                child: ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFFFD5A0), Color(0xFFFFB06A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  blendMode: BlendMode.srcIn,
-                  child: Transform.scale(
-                    scaleX: context.locale.languageCode == 'ar' ? -1 : 1,
-                    child: Icon(
-                      Symbols.mosque,
-                      size: 110.w,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(18.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        child: Padding(
+          padding: EdgeInsets.all(18.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                   // Status + SOS badge + menu row
                   Row(
                     children: [
@@ -1587,16 +1540,25 @@ class _GroupCard extends ConsumerWidget {
                       GestureDetector(
                         onTap: () => _confirmDelete(context, ref),
                         child: Container(
-                          width: 34.w,
-                          height: 34.w,
+                          width: 38.w,
+                          height: 38.w,
                           decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
+                            color: isDark
+                                ? const Color(0xFF3D1515)
+                                : const Color(0xFFFEE2E2),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFEF4444).withValues(
+                                alpha: 0.35,
+                              ),
+                              width: 1,
+                            ),
                           ),
                           child: Icon(
-                            Symbols.delete_outline,
-                            size: 18.w,
-                            color: Colors.red,
+                            Symbols.delete,
+                            size: 20.w,
+                            color: const Color(0xFFDC2626),
+                            fill: 1,
                           ),
                         ),
                       ),
@@ -1868,21 +1830,11 @@ class _GroupCard extends ConsumerWidget {
                                   ),
                                   if (group.unreadCount > 0)
                                     Positioned(
-                                      top: 4.h,
-                                      right: 4.w,
-                                      child: Container(
-                                        width: 10.w,
-                                        height: 10.w,
-                                        decoration: BoxDecoration(
-                                          color: Colors.red,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isDark
-                                                ? AppColors.surfaceDark
-                                                : Colors.white,
-                                            width: 1.5,
-                                          ),
-                                        ),
+                                      top: -2,
+                                      right: -2,
+                                      child: _CountBadge(
+                                        count: group.unreadCount,
+                                        isDark: isDark,
                                       ),
                                     ),
                                 ],
@@ -1896,7 +1848,36 @@ class _GroupCard extends ConsumerWidget {
                 ],
               ),
             ),
-          ],
+      ),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  final int count;
+  final bool isDark;
+
+  const _CountBadge({required this.count, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEF4444),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isDark ? AppColors.backgroundDark : Colors.white,
+          width: 2.w,
+        ),
+      ),
+      child: Text(
+        count > 99 ? '99+' : count.toString(),
+        style: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: 9.sp,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
       ),
     );

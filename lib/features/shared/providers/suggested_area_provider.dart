@@ -72,6 +72,11 @@ class SuggestedAreaState {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
+  String? _activeGroupId;
+
+  /// Group id currently loaded (or loading). Used to avoid showing stale areas.
+  String? get activeGroupId => _activeGroupId;
+
   @override
   SuggestedAreaState build() => const SuggestedAreaState();
 
@@ -92,6 +97,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
           .map((j) => SuggestedArea.fromJson(j as Map<String, dynamic>))
           .toList();
       if (raw.isEmpty) return;
+      if (_activeGroupId != groupId) return;
       state = state.copyWith(areas: raw);
     } catch (_) {}
   }
@@ -109,10 +115,13 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   Future<void> load(String groupId) async {
+    _activeGroupId = groupId;
+    state = const SuggestedAreaState(isLoading: true);
     await _hydrateFromCache(groupId);
-    state = state.copyWith(isLoading: true, error: null);
+    if (_activeGroupId != groupId) return;
     try {
       final res = await ApiService.dio.get('/groups/$groupId/suggested-areas');
+      if (_activeGroupId != groupId) return;
       final data = res.data is Map
           ? Map<String, dynamic>.from(res.data as Map)
           : <String, dynamic>{};
@@ -120,6 +129,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
       if (uid != null) {
         await _persist(groupId, data);
       }
+      if (_activeGroupId != groupId) return;
       final List<dynamic> list =
           (data['areas'] ?? data['data'] ?? []) as List<dynamic>;
       final raw = list
@@ -127,9 +137,11 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
           .toList();
       state = state.copyWith(areas: raw, isLoading: false);
     } on DioException catch (e) {
+      if (_activeGroupId != groupId) return;
       if (state.areas.isEmpty) {
         await _hydrateFromCache(groupId);
       }
+      if (_activeGroupId != groupId) return;
       if (state.areas.isNotEmpty) {
         state = state.copyWith(isLoading: false, error: null);
       } else {
@@ -139,6 +151,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
         );
       }
     } catch (_) {
+      if (_activeGroupId != groupId) return;
       state = state.copyWith(isLoading: false, error: 'Something went wrong');
     }
   }
@@ -260,6 +273,7 @@ class SuggestedAreaNotifier extends Notifier<SuggestedAreaState> {
   // ── Clear all areas (used when pilgrim removed from group) ────────────────
 
   void clear() {
+    _activeGroupId = null;
     state = const SuggestedAreaState();
   }
 }
