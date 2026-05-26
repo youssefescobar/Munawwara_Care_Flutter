@@ -269,17 +269,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           : AppColors.textMutedLight,
                       fontSize: 10,
                     ),
-                    SizedBox(height: 12.h),
-                    Container(
-                      width: 96.w,
-                      height: 4.h,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(100.r),
-                      ),
-                    ),
                     SizedBox(height: 16.h),
                   ],
                 ),
