@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_colors.dart';
+import 'support_dialogs.dart';
 
 /// Privacy policy and About entry for profile settings.
 class LegalSupportSection extends ConsumerWidget {
@@ -46,6 +47,30 @@ class LegalSupportSection extends ConsumerWidget {
           ),
           child: Column(
             children: [
+              _LegalRow(
+                icon: Icons.report_problem_outlined,
+                label: 'settings_report_issue'.tr(),
+                textPrimary: textPrimary,
+                textMuted: textMuted,
+                onTap: () => SupportDialogs.showReport(context),
+              ),
+              _DividerLine(color: dividerColor),
+              _LegalRow(
+                icon: Icons.rate_review_outlined,
+                label: 'settings_send_feedback'.tr(),
+                textPrimary: textPrimary,
+                textMuted: textMuted,
+                onTap: () => SupportDialogs.showFeedback(context),
+              ),
+              _DividerLine(color: dividerColor),
+              _LegalRow(
+                icon: Icons.star_rate_rounded,
+                label: 'settings_rate_app'.tr(),
+                textPrimary: textPrimary,
+                textMuted: textMuted,
+                onTap: () => SupportDialogs.showRating(context),
+              ),
+              _DividerLine(color: dividerColor),
               _LegalRow(
                 icon: Icons.privacy_tip_outlined,
                 label: 'legal_privacy_policy'.tr(),

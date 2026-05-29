@@ -42,6 +42,7 @@ import '../../shared/providers/suggested_area_provider.dart';
 import '../providers/pilgrim_provider.dart';
 import '../services/pilgrim_sos_coordinator.dart';
 import '../widgets/bottom_nav.dart';
+import '../../../core/widgets/support_dialogs.dart';
 import '../widgets/home_tab/home_cards.dart';
 import '../widgets/home_tab/home_tab.dart';
 import '../widgets/map_tab/pilgrim_map_tab.dart';
@@ -330,6 +331,7 @@ class _PilgrimDashboardScreenState extends ConsumerState<PilgrimDashboardScreen>
         _sosHomePhase = SosHomePhase.idle;
         _sosHelpStatusKey = 'sos_status_notifying';
       });
+      SupportDialogs.showRating(context, isContextual: true);
     });
   }
 

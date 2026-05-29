@@ -9,6 +9,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/services/callkit_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/support_dialogs.dart';
 import '../../shared/widgets/pilgrim_gender_avatar.dart';
 import '../providers/call_provider.dart';
 import '../widgets/call_peer_display.dart';
@@ -47,6 +48,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
   String? _cachedName;
   String? _cachedGender;
   Timer? _autoPopTimer;
+  bool _showRatingOnPop = false;
 
   @override
   void initState() {
@@ -109,6 +111,11 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
 
     ref.listen(callProvider, (prev, next) {
       if (next.status == CallStatus.ended &&
+          prev?.status == CallStatus.connected) {
+        _showRatingOnPop = true;
+      }
+
+      if (next.status == CallStatus.ended &&
           prev?.status != CallStatus.ended &&
           mounted) {
         final autoRouteReasons = [
@@ -152,6 +159,9 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
               if (isAutoRouteReason && widget.onAllBusy != null) {
                 widget.onAllBusy!();
               }
+              if (_showRatingOnPop) {
+                SupportDialogs.showRating(context, isContextual: true);
+              }
             }
           });
         }
@@ -160,6 +170,9 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
           prev?.status != CallStatus.ended &&
           mounted) {
         Navigator.of(context).maybePop();
+        if (_showRatingOnPop) {
+          SupportDialogs.showRating(context, isContextual: true);
+        }
       }
     });
 
